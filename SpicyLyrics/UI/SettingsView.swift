@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Settings laid out like iOS Settings: a list of categories, each opening its own page.
+/// Settings laid out like iOS Settings: a short list of clearly named categories, each opening
+/// its own page.
 struct SettingsView: View {
     @EnvironmentObject private var auth: SpotifyAuth
     @Environment(AppSettings.self) private var settings
@@ -11,31 +12,37 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    category("Внешний вид", "paintbrush.fill", .purple,
-                             value: LyricsFont(rawValue: settings.lyricsFont)?.title) { AppearanceSettings() }
-                    category("Текст и перевод", "character.bubble.fill", .blue,
-                             value: settings.translateLyrics ? "Перевод вкл." : nil) { TextSettings() }
-                    category("Плеер", "play.rectangle.fill", .orange) { PlayerSettings() }
-                    category("Картинка в картинке", "pip.fill", .green,
-                             value: settings.autoPictureInPicture ? "Авто" : nil) { PictureInPictureSettings() }
-                    category("Жесты", "hand.draw.fill", .pink,
-                             value: settings.gesturesEnabled ? "Вкл." : "Выкл.") { GestureSettings() }
+                Section("Вид текста") {
+                    category("Текст", "textformat.size", .purple,
+                             value: "\(Int(settings.fontSize)) pt") { TextLookSettings() }
+                    category("Эффекты", "sparkles", .pink,
+                             value: settings.simpleLyricsMode ? "Simple" : nil) { EffectsSettings() }
+                    category("Фон", "photo.fill", .indigo,
+                             value: settings.dynamicBackground ? nil : "Выкл.") { BackgroundSettings() }
+                    category("Перевод и романизация", "character.bubble.fill", .blue,
+                             value: translationSummary) { LanguageSettings() }
                 }
 
-                Section {
-                    category("Синхронизация", "timer", .teal,
+                Section("Экран плеера") {
+                    category("Интерфейс", "rectangle.bottomhalf.inset.filled", .orange) { InterfaceSettings() }
+                    category("Горизонтальный режим", "rectangle.landscape.rotate", .teal,
+                             value: settings.landscapeLyricsOnly ? "Только текст" : nil) { LandscapeSettings() }
+                    category("Жесты", "hand.draw.fill", .red,
+                             value: settings.gesturesEnabled ? "Вкл." : "Выкл.") { GestureSettings() }
+                    category("Картинка в картинке", "pip.fill", .green,
+                             value: settings.autoPictureInPicture ? "Авто" : nil) { PictureInPictureSettings() }
+                }
+
+                Section("Работа") {
+                    category("Синхронизация", "timer", .cyan,
                              value: settings.timingOffsetMs == 0 ? nil : "\(Int(settings.timingOffsetMs)) мс") { SyncSettings() }
-                    category("Производительность", "bolt.fill", .yellow,
+                    category("Батарея и нагрев", "bolt.fill", .yellow,
                              value: settings.powerSaving ? "Экономия" : (performance.constrained ? "Авто-экономия" : nil)) {
                         PerformanceSettings()
                     }
-                }
-
-                Section {
-                    category("Источники текстов", "doc.text.fill", .indigo) { SourceSettings() }
+                    category("Источники текстов", "doc.text.fill", .brown) { SourceSettings() }
                     category("Spotify", "music.note", Color(red: 0.12, green: 0.84, blue: 0.38),
-                             value: settings.usingBundledClientID ? "Встроенный доступ" : "Свой Client ID") { SpotifySettings() }
+                             value: settings.usingBundledClientID ? "Встроенный" : "Свой Client ID") { SpotifySettings() }
                 }
 
                 Section {
@@ -49,6 +56,15 @@ struct SettingsView: View {
                     Button("Готово") { dismiss() }
                 }
             }
+        }
+    }
+
+    private var translationSummary: String? {
+        switch (settings.translateLyrics, settings.showRomanization) {
+        case (true, true): return "Оба"
+        case (true, false): return "Перевод"
+        case (false, true): return "Романизация"
+        case (false, false): return nil
         }
     }
 
@@ -77,9 +93,48 @@ struct SettingsView: View {
     }
 }
 
+// MARK: - Building blocks
+
+/// A slider with its title and current value on one line above it.
+private struct SliderRow: View {
+    let title: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var step: Double = 0.05
+    /// How the value is shown; percent of 1 by default.
+    var format: (Double) -> String = { "\(Int(($0 * 100).rounded()))%" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(format(value))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Slider(value: $value, in: range, step: step)
+        }
+    }
+}
+
+/// A "back to defaults" button at the bottom of a page.
+private struct ResetSection: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Section {
+            Button(title, role: .destructive) {
+                withAnimation { action() }
+            }
+        }
+    }
+}
+
 // MARK: - Pages
 
-private struct AppearanceSettings: View {
+private struct TextLookSettings: View {
     @Environment(AppSettings.self) private var settings
 
     var body: some View {
@@ -91,31 +146,99 @@ private struct AppearanceSettings: View {
                         Text(font.title).tag(font.rawValue)
                     }
                 }
-                VStack(alignment: .leading) {
-                    Text("Размер текста: \(Int(settings.fontSize))")
-                    Slider(value: $settings.fontSize, in: 22...56, step: 1)
-                }
-                Toggle("Текст по центру", isOn: $settings.centerLyrics)
-            } header: {
-                Text("Текст")
+                SliderRow(title: "Размер", value: $settings.fontSize,
+                          range: Double(AppSettings.fontRange.lowerBound)...Double(AppSettings.fontRange.upperBound),
+                          step: 1, format: { "\(Int($0)) pt" })
+                Toggle("По центру", isOn: $settings.centerLyrics)
             } footer: {
-                Text("Размер можно менять и щипком двумя пальцами прямо по тексту.")
+                Text("Размер можно менять и щипком двумя пальцами прямо по тексту. После этого на пару секунд появится кнопка «Сбросить размер».")
             }
 
-            Section {
-                Toggle("Simple Lyrics Mode", isOn: $settings.simpleLyricsMode)
-                Toggle("Размытие неактивных строк", isOn: $settings.blurInactiveLines)
-                Toggle("Динамический фон", isOn: $settings.dynamicBackground)
-            } header: {
-                Text("Анимации")
-            } footer: {
-                Text("Simple Lyrics Mode — спокойная анимация из оригинального расширения: слова не увеличиваются и не светятся, заливка мягче.")
+            Section("Расстояния") {
+                SliderRow(title: "Между строками", value: $settings.lineSpacingScale, range: 0...4, step: 0.25)
             }
+
+            ResetSection(title: "Вернуть как было") { settings.resetLyricsLook() }
         }
     }
 }
 
-private struct TextSettings: View {
+private struct EffectsSettings: View {
+    @Environment(AppSettings.self) private var settings
+
+    var body: some View {
+        @Bindable var settings = settings
+        Form {
+            Section {
+                Toggle("Simple Lyrics Mode", isOn: $settings.simpleLyricsMode)
+            } footer: {
+                Text("Спокойная анимация из оригинального расширения: слова не подпрыгивают и не светятся, заливка мягче.")
+            }
+
+            Section {
+                Toggle("Размывать неактивные строки", isOn: $settings.blurInactiveLines)
+                if settings.blurInactiveLines {
+                    SliderRow(title: "Сила размытия", value: $settings.blurStrength, range: 0.25...2.5)
+                }
+            } header: {
+                Text("Размытие")
+            } footer: {
+                Text("Строки размываются тем сильнее, чем дальше они от текущей.")
+            }
+
+            Section {
+                SliderRow(title: "Свечение слов", value: $settings.glowStrength, range: 0...2)
+                    .disabled(settings.simpleLyricsMode)
+                SliderRow(title: "Яркость остальных строк", value: $settings.inactiveBrightness, range: 0.5...1.5)
+            } header: {
+                Text("Свет")
+            } footer: {
+                Text(settings.simpleLyricsMode
+                     ? "В Simple Lyrics Mode слова не светятся."
+                     : "Свечение — мягкий ореол вокруг спетых слов.")
+            }
+
+            ResetSection(title: "Вернуть эффекты по умолчанию") { settings.resetEffects() }
+        }
+    }
+}
+
+private struct BackgroundSettings: View {
+    @Environment(AppSettings.self) private var settings
+    @Environment(PerformanceMonitor.self) private var performance
+
+    var body: some View {
+        @Bindable var settings = settings
+        Form {
+            Section {
+                Toggle("Обложка на фоне", isOn: $settings.dynamicBackground)
+            } footer: {
+                if settings.powerSaving || performance.constrained {
+                    Text("Сейчас включена экономия батареи, поэтому фон не двигается.")
+                } else {
+                    Text("Размытая обложка трека, которая медленно плавает за текстом.")
+                }
+            }
+
+            if settings.dynamicBackground {
+                Section("Обложка") {
+                    SliderRow(title: "Скорость движения", value: $settings.backgroundSpeed, range: 0.25...3)
+                    SliderRow(title: "Размытие", value: $settings.backgroundBlur, range: 0.3...3)
+                }
+            }
+
+            Section {
+                SliderRow(title: "Затемнение", value: $settings.backgroundDim, range: 0...0.7, step: 0.02)
+            } footer: {
+                Text("Чем темнее фон, тем лучше читается белый текст на светлых обложках.")
+            }
+
+            ResetSection(title: "Вернуть фон по умолчанию") { settings.resetBackground() }
+        }
+    }
+}
+
+private struct LanguageSettings: View {
     @Environment(AppSettings.self) private var settings
 
     var body: some View {
@@ -135,37 +258,60 @@ private struct TextSettings: View {
                             Text(language.name).tag(language.id)
                         }
                     }
+                    SliderRow(title: "Размер перевода", value: $settings.translationScale, range: 0.6...1.6)
                 }
             } footer: {
-                Text("Перевод Apple на устройстве (iOS 18 и новее). При первом использовании iOS предложит скачать языковую модель.")
+                Text("Перевод Apple на устройстве (iOS 18 и новее). Строки, которые уже на выбранном языке, не переводятся. При первом использовании iOS предложит скачать языковую модель.")
             }
         }
     }
 }
 
-private struct PlayerSettings: View {
+private struct InterfaceSettings: View {
     @Environment(AppSettings.self) private var settings
 
     var body: some View {
         @Bindable var settings = settings
         Form {
             Section {
-                Toggle("Прятать интерфейс во время песни", isOn: $settings.autoHideControls)
-                Toggle("Полоска громкости", isOn: $settings.showVolumeSlider)
-                Toggle("Не гасить экран", isOn: $settings.keepScreenOn)
+                Toggle("Прятать кнопки во время песни", isOn: $settings.autoHideControls)
+                if settings.autoHideControls {
+                    SliderRow(title: "Через", value: $settings.autoHideDelay, range: 2...12, step: 1,
+                              format: { "\(Int($0)) с" })
+                }
+            } footer: {
+                Text("Как в Apple Music: кнопки исчезают, пока играет песня. Касание внизу экрана возвращает их.")
             }
 
             Section {
-                Toggle("Только текст", isOn: $settings.landscapeLyricsOnly)
-                Toggle("Обложка", isOn: $settings.landscapeArtwork)
-                    .disabled(settings.landscapeLyricsOnly)
-                Toggle("Название и исполнитель", isOn: $settings.landscapeTitle)
-                    .disabled(settings.landscapeLyricsOnly)
-            } header: {
-                Text("Горизонтальный режим")
-            } footer: {
-                Text("«Только текст» прячет весь интерфейс: текст занимает весь экран, а кнопки появляются по касанию на несколько секунд. Обложку и название можно выключить и по отдельности.")
+                Toggle("Полоска громкости", isOn: $settings.showVolumeSlider)
+                Toggle("Не гасить экран", isOn: $settings.keepScreenOn)
             }
+        }
+    }
+}
+
+private struct LandscapeSettings: View {
+    @Environment(AppSettings.self) private var settings
+
+    var body: some View {
+        @Bindable var settings = settings
+        Form {
+            Section {
+                Toggle("Только текст", isOn: $settings.landscapeLyricsOnly)
+            } footer: {
+                Text("Прячет весь интерфейс: текст занимает весь экран, а кнопки появляются по касанию на несколько секунд.")
+            }
+
+            Section {
+                Toggle("Обложка", isOn: $settings.landscapeArtwork)
+                Toggle("Название и исполнитель", isOn: $settings.landscapeTitle)
+            } header: {
+                Text("Слева от текста")
+            } footer: {
+                Text("Если выключить и то и другое, текст сдвинется к центру, когда кнопки спрячутся.")
+            }
+            .disabled(settings.landscapeLyricsOnly)
         }
     }
 }

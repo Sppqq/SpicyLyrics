@@ -26,7 +26,6 @@ struct NowPlayingView: View {
     @State private var landscapeControlsHeight: CGFloat = 150
     @State private var isLandscape = false
 
-    private static let autoHideDelay: Duration = .seconds(4)
     private static let chromeAnimation = Animation.easeInOut(duration: 0.45)
 
     var body: some View {
@@ -43,7 +42,10 @@ struct NowPlayingView: View {
                 DynamicBackground(
                     image: settings.dynamicBackground ? player.backgroundArtwork : nil,
                     imageID: player.artworkID,
-                    animated: settings.dynamicBackground && !reduced
+                    animated: settings.dynamicBackground && !reduced,
+                    dim: settings.backgroundDim,
+                    speed: settings.backgroundSpeed,
+                    blur: settings.backgroundBlur
                 )
 
                 if landscape {
@@ -73,7 +75,7 @@ struct NowPlayingView: View {
         .persistentSystemOverlays(chromeVisible ? .automatic : .hidden)
         .task(id: AutoHideKey(tick: interactionTick, eligible: canAutoHide)) {
             guard canAutoHide else { return }
-            try? await Task.sleep(for: Self.autoHideDelay)
+            try? await Task.sleep(for: .seconds(lyricsOnly ? 4 : settings.autoHideDelay))
             guard !Task.isCancelled, canAutoHide else { return }
             withAnimation(Self.chromeAnimation) { chromeVisible = false }
         }

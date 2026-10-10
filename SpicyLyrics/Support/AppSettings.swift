@@ -51,6 +51,26 @@ final class AppSettings {
     /// Landscape: nothing but the lyrics; a tap brings the controls back for a few seconds.
     var landscapeLyricsOnly: Bool { didSet { defaults.set(landscapeLyricsOnly, forKey: Keys.landscapeLyricsOnly) } }
 
+    // Look & feel (multipliers are 1 at the original's values).
+    /// Strength of the blur on lines away from the active one.
+    var blurStrength: Double { didSet { defaults.set(blurStrength, forKey: Keys.blurStrength) } }
+    /// Strength of the glow around sung words.
+    var glowStrength: Double { didSet { defaults.set(glowStrength, forKey: Keys.glowStrength) } }
+    /// Brightness of lines that are not being sung.
+    var inactiveBrightness: Double { didSet { defaults.set(inactiveBrightness, forKey: Keys.inactiveBrightness) } }
+    /// Gap between lines.
+    var lineSpacingScale: Double { didSet { defaults.set(lineSpacingScale, forKey: Keys.lineSpacingScale) } }
+    /// Size of the translation under a line, × its default.
+    var translationScale: Double { didSet { defaults.set(translationScale, forKey: Keys.translationScale) } }
+    /// Black layer over the background, 0…0.7.
+    var backgroundDim: Double { didSet { defaults.set(backgroundDim, forKey: Keys.backgroundDim) } }
+    /// Speed of the background drift.
+    var backgroundSpeed: Double { didSet { defaults.set(backgroundSpeed, forKey: Keys.backgroundSpeed) } }
+    /// Blur of the background cover.
+    var backgroundBlur: Double { didSet { defaults.set(backgroundBlur, forKey: Keys.backgroundBlur) } }
+    /// Seconds before the controls hide while a song plays.
+    var autoHideDelay: Double { didSet { defaults.set(autoHideDelay, forKey: Keys.autoHideDelay) } }
+
     /// Keys baked in at build time from `Config/Secrets.xcconfig` or CI secrets (may be empty).
     /// When present they are fixed: the app ignores anything typed in settings.
     let bundledSpotifyClientID = BundledKeys.spotifyClientID
@@ -62,7 +82,7 @@ final class AppSettings {
             Keys.pipAnimatedBackground: true,
             Keys.pipShowTitle: true,
             Keys.offset: 0.0,
-            Keys.fontSize: 32.0,
+            Keys.fontSize: Self.defaultFontSize,
             Keys.blur: true,
             Keys.background: true,
             Keys.romanization: false,
@@ -83,6 +103,15 @@ final class AppSettings {
             Keys.lyricsFont: LyricsFont.standard.rawValue,
             Keys.landscapeTitle: true,
             Keys.landscapeLyricsOnly: false,
+            Keys.blurStrength: 1.0,
+            Keys.glowStrength: 1.0,
+            Keys.inactiveBrightness: 1.0,
+            Keys.lineSpacingScale: 1.0,
+            Keys.translationScale: 1.0,
+            Keys.backgroundDim: Self.defaultBackgroundDim,
+            Keys.backgroundSpeed: 1.0,
+            Keys.backgroundBlur: 1.0,
+            Keys.autoHideDelay: 4.0,
         ])
         spotifyClientID = defaults.string(forKey: Keys.clientID) ?? ""
         spicyLyricsKey = defaults.string(forKey: Keys.spicyKey) ?? ""
@@ -110,6 +139,15 @@ final class AppSettings {
         landscapeArtwork = defaults.bool(forKey: Keys.landscapeArtwork)
         landscapeTitle = defaults.bool(forKey: Keys.landscapeTitle)
         landscapeLyricsOnly = defaults.bool(forKey: Keys.landscapeLyricsOnly)
+        blurStrength = defaults.double(forKey: Keys.blurStrength)
+        glowStrength = defaults.double(forKey: Keys.glowStrength)
+        inactiveBrightness = defaults.double(forKey: Keys.inactiveBrightness)
+        lineSpacingScale = defaults.double(forKey: Keys.lineSpacingScale)
+        translationScale = defaults.double(forKey: Keys.translationScale)
+        backgroundDim = defaults.double(forKey: Keys.backgroundDim)
+        backgroundSpeed = defaults.double(forKey: Keys.backgroundSpeed)
+        backgroundBlur = defaults.double(forKey: Keys.backgroundBlur)
+        autoHideDelay = defaults.double(forKey: Keys.autoHideDelay)
     }
 
     /// The built-in Client ID, unless the user switched to their own (or none is built in).
@@ -143,6 +181,32 @@ final class AppSettings {
 
     /// Lyric font size limits (settings slider and pinch).
     static let fontRange: ClosedRange<CGFloat> = 22...56
+    static let defaultFontSize = 32.0
+    static let defaultBackgroundDim = 0.28
+
+    /// Back to the original look: text size, alignment, font and every effect slider.
+    func resetLyricsLook() {
+        fontSize = Self.defaultFontSize
+        lyricsFont = LyricsFont.standard.rawValue
+        centerLyrics = false
+        lineSpacingScale = 1
+        translationScale = 1
+    }
+
+    func resetEffects() {
+        simpleLyricsMode = false
+        blurInactiveLines = true
+        blurStrength = 1
+        glowStrength = 1
+        inactiveBrightness = 1
+    }
+
+    func resetBackground() {
+        dynamicBackground = true
+        backgroundDim = Self.defaultBackgroundDim
+        backgroundSpeed = 1
+        backgroundBlur = 1
+    }
 
     private enum Keys {
         static let clientID = "spotifyClientID"
@@ -171,6 +235,15 @@ final class AppSettings {
         static let landscapeArtwork = "landscapeArtwork"
         static let landscapeTitle = "landscapeTitle"
         static let landscapeLyricsOnly = "landscapeLyricsOnly"
+        static let blurStrength = "blurStrength"
+        static let glowStrength = "glowStrength"
+        static let inactiveBrightness = "inactiveBrightness"
+        static let lineSpacingScale = "lineSpacingScale"
+        static let translationScale = "translationScale"
+        static let backgroundDim = "backgroundDim"
+        static let backgroundSpeed = "backgroundSpeed"
+        static let backgroundBlur = "backgroundBlur"
+        static let autoHideDelay = "autoHideDelay"
     }
 }
 

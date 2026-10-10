@@ -11,6 +11,13 @@ struct LyricsTypography: Equatable {
     var simple = false
     var centered = false
     var font: LyricsFont = .standard
+    /// User multipliers (1 = the original look).
+    var blurScale: CGFloat = 1
+    var glowScale: Double = 1
+    /// 0.5 darker … 1.5 brighter lines that are not being sung.
+    var inactiveBrightness: Double = 1
+    var lineSpacingScale: CGFloat = 1
+    var translationScale: CGFloat = 1
 
     private var design: Font.Design {
         switch font {
@@ -30,7 +37,7 @@ struct LyricsTypography: Equatable {
     /// `.word::after { margin-right: 0.32ch }` (a "0" in the bold face is ~0.6em wide).
     func wordGap(_ size: CGFloat) -> CGFloat { size * 0.6 * 0.32 }
     /// `.line { margin: 1cqw 0 }`, collapsing between neighbours.
-    var lineSpacing: CGFloat { cqw }
+    var lineSpacing: CGFloat { cqw * lineSpacingScale }
     /// Static lyrics: `--DefaultLyricsSize: 5cqw` against the synced 7cqw, weight 500.
     var staticFont: Font { .system(size: fontSize * 5 / 7, weight: .medium, design: design) }
     /// `.line { padding-right: 5cqw }`, or the 15cqw duet inset on the side a line leans away from.
@@ -46,6 +53,15 @@ struct LyricsTypography: Equatable {
     static func == (lhs: LyricsTypography, rhs: LyricsTypography) -> Bool {
         lhs.fontSize == rhs.fontSize && lhs.cqw == rhs.cqw && lhs.hasDuets == rhs.hasDuets
             && lhs.simple == rhs.simple && lhs.centered == rhs.centered && lhs.font == rhs.font
+            && lhs.blurScale == rhs.blurScale && lhs.glowScale == rhs.glowScale
+            && lhs.inactiveBrightness == rhs.inactiveBrightness && lhs.lineSpacingScale == rhs.lineSpacingScale
+            && lhs.translationScale == rhs.translationScale
+    }
+
+    /// Scales how far a line's opacity sits below fully lit, so the active line stays at 1
+    /// and the change animates as smoothly as the opacity itself.
+    func opacity(_ value: Double) -> Double {
+        clamp(1 - (1 - value) * (2 - inactiveBrightness), 0.05, 1)
     }
 }
 
@@ -132,7 +148,7 @@ struct LyricLineView: View, Equatable {
             content
             if let translation, !translation.isEmpty {
                 Text(translation)
-                    .font(.system(size: typography.fontSize * 0.55, weight: .semibold))
+                    .font(.system(size: typography.fontSize * 0.55 * typography.translationScale, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.6))
                     .multilineTextAlignment(textAlignment)
                     .fixedSize(horizontal: false, vertical: true)
@@ -142,8 +158,8 @@ struct LyricLineView: View, Equatable {
             // `.bg-line { margin: -1cqw 0 1cqw }`: tucked right under the line above.
             .padding(.top, line.isBackground ? -typography.lineSpacing : 0)
             .frame(maxWidth: .infinity, alignment: frameAlignment)
-            .opacity(visual.opacity)
-            .blur(radius: visual.blur > 0.05 ? visual.blur / 2 : 0)
+            .opacity(typography.opacity(visual.opacity))
+            .blur(radius: visual.blur * typography.blurScale > 0.05 ? visual.blur * typography.blurScale / 2 : 0)
     }
 
     @ViewBuilder
@@ -171,7 +187,7 @@ struct LyricLineView: View, Equatable {
                 .font(typography.leadFont)
                 .multilineTextAlignment(textAlignment)
                 .lyricFill(visual.line.gradient, alpha: typography.leadAlpha, fade: typography.fillFade)
-                .lyricGlow(visual.state == .active ? visual.line.glow : 0, kind: .line)
+                .lyricGlow(visual.state == .active ? visual.line.glow * typography.glowScale : 0, kind: .line)
                 // Active line-synced lines grow to 1.05 from their aligned edge.
                 .scaleEffect(visual.scale, anchor: typography.centered ? .center : (line.oppositeAligned ? .trailing : .leading))
 
@@ -226,7 +242,8 @@ private struct WordFlowView: View {
                         ? visuals[item.w][item.s] : SyllableVisual(),
                     fontSize: fontSize,
                     font: font,
-                    alpha: alpha
+                    alpha: alpha,
+                    glowScale: typography.glowScale
                 )
                 .layoutValue(key: GluedToNext.self, value: item.gluedToNext)
             }
@@ -241,18 +258,19 @@ private struct SyllableView: View {
     let fontSize: CGFloat
     let font: Font
     let alpha: GradientAlpha
+    let glowScale: Double
 
     var body: some View {
         if let letters = syllable.letters, visual.letters.count == letters.count {
             HStack(spacing: 0) {
                 ForEach(letters.indices, id: \.self) { i in
                     GlyphView(text: letters[i].text, visual: visual.letters[i], fontSize: fontSize,
-                              font: font, alpha: alpha, fade: fade, glowKind: .letter)
+                              font: font, alpha: alpha, fade: fade, glowKind: .letter, glowScale: glowScale)
                 }
             }
         } else {
             GlyphView(text: syllable.text, visual: visual.glyph, fontSize: fontSize,
-                      font: font, alpha: alpha, fade: fade, glowKind: .syllable)
+                      font: font, alpha: alpha, fade: fade, glowKind: .syllable, glowScale: glowScale)
         }
     }
 }
@@ -265,13 +283,14 @@ private struct GlyphView: View {
     let alpha: GradientAlpha
     let fade: Double
     let glowKind: GlowKind
+    let glowScale: Double
 
     var body: some View {
         Text(text)
             .font(font)
             .fixedSize()
             .lyricFill(visual.gradient, alpha: alpha, fade: fade)
-            .lyricGlow(visual.glow, kind: glowKind)
+            .lyricGlow(visual.glow * glowScale, kind: glowKind)
             .scaleEffect(visual.scale)
             .offset(y: visual.yOffset * fontSize)
     }
@@ -307,7 +326,7 @@ private struct InterludeDotsView: View {
                         .frame(width: diameter, height: diameter)
                         .frame(width: dotFont * Self.bulletAdvance)
                         .opacity(dot.opacity)
-                        .lyricGlow(dot.glow, kind: .dot)
+                        .lyricGlow(dot.glow * typography.glowScale, kind: .dot)
                         .scaleEffect(dot.scale)
                         .offset(y: dot.yOffset * typography.fontSize)
                 }
@@ -347,7 +366,12 @@ struct FlowLayout: Layout {
         }
     }
 
-    private func arrangeRows(for subviews: Subviews, maxWidth: CGFloat) -> ([Row], [CGSize]) {
+    /// Bounds arrive rounded to the pixel grid; without slack the widest row could stop fitting
+    /// on placement and spill into an extra row over the next line.
+    private static let slack: CGFloat = 1
+
+    private func arrangeRows(for subviews: Subviews, maxWidth rawWidth: CGFloat) -> ([Row], [CGSize]) {
+        let maxWidth = rawWidth + Self.slack
         let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
 
         // Words: runs of glued subviews.
@@ -393,8 +417,9 @@ struct FlowLayout: Layout {
         let maxWidth = proposal.width ?? .infinity
         let (rows, _) = arrangeRows(for: subviews, maxWidth: maxWidth)
         let height = rows.reduce(0) { $0 + $1.height } + rowSpacing * CGFloat(max(rows.count - 1, 0))
+        // Take the whole offered width, so placement wraps against exactly what was measured.
         let width = rows.map(\.width).max() ?? 0
-        return CGSize(width: proposal.width.map { min($0, width) } ?? width, height: height)
+        return CGSize(width: proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? width, height: height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {

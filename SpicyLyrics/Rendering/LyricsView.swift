@@ -24,6 +24,9 @@ struct LyricsView: View {
     @State private var resumeAutoScrollAt: Date = .distantPast
     /// Live two-finger pinch, applied to the font size until the fingers lift.
     @State private var pinchScale: CGFloat = 1
+    /// "Reset size" pill after a pinch; each pinch restarts its countdown.
+    @State private var showResetSize = false
+    @State private var resetSizeTick = 0
 
     init(lyrics: PreparedLyrics, player: PlayerModel, settings: AppSettings,
          topInset: CGFloat = 0, bottomInset: CGFloat = 0, horizontalPadding: CGFloat = 24,
@@ -53,7 +56,12 @@ struct LyricsView: View {
             hasDuets: shown.lines.contains(where: \.oppositeAligned),
             simple: settings.simpleLyricsMode,
             centered: settings.centerLyrics,
-            font: LyricsFont(rawValue: settings.lyricsFont) ?? .standard
+            font: LyricsFont(rawValue: settings.lyricsFont) ?? .standard,
+            blurScale: CGFloat(settings.blurStrength),
+            glowScale: settings.glowStrength,
+            inactiveBrightness: settings.inactiveBrightness,
+            lineSpacingScale: CGFloat(settings.lineSpacingScale),
+            translationScale: CGFloat(settings.translationScale)
         )
     }
 
@@ -147,9 +155,46 @@ struct LyricsView: View {
                                      Double(AppSettings.fontRange.upperBound))
                     settings.fontSize = size.rounded()
                     pinchScale = 1
+                    if settings.fontSize != AppSettings.defaultFontSize {
+                        resetSizeTick += 1
+                        withAnimation(.easeOut(duration: 0.2)) { showResetSize = true }
+                    }
+                }
+                .overlay(alignment: .bottom) {
+                    if showResetSize {
+                        resetSizeButton
+                            .padding(.bottom, bottomInset + 16)
+                            .transition(.opacity)
+                    }
+                }
+                .task(id: resetSizeTick) {
+                    guard showResetSize else { return }
+                    try? await Task.sleep(for: .seconds(2.5))
+                    guard !Task.isCancelled else { return }
+                    // Fades away slowly, so there is time to notice and tap it.
+                    withAnimation(.easeIn(duration: 1.5)) { showResetSize = false }
                 }
             }
         }
+    }
+
+    /// Undo an accidental pinch.
+    private var resetSizeButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                settings.fontSize = AppSettings.defaultFontSize
+            }
+            withAnimation(.easeOut(duration: 0.25)) { showResetSize = false }
+        } label: {
+            Label("Сбросить размер", systemImage: "arrow.uturn.backward")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: Capsule())
+                .environment(\.colorScheme, .dark)
+        }
+        .buttonStyle(.plain)
     }
 }
 
