@@ -101,8 +101,8 @@ Choose one update channel in AltStore or SideStore:
 
 | Channel | Source URL |
 | --- | --- |
-| Stable | https://github.com/Sppqq/SpicyLyrics/releases/latest/download/altstore-source.json |
-| Alpha & Beta | https://github.com/Sppqq/SpicyLyrics/releases/latest/download/altstore-source-testing.json |
+| Stable | https://github.com/Sppqq/spicy-lyrics-ios/releases/latest/download/altstore-source.json |
+| Alpha & Beta | https://github.com/Sppqq/spicy-lyrics-ios/releases/latest/download/altstore-source-testing.json |
 
 Both sources refresh after each published build. The testing source includes alpha,
 beta and stable releases, with the newest version first. Beta builds will appear when
