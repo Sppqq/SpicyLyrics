@@ -13,61 +13,70 @@ struct PlaybackBar: View {
     var onHideControls: () -> Void = {}
     /// False while the controls are faded out: the scrubber stops ticking.
     var isVisible = true
+    /// Landscape: tighter spacing and no bottom icon row (it does not fit beside the lyrics).
+    var compact = false
 
     var body: some View {
         VStack(spacing: 0) {
             Scrubber(onInteraction: onInteraction, isVisible: isVisible)
-                .padding(.bottom, 14)
+                .padding(.bottom, compact ? 4 : 14)
 
             HStack(spacing: 0) {
-                TransportButton(systemName: "backward.fill", size: 30) {
+                TransportButton(systemName: "backward.fill", size: 30, height: compact ? 52 : 64) {
                     onInteraction()
                     player.previous()
                 }
-                TransportButton(systemName: player.isPlaying ? "pause.fill" : "play.fill", size: 42) {
+                TransportButton(systemName: player.isPlaying ? "pause.fill" : "play.fill", size: 42, height: compact ? 52 : 64) {
                     onInteraction()
                     player.togglePlay()
                 }
-                TransportButton(systemName: "forward.fill", size: 30) {
+                TransportButton(systemName: "forward.fill", size: 30, height: compact ? 52 : 64) {
                     onInteraction()
                     player.next()
                 }
             }
-            .padding(.bottom, 18)
+            .padding(.bottom, compact ? 6 : 18)
 
             if settings.showVolumeSlider {
                 VolumeRow()
-                    .padding(.bottom, 20)
+                    .padding(.bottom, compact ? 0 : 20)
             }
 
-            HStack {
-                Button {
-                    onHideControls()
-                } label: {
-                    Image(systemName: "quote.bubble.fill")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.black.opacity(0.75))
-                        .frame(width: 34, height: 30)
-                        .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-                .accessibilityLabel("Скрыть элементы управления")
-                Spacer()
-                AirPlayButton()
-                    .frame(width: 34, height: 30)
-                Spacer()
-                Button {
-                    onInteraction()
-                    onShowQueue()
-                } label: {
-                    Image(systemName: "list.bullet")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .frame(width: 34, height: 30)
-                }
-                .accessibilityLabel("Выбрать трек")
+            if !compact {
+                accessoryRow
             }
-            .padding(.horizontal, 26)
         }
+    }
+
+    /// Lyrics toggle, AirPlay and the track list under the volume (portrait only).
+    private var accessoryRow: some View {
+        HStack {
+            Button {
+                onHideControls()
+            } label: {
+                Image(systemName: "quote.bubble.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.black.opacity(0.75))
+                    .frame(width: 34, height: 30)
+                    .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .accessibilityLabel("Скрыть элементы управления")
+            Spacer()
+            AirPlayButton()
+                .frame(width: 34, height: 30)
+            Spacer()
+            Button {
+                onInteraction()
+                onShowQueue()
+            } label: {
+                Image(systemName: "list.bullet")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .frame(width: 34, height: 30)
+            }
+            .accessibilityLabel("Выбрать трек")
+        }
+        .padding(.horizontal, 26)
     }
 
     static func format(_ seconds: Double) -> String {
@@ -137,6 +146,7 @@ private struct Scrubber: View {
 private struct TransportButton: View {
     let systemName: String
     let size: CGFloat
+    var height: CGFloat = 64
     let action: () -> Void
 
     var body: some View {
@@ -145,7 +155,7 @@ private struct TransportButton: View {
                 .font(.system(size: size, weight: .regular))
                 .contentTransition(.symbolEffect(.replace))
                 .frame(maxWidth: .infinity)
-                .frame(height: 64)
+                .frame(height: height)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressedCircleStyle())

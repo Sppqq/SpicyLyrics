@@ -48,6 +48,8 @@ final class AppSettings {
     /// Landscape: show the big artwork / the title and artist next to the lyrics.
     var landscapeArtwork: Bool { didSet { defaults.set(landscapeArtwork, forKey: Keys.landscapeArtwork) } }
     var landscapeTitle: Bool { didSet { defaults.set(landscapeTitle, forKey: Keys.landscapeTitle) } }
+    /// Landscape: nothing but the lyrics; a tap brings the controls back for a few seconds.
+    var landscapeLyricsOnly: Bool { didSet { defaults.set(landscapeLyricsOnly, forKey: Keys.landscapeLyricsOnly) } }
 
     /// Keys baked in at build time from `Config/Secrets.xcconfig` or CI secrets (may be empty).
     /// When present they are fixed: the app ignores anything typed in settings.
@@ -80,6 +82,7 @@ final class AppSettings {
             Keys.centerLyrics: false,
             Keys.lyricsFont: LyricsFont.standard.rawValue,
             Keys.landscapeTitle: true,
+            Keys.landscapeLyricsOnly: false,
         ])
         spotifyClientID = defaults.string(forKey: Keys.clientID) ?? ""
         spicyLyricsKey = defaults.string(forKey: Keys.spicyKey) ?? ""
@@ -106,6 +109,7 @@ final class AppSettings {
         lyricsFont = defaults.string(forKey: Keys.lyricsFont) ?? LyricsFont.standard.rawValue
         landscapeArtwork = defaults.bool(forKey: Keys.landscapeArtwork)
         landscapeTitle = defaults.bool(forKey: Keys.landscapeTitle)
+        landscapeLyricsOnly = defaults.bool(forKey: Keys.landscapeLyricsOnly)
     }
 
     /// The built-in Client ID, unless the user switched to their own (or none is built in).
@@ -166,6 +170,7 @@ final class AppSettings {
         static let lyricsFont = "lyricsFont"
         static let landscapeArtwork = "landscapeArtwork"
         static let landscapeTitle = "landscapeTitle"
+        static let landscapeLyricsOnly = "landscapeLyricsOnly"
     }
 }
 

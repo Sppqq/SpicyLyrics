@@ -383,10 +383,10 @@ final class PiPFrameRenderer {
     /// drift radii and period (s), whether the layer is a soft blob.
     private static let backgroundLayers: [(size: CGFloat, center: CGPoint, rotation: Double,
                                            drift: CGSize, driftPeriod: Double, blob: Bool)] = [
-        (1.35, CGPoint(x: 0.5, y: 0.5), 140, .zero, 0, false),
-        (0.95, CGPoint(x: 0.22, y: 0.24), -90, CGSize(width: 0.1, height: 0.07), 41, true),
-        (0.85, CGPoint(x: 0.82, y: 0.68), 70, CGSize(width: 0.08, height: 0.09), 47, true),
-        (0.75, CGPoint(x: 0.3, y: 0.86), -110, CGSize(width: 0.09, height: 0.06), 53, true),
+        (1.35, CGPoint(x: 0.5, y: 0.5), 60, .zero, 0, false),
+        (0.95, CGPoint(x: 0.22, y: 0.24), -40, CGSize(width: 0.16, height: 0.12), 19, true),
+        (0.85, CGPoint(x: 0.82, y: 0.68), 32, CGSize(width: 0.14, height: 0.15), 23, true),
+        (0.75, CGPoint(x: 0.3, y: 0.86), -50, CGSize(width: 0.15, height: 0.1), 27, true),
     ]
     private var coverImages: (id: String, base: CGImage, blob: CGImage)?
     private var backgroundFrame: CGImage?

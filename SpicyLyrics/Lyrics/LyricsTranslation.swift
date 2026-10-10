@@ -45,14 +45,33 @@ private struct TranslationDriver: ViewModifier {
             .onChange(of: key, initial: true) { _, _ in reconfigure() }
     }
 
-    /// Unique original-language texts of the lead lines.
+    private var targetCode: String {
+        Locale.Language(identifier: settings.translationLanguage).languageCode?.identifier ?? settings.translationLanguage
+    }
+
+    /// Unique texts of the lead lines that are not already in the target language.
     private func pendingTexts() -> [String] {
         guard settings.translateLyrics, case .loaded(let lyrics) = player.lyricsState else { return [] }
-        let texts = lyrics.lines
+        let texts = Set(lyrics.lines
             .filter { !$0.isInterlude && !$0.isBackground }
             .map(\.sourceText)
-            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        return Array(Set(texts))
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
+        let code = targetCode
+        return texts.filter { !Self.isWritten(in: code, $0) }
+    }
+
+    /// A line counts as already translated when the recognizer is fairly sure of the target language.
+    private static func isWritten(in code: String, _ text: String) -> Bool {
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(text)
+        let likely = recognizer.languageHypotheses(withMaximum: 3)
+            .first { $0.key.rawValue.hasPrefix(code) }?.value ?? 0
+        return likely > 0.5
+    }
+
+    /// Letters only, so "Hello!" and "hello" compare equal.
+    private static func normalized(_ text: String) -> String {
+        String(text.lowercased().unicodeScalars.filter(CharacterSet.letters.contains).map(Character.init))
     }
 
     private func sourceLanguage(of texts: [String]) -> NLLanguage? {
@@ -63,11 +82,13 @@ private struct TranslationDriver: ViewModifier {
 
     private func reconfigure() {
         let texts = pendingTexts()
-        guard !texts.isEmpty else { return }
         let target = Locale.Language(identifier: settings.translationLanguage)
         let source = sourceLanguage(of: texts)
-        // A song already in the target language needs no translation.
-        if let source, let code = target.languageCode?.identifier, source.rawValue.hasPrefix(code) { return }
+        // A song already in the target language needs no translation; drop any left from before.
+        if texts.isEmpty || source.map({ $0.rawValue.hasPrefix(targetCode) }) == true {
+            if !player.translations.isEmpty { player.setTranslations([:], revision: player.lyricsRevision) }
+            return
+        }
         let sourceLanguage = source.map { Locale.Language(identifier: $0.rawValue) }
         if configuration?.source == sourceLanguage, configuration?.target == target {
             configuration?.invalidate()
@@ -84,7 +105,10 @@ private struct TranslationDriver: ViewModifier {
         do {
             var result: [String: String] = [:]
             for response in try await session.translations(from: requests) {
-                if let id = response.clientIdentifier { result[id] = response.targetText }
+                // A "translation" that only repeats the line adds nothing under it.
+                if let id = response.clientIdentifier, Self.normalized(response.targetText) != Self.normalized(id) {
+                    result[id] = response.targetText
+                }
             }
             player.setTranslations(result, revision: revision)
         } catch {

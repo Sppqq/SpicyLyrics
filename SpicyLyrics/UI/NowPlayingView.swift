@@ -23,6 +23,8 @@ struct NowPlayingView: View {
     @State private var headerSwipe: CGFloat = 0
     @State private var headerHeight: CGFloat = 76
     @State private var controlsHeight: CGFloat = 250
+    @State private var landscapeControlsHeight: CGFloat = 150
+    @State private var isLandscape = false
 
     private static let autoHideDelay: Duration = .seconds(4)
     private static let chromeAnimation = Animation.easeInOut(duration: 0.45)
@@ -50,6 +52,10 @@ struct NowPlayingView: View {
                     portraitLayout(geometry.size)
                 }
 
+                Color.clear
+                    .allowsHitTesting(false)
+                    .onChange(of: landscape, initial: true) { _, value in isLandscape = value }
+
                 if let skipFeedback {
                     Image(systemName: skipFeedback == .next ? "forward.fill" : "backward.fill")
                         .font(.system(size: 40))
@@ -72,8 +78,11 @@ struct NowPlayingView: View {
             withAnimation(Self.chromeAnimation) { chromeVisible = false }
         }
         .onChange(of: player.isPlaying) { _, playing in
-            // Pausing brings the controls back, like Apple Music.
-            if !playing { showChrome() }
+            // Pausing brings the controls back, like Apple Music (not in lyrics-only mode).
+            if !playing && !lyricsOnly { showChrome() }
+        }
+        .onChange(of: lyricsOnly) { _, value in
+            if value { hideChrome() }
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
@@ -143,9 +152,12 @@ struct NowPlayingView: View {
         return false
     }
 
+    /// Landscape with "Только текст": the controls only show up for a moment after a tap.
+    private var lyricsOnly: Bool { isLandscape && settings.landscapeLyricsOnly }
+
     private var canAutoHide: Bool {
-        settings.autoHideControls && chromeVisible && player.isPlaying && lyricsLoaded
-            && !showSettings && !showPicker && !showSetupGuide && !showOwnLyrics
+        guard chromeVisible, !showSettings, !showPicker, !showSetupGuide, !showOwnLyrics else { return false }
+        return lyricsOnly || (settings.autoHideControls && player.isPlaying && lyricsLoaded)
     }
 
     private func showChrome() {
@@ -215,7 +227,7 @@ struct NowPlayingView: View {
 
                 Spacer(minLength: 0)
 
-                controls
+                controls()
                     .padding(.horizontal, 26)
                     .padding(.bottom, 6)
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { controlsHeight = $0 }
@@ -249,11 +261,14 @@ struct NowPlayingView: View {
     // MARK: Landscape
 
     private func landscapeLayout(_ size: CGSize) -> some View {
-        let showArtwork = settings.landscapeArtwork
-        let showTitle = settings.landscapeTitle
+        let lyricsOnly = settings.landscapeLyricsOnly
+        let showTitle = settings.landscapeTitle && !lyricsOnly
         let column = min(size.width * 0.4, 420)
         let blockWidth = column - 40
-        let artworkSide = min(blockWidth, size.height * (chromeVisible ? 0.42 : 0.62))
+        // The artwork gets whatever height the title and controls leave free.
+        let reserved = (chromeVisible ? landscapeControlsHeight + 18 : 0) + (showTitle || chromeVisible ? 62 : 0) + 24
+        let artworkSide = min(blockWidth, size.height * 0.62, size.height - reserved)
+        let showArtwork = settings.landscapeArtwork && !lyricsOnly && artworkSide >= 72
         let infoWidth = showArtwork ? artworkSide : min(blockWidth, 320)
         // With artwork and title switched off the column is empty once the controls hide:
         // slide the lyrics to the middle instead of leaving a gap (no re-wrapping).
@@ -282,7 +297,8 @@ struct NowPlayingView: View {
                 }
 
                 if chromeVisible {
-                    controls
+                    controls(compact: true)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { landscapeControlsHeight = $0 }
                         .frame(width: max(infoWidth, 280))
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
@@ -440,12 +456,13 @@ struct NowPlayingView: View {
         return URL(string: track.uri) ?? URL(string: "spotify:")
     }
 
-    private var controls: some View {
+    private func controls(compact: Bool = false) -> some View {
         PlaybackBar(
             onInteraction: { showChrome() },
             onShowQueue: { showPicker = true },
             onHideControls: { hideChrome() },
-            isVisible: chromeVisible
+            isVisible: chromeVisible,
+            compact: compact
         )
         .foregroundStyle(.white)
     }

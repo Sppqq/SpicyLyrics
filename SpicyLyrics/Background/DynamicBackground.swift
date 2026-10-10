@@ -51,10 +51,10 @@ final class CoverBlobsView: UIView {
     }
 
     private static let specs: [LayerSpec] = [
-        LayerSpec(size: 1.35, center: CGPoint(x: 0.5, y: 0.5), rotationPeriod: 140, drift: .zero, driftPeriod: 0, isBlob: false),
-        LayerSpec(size: 0.95, center: CGPoint(x: 0.22, y: 0.24), rotationPeriod: -90, drift: CGSize(width: 0.1, height: 0.07), driftPeriod: 41, isBlob: true),
-        LayerSpec(size: 0.85, center: CGPoint(x: 0.82, y: 0.68), rotationPeriod: 70, drift: CGSize(width: 0.08, height: 0.09), driftPeriod: 47, isBlob: true),
-        LayerSpec(size: 0.75, center: CGPoint(x: 0.3, y: 0.86), rotationPeriod: -110, drift: CGSize(width: 0.09, height: 0.06), driftPeriod: 53, isBlob: true),
+        LayerSpec(size: 1.35, center: CGPoint(x: 0.5, y: 0.5), rotationPeriod: 60, drift: .zero, driftPeriod: 0, isBlob: false),
+        LayerSpec(size: 0.95, center: CGPoint(x: 0.22, y: 0.24), rotationPeriod: -40, drift: CGSize(width: 0.16, height: 0.12), driftPeriod: 19, isBlob: true),
+        LayerSpec(size: 0.85, center: CGPoint(x: 0.82, y: 0.68), rotationPeriod: 32, drift: CGSize(width: 0.14, height: 0.15), driftPeriod: 23, isBlob: true),
+        LayerSpec(size: 0.75, center: CGPoint(x: 0.3, y: 0.86), rotationPeriod: -50, drift: CGSize(width: 0.15, height: 0.1), driftPeriod: 27, isBlob: true),
     ]
 
     private static let ciContext = CIContext(options: [.cacheIntermediates: false])
@@ -62,6 +62,8 @@ final class CoverBlobsView: UIView {
     private let container = CALayer()
     private var coverLayers: [CALayer] = []
     private var currentID: String?
+    /// Size the running animations were built for; other layout passes leave them alone.
+    private var animatedSize: CGSize = .zero
     private var animated = true
     private var processing: Task<Void, Never>?
     private var foregroundObserver: NSObjectProtocol?
@@ -94,6 +96,9 @@ final class CoverBlobsView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        // SwiftUI lays this view out often; restarting here kept snapping the layers back to
+        // their first frame, so the background looked frozen.
+        guard bounds.size != animatedSize else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         container.frame = bounds
@@ -182,7 +187,9 @@ final class CoverBlobsView: UIView {
 
     private func restartAnimations() {
         for cover in coverLayers { cover.removeAllAnimations() }
+        animatedSize = .zero
         guard animated, window != nil, bounds.width > 0 else { return }
+        animatedSize = bounds.size
         // Slow motion looks the same at 30 fps and costs half as much.
         let frameRate = CAFrameRateRange(minimum: 15, maximum: 30, preferred: 30)
 

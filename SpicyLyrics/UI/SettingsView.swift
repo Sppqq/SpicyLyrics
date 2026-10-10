@@ -156,12 +156,15 @@ private struct PlayerSettings: View {
             }
 
             Section {
+                Toggle("Только текст", isOn: $settings.landscapeLyricsOnly)
                 Toggle("Обложка", isOn: $settings.landscapeArtwork)
+                    .disabled(settings.landscapeLyricsOnly)
                 Toggle("Название и исполнитель", isOn: $settings.landscapeTitle)
+                    .disabled(settings.landscapeLyricsOnly)
             } header: {
                 Text("Горизонтальный режим")
             } footer: {
-                Text("Если выключить и то и другое, текст займёт весь экран, а кнопки будут появляться слева по касанию.")
+                Text("«Только текст» прячет весь интерфейс: текст занимает весь экран, а кнопки появляются по касанию на несколько секунд. Обложку и название можно выключить и по отдельности.")
             }
         }
     }
