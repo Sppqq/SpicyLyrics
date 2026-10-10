@@ -29,6 +29,10 @@ final class AppSettings {
     var translationLanguage: String { didSet { defaults.set(translationLanguage, forKey: Keys.translationLanguage) } }
     /// Open the floating lyrics window when leaving the app.
     var autoPictureInPicture: Bool { didSet { defaults.set(autoPictureInPicture, forKey: Keys.autoPiP) } }
+    /// PiP: drifting cover background like the app (off = still cover, for weaker phones).
+    var pipAnimatedBackground: Bool { didSet { defaults.set(pipAnimatedBackground, forKey: Keys.pipAnimatedBackground) } }
+    /// PiP: track and artist under the lyrics.
+    var pipShowTitle: Bool { didSet { defaults.set(pipShowTitle, forKey: Keys.pipShowTitle) } }
     /// Spicy Lyrics' Simple Lyrics Mode: calmer word animation, softer fill.
     var simpleLyricsMode: Bool { didSet { defaults.set(simpleLyricsMode, forKey: Keys.simpleMode) } }
     /// Centre the lyrics instead of aligning them left (duets then stay centred too).
@@ -53,6 +57,8 @@ final class AppSettings {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         defaults.register(defaults: [
+            Keys.pipAnimatedBackground: true,
+            Keys.pipShowTitle: true,
             Keys.offset: 0.0,
             Keys.fontSize: 32.0,
             Keys.blur: true,
@@ -92,6 +98,8 @@ final class AppSettings {
         compensateOutputLatency = defaults.bool(forKey: Keys.outputLatency)
         simpleLyricsMode = defaults.bool(forKey: Keys.simpleMode)
         autoPictureInPicture = defaults.bool(forKey: Keys.autoPiP)
+        pipAnimatedBackground = defaults.bool(forKey: Keys.pipAnimatedBackground)
+        pipShowTitle = defaults.bool(forKey: Keys.pipShowTitle)
         translateLyrics = defaults.bool(forKey: Keys.translate)
         translationLanguage = defaults.string(forKey: Keys.translationLanguage) ?? "en"
         centerLyrics = defaults.bool(forKey: Keys.centerLyrics)
@@ -150,6 +158,8 @@ final class AppSettings {
         static let outputLatency = "compensateOutputLatency"
         static let simpleMode = "simpleLyricsMode"
         static let autoPiP = "autoPictureInPicture"
+        static let pipAnimatedBackground = "pipAnimatedBackground"
+        static let pipShowTitle = "pipShowTitle"
         static let translate = "translateLyrics"
         static let translationLanguage = "translationLanguage"
         static let centerLyrics = "centerLyrics"

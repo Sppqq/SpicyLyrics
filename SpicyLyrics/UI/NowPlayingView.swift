@@ -79,6 +79,7 @@ struct NowPlayingView: View {
             SettingsView()
                 .environment(settings)
                 .environment(player)
+                .environment(performance)
                 .environmentObject(auth)
         }
         .sheet(isPresented: $showSetupGuide) {
@@ -107,7 +108,7 @@ struct NowPlayingView: View {
         .onChange(of: settings.showRomanization) { _, _ in player.settingsChanged() }
         .onChange(of: settings.simpleLyricsMode) { _, _ in player.settingsChanged() }
         .modifier(LyricsTranslation(player: player, settings: settings))
-        .task { pip.configure(player: player, settings: settings) }
+        .task { pip.configure(player: player, settings: settings, performance: performance) }
         .onChange(of: settings.autoPictureInPicture) { _, enabled in pip.setAutomaticStart(enabled) }
         .alert("Картинка в картинке", isPresented: Binding(
             get: { pip.lastError != nil && !pip.isActive },

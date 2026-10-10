@@ -30,6 +30,11 @@ final class LyricsPictureInPicture: NSObject {
     @ObservationIgnored private let renderer = PiPFrameRenderer(size: LyricsPictureInPicture.frameSize)
     @ObservationIgnored private var lastPlaying: Bool?
     @ObservationIgnored private var lyricsAnimator: LyricsAnimator?
+    /// What the animator was built for: comparing whole lyrics every frame was the costliest
+    /// thing PiP did, the player's revision number says the same for free.
+    @ObservationIgnored private var animatorKey: (revision: Int, simple: Bool)?
+    @ObservationIgnored private weak var performance: PerformanceMonitor?
+    @ObservationIgnored private var framesPerSecond: Double = 0
 
     static var isSupported: Bool { AVPictureInPictureController.isPictureInPictureSupported() }
 
@@ -39,9 +44,10 @@ final class LyricsPictureInPicture: NSObject {
     }
 
     /// Connects the player and creates the controller (once the layer is in a window).
-    func configure(player: PlayerModel, settings: AppSettings) {
+    func configure(player: PlayerModel, settings: AppSettings, performance: PerformanceMonitor? = nil) {
         self.player = player
         self.settings = settings
+        self.performance = performance
         guard controller == nil, Self.isSupported else { return }
         let source = AVPictureInPictureController.ContentSource(sampleBufferDisplayLayer: displayLayer, playbackDelegate: self)
         let controller = AVPictureInPictureController(contentSource: source)
@@ -52,12 +58,19 @@ final class LyricsPictureInPicture: NSObject {
             DispatchQueue.main.async { self?.isPossible = controller.isPictureInPicturePossible }
         }
         self.controller = controller
-        // A frame must be on the layer before PiP can start; keep a slow trickle while inactive.
-        scheduleFrames(fps: 2)
+        renderFrame()
+        scheduleFrames(fps: idleFramesPerSecond)
+    }
+
+    /// While the window is closed: nothing, unless it may open on its own when leaving the app;
+    /// then a slow trickle keeps a current frame on the layer (PiP cannot start without one).
+    private var idleFramesPerSecond: Double {
+        MainActor.assumeIsolated { settings?.autoPictureInPicture ?? false } ? 1 : 0
     }
 
     func setAutomaticStart(_ enabled: Bool) {
         controller?.canStartPictureInPictureAutomaticallyFromInline = enabled
+        if !isActive { scheduleFrames(fps: idleFramesPerSecond) }
     }
 
     func start() {
@@ -89,7 +102,11 @@ final class LyricsPictureInPicture: NSObject {
     // MARK: Frames
 
     private func scheduleFrames(fps: Double) {
+        guard fps != framesPerSecond else { return }
+        framesPerSecond = fps
         timer?.invalidate()
+        timer = nil
+        guard fps > 0 else { return }
         let timer = Timer(timeInterval: 1 / fps, repeats: true) { [weak self] _ in self?.renderFrame() }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
@@ -100,20 +117,29 @@ final class LyricsPictureInPicture: NSObject {
         let output = displayLayer.sampleBufferRenderer
         if output.status == .failed { output.flush() }
         guard output.isReadyForMoreMediaData else { return }
+        let reduced = MainActor.assumeIsolated { (settings?.powerSaving ?? false) || (performance?.constrained ?? false) }
         let snapshot = MainActor.assumeIsolated {
             if case .loaded(let lyrics) = player.lyricsState {
                 let simple = settings?.simpleLyricsMode ?? false
-                if lyricsAnimator?.lyrics != lyrics || lyricsAnimator?.simple != simple {
+                if animatorKey?.revision != player.lyricsRevision || animatorKey?.simple != simple {
                     lyricsAnimator = LyricsAnimator(lyrics: lyrics, simple: simple)
+                    animatorKey = (player.lyricsRevision, simple)
                 }
                 lyricsAnimator?.step(position: player.position(), now: CACurrentMediaTime(), blurEnabled: false)
             } else {
                 lyricsAnimator = nil
+                animatorKey = nil
             }
-            return PiPSnapshot(player: player, settings: settings, animator: lyricsAnimator)
+            return PiPSnapshot(player: player, settings: settings, animator: lyricsAnimator, reduced: reduced)
         }
         guard let sample = renderer.sampleBuffer(for: snapshot) else { return }
         output.enqueue(sample)
+
+        // Full rate only while something moves: playing, or a line still sliding into place.
+        if isActive {
+            let moving = snapshot.isPlaying || renderer.isTransitioning
+            scheduleFrames(fps: moving ? (reduced ? 20 : 30) : 5)
+        }
 
         // Keep the PiP play/pause button in step with Spotify.
         if lastPlaying != snapshot.isPlaying {
@@ -129,11 +155,12 @@ extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
     func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
         isActive = true
         scheduleFrames(fps: 30)
+        renderFrame()
     }
 
     func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
         isActive = false
-        scheduleFrames(fps: 2)
+        scheduleFrames(fps: idleFramesPerSecond)
     }
 
     func pictureInPictureController(_ controller: AVPictureInPictureController,
@@ -211,9 +238,15 @@ struct PiPSnapshot: @unchecked Sendable {
     var fontDesign: UIFontDescriptor.SystemDesign = .default
     /// Includes timing so consecutive identical lines still animate independently.
     var lineID = ""
+    /// Drifting cover like the app's background, or a still one (setting / battery saver).
+    var animatedBackground = true
+    /// The track and artist at the bottom of the window.
+    var showTitle = true
 
     @MainActor
-    init(player: PlayerModel, settings: AppSettings?, animator: LyricsAnimator?) {
+    init(player: PlayerModel, settings: AppSettings?, animator: LyricsAnimator?, reduced: Bool = false) {
+        animatedBackground = (settings?.pipAnimatedBackground ?? true) && !reduced
+        showTitle = settings?.pipShowTitle ?? true
         title = player.track?.title ?? "Spicy Lyrics"
         artist = player.track?.artistLine ?? ""
         isPlaying = player.isPlaying
@@ -321,10 +354,44 @@ final class PiPFrameRenderer {
     private let size: CGSize
     private var pool: CVPixelBufferPool?
     private var format: CMVideoFormatDescription?
-    private var blurredArtwork: (id: String, image: CGImage)?
     private var currentSnapshot: PiPSnapshot?
     private var outgoingSnapshot: PiPSnapshot?
     private var transitionStart: CFTimeInterval = 0
+
+    /// A line is still moving into place.
+    var isTransitioning: Bool { outgoingSnapshot != nil }
+
+    // Things that used to be rebuilt on every frame.
+    private static let sRGB = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+    private static let fillMask = CGGradient(colorSpace: CGColorSpaceCreateDeviceGray(),
+                                             colorComponents: [1, 1, 1, 0], locations: [0, 1], count: 2)!
+    private var fonts: [String: UIFont] = [:]
+    private struct TextLayout {
+        let key: String
+        let storage: NSTextStorage
+        let layout: NSLayoutManager
+        let container: NSTextContainer
+        let ranges: [NSRange]
+    }
+    private var textLayout: TextLayout?
+
+    // The animated background is drawn small (200×100, ten times a second) and stretched: it is
+    // a blur, so nobody can tell, and it costs a fraction of drawing it at full size.
+    private static let backgroundSize = CGSize(width: 200, height: 100)
+    private static let backgroundInterval: CFTimeInterval = 0.1
+    /// Same layers as the app's `CoverBlobsView`: size × diagonal, centre, rotation period (s),
+    /// drift radii and period (s), whether the layer is a soft blob.
+    private static let backgroundLayers: [(size: CGFloat, center: CGPoint, rotation: Double,
+                                           drift: CGSize, driftPeriod: Double, blob: Bool)] = [
+        (1.35, CGPoint(x: 0.5, y: 0.5), 140, .zero, 0, false),
+        (0.95, CGPoint(x: 0.22, y: 0.24), -90, CGSize(width: 0.1, height: 0.07), 41, true),
+        (0.85, CGPoint(x: 0.82, y: 0.68), 70, CGSize(width: 0.08, height: 0.09), 47, true),
+        (0.75, CGPoint(x: 0.3, y: 0.86), -110, CGSize(width: 0.09, height: 0.06), 53, true),
+    ]
+    private var coverImages: (id: String, base: CGImage, blob: CGImage)?
+    private var backgroundFrame: CGImage?
+    private var backgroundRenderedAt: CFTimeInterval = 0
+    private var backgroundAnimated = true
 
     init(size: CGSize) {
         self.size = size
@@ -350,7 +417,7 @@ final class PiPFrameRenderer {
             data: CVPixelBufferGetBaseAddress(pixelBuffer),
             width: Int(size.width), height: Int(size.height), bitsPerComponent: 8,
             bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
-            space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
+            space: Self.sRGB,
             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         ) {
             // UIKit drawing expects a top-left origin.
@@ -385,32 +452,20 @@ final class PiPFrameRenderer {
     }
 
     private func draw(_ snapshot: PiPSnapshot, in rect: CGRect, context: CGContext) {
-        // Background: the blurred cover (made once per track), darkened for contrast.
-        UIColor(red: 0.07, green: 0.07, blue: 0.09, alpha: 1).setFill()
-        context.fill(rect)
-        if let artwork = snapshot.artwork {
-            if blurredArtwork?.id != snapshot.artworkID, let blurred = CoverBlobsView.render(artwork)?.base {
-                blurredArtwork = (snapshot.artworkID, blurred)
-            }
-            if let image = blurredArtwork?.image {
-                let side = max(rect.width, rect.height) * 1.2
-                UIImage(cgImage: image).draw(in: CGRect(x: (rect.width - side) / 2, y: (rect.height - side) / 2,
-                                                        width: side, height: side))
-            }
-        }
-        UIColor.black.withAlphaComponent(0.42).setFill()
-        context.fill(rect)
+        drawBackground(snapshot, in: rect, context: context)
 
         let inset: CGFloat = 40
         let textWidth = rect.width - inset * 2
 
-        // Footer: track and artist.
-        let footer = NSAttributedString(
-            string: snapshot.artist.isEmpty ? snapshot.title : "\(snapshot.title) — \(snapshot.artist)",
-            attributes: [.font: font(20, .semibold, snapshot.fontDesign), .foregroundColor: UIColor.white.withAlphaComponent(0.55)]
-        )
-        footer.draw(with: CGRect(x: inset, y: rect.height - 46, width: textWidth, height: 28),
-                    options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
+        // Footer: track and artist (can be switched off).
+        if snapshot.showTitle {
+            let footer = NSAttributedString(
+                string: snapshot.artist.isEmpty ? snapshot.title : "\(snapshot.title) — \(snapshot.artist)",
+                attributes: [.font: font(20, .semibold, snapshot.fontDesign), .foregroundColor: UIColor.white.withAlphaComponent(0.55)]
+            )
+            footer.draw(with: CGRect(x: inset, y: rect.height - 46, width: textWidth, height: 28),
+                        options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
+        }
 
         let now = CACurrentMediaTime()
         if let previous = currentSnapshot,
@@ -427,7 +482,8 @@ final class PiPFrameRenderer {
         let progress = UIAccessibility.isReduceMotionEnabled ? 1 : min(1, max(0, (now - transitionStart) / 0.42))
         let eased = CGFloat(1 - pow(1 - progress, 3))
         context.saveGState()
-        context.clip(to: CGRect(x: inset - 8, y: 24, width: textWidth + 16, height: rect.height - 88))
+        context.clip(to: CGRect(x: inset - 8, y: 24, width: textWidth + 16,
+                                height: rect.height - (snapshot.showTitle ? 88 : 40)))
         drawLyrics(snapshot, from: outgoingSnapshot, progress: eased, in: rect, context: context)
         context.restoreGState()
         if progress >= 1 { outgoingSnapshot = nil }
@@ -506,23 +562,30 @@ final class PiPFrameRenderer {
         let runs = snapshot.animatedRuns.isEmpty
             ? snapshot.current.map { PiPSnapshot.AnimatedRun(text: $0.text, visual: GlyphVisual(gradient: $0.lit)) }
             : snapshot.animatedRuns
-        let text = NSMutableAttributedString()
-        var ranges: [NSRange] = []
-        for run in runs {
-            ranges.append(NSRange(location: text.length, length: (run.text as NSString).length))
-            text.append(NSAttributedString(string: run.text, attributes: [
-                .font: textFont, .ligature: 0, .foregroundColor: UIColor.white.withAlphaComponent(0.32),
-            ]))
+        // Text layout is the expensive part: build it once per line (and size), not per frame.
+        let key = runs.map(\.text).joined(separator: "\u{1}") + "|\(textFont.fontName)|\(textFont.pointSize)|\(box.size)"
+        if textLayout?.key != key {
+            let text = NSMutableAttributedString()
+            var ranges: [NSRange] = []
+            for run in runs {
+                ranges.append(NSRange(location: text.length, length: (run.text as NSString).length))
+                text.append(NSAttributedString(string: run.text, attributes: [
+                    .font: textFont, .ligature: 0, .foregroundColor: UIColor.white.withAlphaComponent(0.32),
+                ]))
+            }
+            let storage = NSTextStorage(attributedString: text)
+            let layout = NSLayoutManager()
+            let container = NSTextContainer(size: box.size)
+            container.lineFragmentPadding = 0
+            container.maximumNumberOfLines = 2
+            container.lineBreakMode = .byTruncatingTail
+            storage.addLayoutManager(layout)
+            layout.addTextContainer(container)
+            layout.ensureLayout(for: container)
+            textLayout = TextLayout(key: key, storage: storage, layout: layout, container: container, ranges: ranges)
         }
-        let storage = NSTextStorage(attributedString: text)
-        let layout = NSLayoutManager()
-        let container = NSTextContainer(size: box.size)
-        container.lineFragmentPadding = 0
-        container.maximumNumberOfLines = 2
-        container.lineBreakMode = .byTruncatingTail
-        storage.addLayoutManager(layout)
-        layout.addTextContainer(container)
-        layout.ensureLayout(for: container)
+        guard let cached = textLayout else { return }
+        let storage = cached.storage, layout = cached.layout, container = cached.container, ranges = cached.ranges
         let reduceMotion = UIAccessibility.isReduceMotionEnabled
         for (run, characters) in zip(runs, ranges) where characters.length > 0 {
             let glyphs = layout.glyphRange(forCharacterRange: characters, actualCharacterRange: nil)
@@ -559,9 +622,7 @@ final class PiPFrameRenderer {
                     context.setBlendMode(.destinationIn)
                     let start = frame.minX + edge - advance
                     let end = start + max(1, feather)
-                    let mask = CGGradient(colorSpace: CGColorSpaceCreateDeviceGray(),
-                                          colorComponents: [1, 1, 1, 0], locations: [0, 1], count: 2)!
-                    context.drawLinearGradient(mask, start: CGPoint(x: start, y: frame.minY),
+                    context.drawLinearGradient(Self.fillMask, start: CGPoint(x: start, y: frame.minY),
                                                end: CGPoint(x: end, y: frame.minY),
                                                options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
                     context.endTransparencyLayer()
@@ -600,9 +661,71 @@ final class PiPFrameRenderer {
     }
 
     private func font(_ size: CGFloat, _ weight: UIFont.Weight, _ design: UIFontDescriptor.SystemDesign) -> UIFont {
+        let key = "\(size)|\(weight.rawValue)|\(design.rawValue)"
+        if let cached = fonts[key] { return cached }
         let base = UIFont.systemFont(ofSize: size, weight: weight)
-        guard let descriptor = base.fontDescriptor.withDesign(design) else { return base }
-        return UIFont(descriptor: descriptor, size: size)
+        let font = base.fontDescriptor.withDesign(design).map { UIFont(descriptor: $0, size: size) } ?? base
+        fonts[key] = font
+        return font
+    }
+
+    // MARK: Background
+
+    private func drawBackground(_ snapshot: PiPSnapshot, in rect: CGRect, context: CGContext) {
+        UIColor(red: 0.07, green: 0.07, blue: 0.09, alpha: 1).setFill()
+        context.fill(rect)
+        if let artwork = snapshot.artwork, coverImages?.id != snapshot.artworkID,
+           let rendered = CoverBlobsView.render(artwork) {
+            coverImages = (snapshot.artworkID, rendered.base, rendered.blob)
+            backgroundFrame = nil
+        }
+        if snapshot.artwork != nil, let images = coverImages {
+            let now = CACurrentMediaTime()
+            if backgroundAnimated != snapshot.animatedBackground {
+                backgroundAnimated = snapshot.animatedBackground
+                backgroundFrame = nil
+            }
+            if backgroundFrame == nil || (backgroundAnimated && now - backgroundRenderedAt >= Self.backgroundInterval) {
+                backgroundFrame = renderBackground(images, time: backgroundAnimated ? now : 0)
+                backgroundRenderedAt = now
+            }
+            if let frame = backgroundFrame {
+                context.saveGState()
+                context.interpolationQuality = .medium
+                UIImage(cgImage: frame).draw(in: rect)
+                context.restoreGState()
+            }
+        }
+        // Darker than the app's background: the window is small and has to stay readable.
+        UIColor.black.withAlphaComponent(0.42).setFill()
+        context.fill(rect)
+    }
+
+    /// One frame of the drifting cover, at low resolution.
+    private func renderBackground(_ images: (id: String, base: CGImage, blob: CGImage), time t: CFTimeInterval) -> CGImage? {
+        let size = Self.backgroundSize
+        guard let small = CGContext(
+            data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0,
+            space: Self.sRGB,
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        ) else { return nil }
+        small.interpolationQuality = .low
+        let diagonal = hypot(size.width, size.height)
+        for layer in Self.backgroundLayers {
+            let side = diagonal * layer.size
+            let angle = 2 * Double.pi * t / layer.rotation
+            let drift = layer.driftPeriod > 0 ? 2 * Double.pi * t / layer.driftPeriod : 0
+            let center = CGPoint(
+                x: size.width * layer.center.x + CGFloat(cos(drift)) * size.width * layer.drift.width,
+                y: size.height * layer.center.y + CGFloat(sin(drift)) * size.height * layer.drift.height
+            )
+            small.saveGState()
+            small.translateBy(x: center.x, y: center.y)
+            small.rotate(by: CGFloat(angle))
+            small.draw(layer.blob ? images.blob : images.base, in: CGRect(x: -side / 2, y: -side / 2, width: side, height: side))
+            small.restoreGState()
+        }
+        return small.makeImage()
     }
 }
 
