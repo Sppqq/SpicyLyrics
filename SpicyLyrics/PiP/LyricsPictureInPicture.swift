@@ -374,6 +374,8 @@ final class PiPFrameRenderer {
         let ranges: [NSRange]
     }
     private var textLayout: TextLayout?
+    /// Font sizes that make a line fit its box, by text, size and box.
+    private var fittedSizes: [String: CGFloat] = [:]
 
     // The animated background is drawn small (200×100, ten times a second) and stretched: it is
     // a blur, so nobody can tell, and it costs a fraction of drawing it at full size.
@@ -539,8 +541,16 @@ final class PiPFrameRenderer {
             let alpha: CGFloat = exists ? (old == nil ? progress : 1) : 1 - progress
             context.saveGState()
             context.setAlpha(alpha)
-            let textFont = font(32 + 12 * active, active > 0.5 ? .bold : .semibold, snapshot.fontDesign)
+            let weight: UIFont.Weight = active > 0.5 ? .bold : .semibold
             let box = CGRect(x: inset, y: rowY, width: width, height: 48 + 68 * active)
+            // Long lines get a smaller font instead of being cut off with "…". Sizes are fitted
+            // for the two slots and blended while a row moves between them.
+            let small = fittedSize(row.text, preferred: 32, weight: .semibold, design: snapshot.fontDesign,
+                                   box: CGSize(width: width, height: 48))
+            let large = fittedSize(row.text, preferred: 44, weight: .bold, design: snapshot.fontDesign,
+                                   box: CGSize(width: width, height: 116))
+            let size = (small + (large - small) * active).rounded()
+            let textFont = font(size, weight, snapshot.fontDesign)
             if row.offset == 0, exists, snapshot.interlude, !snapshot.dots.isEmpty {
                 drawDots(snapshot, in: box, context: context)
             } else if row.offset == 0, exists, !snapshot.interlude {
@@ -577,8 +587,8 @@ final class PiPFrameRenderer {
             let layout = NSLayoutManager()
             let container = NSTextContainer(size: box.size)
             container.lineFragmentPadding = 0
-            container.maximumNumberOfLines = 2
-            container.lineBreakMode = .byTruncatingTail
+            container.maximumNumberOfLines = 0
+            container.lineBreakMode = .byWordWrapping
             storage.addLayoutManager(layout)
             layout.addTextContainer(container)
             layout.ensureLayout(for: container)
@@ -658,6 +668,26 @@ final class PiPFrameRenderer {
             context.restoreGState()
         }
         context.restoreGState()
+    }
+
+    /// The largest size (down to 60% of `preferred`) at which `text` fits in `box` without truncation.
+    private func fittedSize(_ text: String, preferred: CGFloat, weight: UIFont.Weight,
+                            design: UIFontDescriptor.SystemDesign, box: CGSize) -> CGFloat {
+        let key = "\(text)|\(preferred)|\(weight.rawValue)|\(design.rawValue)|\(box.width)|\(box.height)"
+        if let cached = fittedSizes[key] { return cached }
+        if fittedSizes.count > 64 { fittedSizes.removeAll() }
+        let minimum = (preferred * 0.6).rounded()
+        var size = preferred
+        while size > minimum {
+            let height = NSAttributedString(string: text, attributes: [.font: font(size, weight, design)])
+                .boundingRect(with: CGSize(width: box.width, height: .greatestFiniteMagnitude),
+                              options: [.usesLineFragmentOrigin], context: nil).height
+            if height <= box.height { break }
+            size -= 2
+        }
+        size = max(size, minimum)
+        fittedSizes[key] = size
+        return size
     }
 
     private func font(_ size: CGFloat, _ weight: UIFont.Weight, _ design: UIFontDescriptor.SystemDesign) -> UIFont {
