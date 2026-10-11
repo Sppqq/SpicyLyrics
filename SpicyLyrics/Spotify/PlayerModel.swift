@@ -93,9 +93,6 @@ final class PlayerModel {
     @ObservationIgnored private var lastRemoteMismatch: String?
     @ObservationIgnored private var holdUntil: CFTimeInterval = 0
     @ObservationIgnored private var backoffUntil: CFTimeInterval = 0
-    /// Consecutive App Remote queries saying we are ahead, and the smallest of those leads.
-    @ObservationIgnored private var remoteAheadStreak = 0
-    @ObservationIgnored private var remoteAheadLead: Double = 0
     /// When App Remote last said anything (event or query), to notice it going quiet.
     @ObservationIgnored private var lastRemoteSampleAt: CFTimeInterval = 0
     /// Asks App Remote for the position right now (set by `SpotifyAppRemote`).
@@ -147,10 +144,6 @@ final class PlayerModel {
     private static let normalRoundTrip: Double = 0.3
     /// App Remote answers slower than this went through a busy main thread: not trusted.
     private static let remoteMaxRoundTrip: Double = 0.25
-    /// Queries only move the clock forward, unless this many in a row agree we are this far
-    /// ahead (a bad reading pushed it there): then ease back by the smallest lead they saw.
-    private static let remoteAheadThreshold: Double = 0.35
-    private static let remoteAheadCount = 3
 
     /// The user's saved TTML files.
     @ObservationIgnored let localLyrics: LocalLyricsStore
@@ -428,7 +421,6 @@ final class PlayerModel {
         remoteConnected = connected
         remoteQueriesFrozen = false
         remoteDisagreements = 0
-        remoteAheadStreak = 0
         lastRemoteQuery = nil
         lastRemoteSampleAt = connected ? MediaClock.now() : 0
         // Back to the Web API: take its next answer as it is.
@@ -538,26 +530,15 @@ final class PlayerModel {
             log.add("remote", "\(summary) drift \(drift.signedMs) → ignored (cached answer)")
             return
         }
+        // Never backwards: Spotify's answers between events can lag behind its real position, so
+        // a query that says we are ahead is old news (events set the clock exactly anyway).
         var decision = "kept clock"
         if drift > Self.resyncThreshold {
             setClock(measured, at: now)
-            remoteAheadStreak = 0
             decision = "far behind → set"
         } else if drift > Self.refineThreshold {
             blend(to: measured, predicted: predicted, now: now)
-            remoteAheadStreak = 0
             decision = "behind → blend"
-        } else if drift < -Self.remoteAheadThreshold {
-            remoteAheadLead = remoteAheadStreak == 0 ? -drift : min(remoteAheadLead, -drift)
-            remoteAheadStreak += 1
-            decision = "ahead (\(remoteAheadStreak))"
-            if remoteAheadStreak >= Self.remoteAheadCount {
-                blend(to: predicted + unapplied - remoteAheadLead, predicted: predicted, now: now)
-                decision = "ahead \(remoteAheadStreak)× → ease back \(remoteAheadLead.signedMs)"
-                remoteAheadStreak = 0
-            }
-        } else {
-            remoteAheadStreak = 0
         }
         log.add("remote", "\(summary) drift \(drift.signedMs) → \(decision)")
         log.synced("App Remote", drift: drift)

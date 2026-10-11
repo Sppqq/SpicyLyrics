@@ -91,6 +91,8 @@ final class AppSettings {
     var hideStaticLyrics: Bool { didSet { defaults.set(hideStaticLyrics, forKey: Keys.hideStatic) } }
     /// `HiddenLyricsView.rawValue`: what fills the screen where lyrics were hidden.
     var hiddenLyricsView: String { didSet { defaults.set(hiddenLyricsView, forKey: Keys.hiddenLyricsView) } }
+    /// `NebulaColors.rawValue`: where the nebula takes its colours from.
+    var nebulaColors: String { didSet { defaults.set(nebulaColors, forKey: Keys.nebulaColors) } }
     /// One synced line under the big cover.
     var artworkLyricLine: Bool { didSet { defaults.set(artworkLyricLine, forKey: Keys.artworkLyricLine) } }
     /// `AutoSkipMode.rawValue`: skip songs without a Spicy Lyrics sync.
@@ -171,6 +173,7 @@ final class AppSettings {
             Keys.hideStatic: false,
             Keys.hiddenLyricsView: HiddenLyricsView.background.rawValue,
             Keys.artworkLyricLine: true,
+            Keys.nebulaColors: NebulaColors.cover.rawValue,
             Keys.autoSkip: AutoSkipMode.off.rawValue,
             Keys.blurStrength: 1.0,
             Keys.glowStrength: 1.0,
@@ -235,6 +238,7 @@ final class AppSettings {
         hideStaticLyrics = defaults.bool(forKey: Keys.hideStatic)
         hiddenLyricsView = defaults.string(forKey: Keys.hiddenLyricsView) ?? HiddenLyricsView.background.rawValue
         artworkLyricLine = defaults.bool(forKey: Keys.artworkLyricLine)
+        nebulaColors = defaults.string(forKey: Keys.nebulaColors) ?? NebulaColors.cover.rawValue
         autoSkipMode = defaults.string(forKey: Keys.autoSkip) ?? AutoSkipMode.off.rawValue
         blurStrength = defaults.double(forKey: Keys.blurStrength)
         glowStrength = defaults.double(forKey: Keys.glowStrength)
@@ -377,6 +381,7 @@ final class AppSettings {
         static let hideStatic = "hideStaticLyrics"
         static let hiddenLyricsView = "hiddenLyricsView"
         static let artworkLyricLine = "artworkLyricLine"
+        static let nebulaColors = "nebulaColors"
         static let autoSkip = "autoSkipMode"
         static let blurStrength = "blurStrength"
         static let glowStrength = "glowStrength"
@@ -417,6 +422,20 @@ enum HiddenLyricsView: String, CaseIterable, Identifiable {
         case .background: return String(localized: "Фон")
         case .artwork: return String(localized: "Большая обложка")
         case .visualizer: return String(localized: "Туманность")
+        }
+    }
+}
+
+/// Where the nebula behind the big cover takes its colours from.
+enum NebulaColors: String, CaseIterable, Identifiable {
+    case cover, random
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .cover: return String(localized: "Из обложки")
+        case .random: return String(localized: "Случайные")
         }
     }
 }

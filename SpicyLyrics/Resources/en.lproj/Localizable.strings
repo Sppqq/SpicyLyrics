@@ -39,7 +39,6 @@
 "Вкладка **Basic Information** → поле **Client ID** (32 символа, буквы и цифры) → скопируйте." = "**Basic Information** tab → **Client ID** field (32 letters and digits) → copy it.";
 "Включите музыку в Spotify" = "Play some music in Spotify";
 "Включите трек в Spotify, чтобы привязать к нему свой текст." = "Play a track in Spotify to attach your lyrics to it.";
-"Включить перевод" = "Turn On Translation";
 "Вместо строки" = "Instead of the line";
 "Войдите тем же аккаунтом, что и в приложении Spotify. При первом входе примите условия (Accept the terms) и подтвердите e-mail, если попросят." = "Sign in with the same account you use in Spotify. On first sign-in, accept the terms and confirm your email if asked.";
 "Войти заново" = "Sign In Again";
@@ -54,7 +53,6 @@
 "Выбрать файл .ttml" = "Choose .ttml File";
 "Выйти из Spotify" = "Sign Out of Spotify";
 "Выкл." = "Off";
-"Выключить перевод" = "Turn Off Translation";
 "Горизонтальный режим" = "Landscape";
 "Готово" = "Done";
 "Далее" = "Up Next";
@@ -70,7 +68,6 @@
 "Жесты" = "Gestures";
 "Загрузка текста…" = "Loading lyrics…";
 "Закрыть" = "Close";
-"Закрыть окно с текстом" = "Close Lyrics Window";
 "Запасной источник LRCLIB" = "LRCLIB as Fallback";
 "Затемнение" = "Dimming";
 "Интерфейс" = "Interface";
@@ -215,7 +212,6 @@
 "Текст не найден" = "No lyrics found";
 "Текст недоступен" = "Lyrics unavailable";
 "Текст поверх других приложений. Вручную окно открывается из меню «•••» в плеере." = "Lyrics over other apps. To open the window manually, use the “•••” menu in the player.";
-"Текст поверх приложений" = "Lyrics Over Other Apps";
 "Текст покажется только сейчас, до закрытия приложения." = "The lyrics show only now, until the app is closed.";
 "Текст сохранится в библиотеке и будет показываться для этого трека вместо текстов из сети." = "The lyrics are saved to the library and shown for this track instead of online lyrics.";
 "Текущий трек" = "Current Track";
@@ -372,6 +368,14 @@
 "Пропущено песен без синхронизации: %lld" = "Skipped songs without sync: %lld";
 "Большая обложка — во весь экран поверх туманности в цветах обложки, как в Apple Music: становится больше, когда кнопки прячутся, и чуть уменьшается на паузе. Туманность течёт, пока песня играет, и почти замирает на паузе." = "Big artwork fills the screen over a nebula in the cover's colours, like Apple Music: it grows when the controls hide and shrinks a little on pause. The nebula flows while the song plays and nearly stops on pause.";
 "Строка текста под обложкой" = "Lyric Line Under the Artwork";
-"Кнопка с цитатой внизу слева переключает текст и большую обложку. Под обложкой — строка, которую поют, с теми же анимациями, что и в тексте." = "The quote button at the bottom left switches between the lyrics and the big artwork. Under the artwork is the line being sung, with the same animations as the lyrics.";
 "Показать обложку" = "Show Artwork";
 "Показать текст" = "Show Lyrics";
+"Цвета туманности" = "Nebula Colours";
+"Из обложки" = "From the Artwork";
+"Случайные" = "Random";
+"Кнопка с цитатой внизу слева переключает текст и большую обложку. Под обложкой — строка, которую поют, с бэк-вокалом и теми же анимациями, что и в тексте. За обложкой течёт туманность: в цветах обложки или в случайных, своих для каждой песни." = "The quote button at the bottom left switches between the lyrics and the big artwork. Under the artwork is the line being sung, with its backing vocals and the same animations as the lyrics. Behind the artwork flows a nebula, in the artwork's colours or in random ones, its own for every song.";
+"Трек" = "Track";
+"Без перевода" = "No Translation";
+"Поверх" = "Float";
+"Закрыть окно" = "Close Window";
+"Ещё" = "More";

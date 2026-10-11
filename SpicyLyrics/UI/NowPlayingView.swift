@@ -69,7 +69,8 @@ struct NowPlayingView: View {
                 // Experimental: a visualizer where the lyrics were hidden.
                 ZStack {
                     if showVisualizer {
-                        CoverVisualizerView(player: player, reduced: reduced, dim: settings.backgroundDim)
+                        CoverVisualizerView(player: player, reduced: reduced, dim: settings.backgroundDim,
+                                            randomColors: settings.nebulaColors == NebulaColors.random.rawValue)
                             .allowsHitTesting(false)
                             .transition(.opacity)
                     }
@@ -580,43 +581,50 @@ struct NowPlayingView: View {
     /// Apple Music's "•••" button.
     private var moreMenu: some View {
         Menu {
-            Button {
-                showPicker = true
-            } label: {
-                Label(String(localized: "Выбрать трек"), systemImage: "music.note.list")
-            }
-            if let url = spotifyURL {
+            // Three rows at most: with large system text a long menu barely fits and scrolls badly.
+            // The everyday actions sit side by side in one row.
+            ControlGroup {
                 Button {
-                    UIApplication.shared.open(url)
+                    showPicker = true
                 } label: {
-                    Label(String(localized: "Открыть в Spotify"), systemImage: "arrow.up.forward.app")
+                    Label(String(localized: "Трек"), systemImage: "music.note.list")
+                }
+                Button {
+                    settings.translateLyrics.toggle()
+                } label: {
+                    Label(settings.translateLyrics ? String(localized: "Без перевода") : String(localized: "Перевод"),
+                          systemImage: "character.bubble")
+                }
+                if LyricsPictureInPicture.isSupported {
+                    Button {
+                        pip.isActive ? pip.stop() : pip.start()
+                    } label: {
+                        Label(pip.isActive ? String(localized: "Закрыть окно") : String(localized: "Поверх"),
+                              systemImage: pip.isActive ? "pip.exit" : "pip.enter")
+                    }
                 }
             }
-            Button {
-                player.loadLyrics(force: true)
-            } label: {
-                Label(String(localized: "Перезагрузить текст"), systemImage: "arrow.clockwise")
-            }
-            Button {
-                showOwnLyrics = true
-            } label: {
-                Label(String(localized: "Свой текст (TTML)"), systemImage: "doc.text")
-            }
-            Button {
-                settings.translateLyrics.toggle()
-            } label: {
-                Label(settings.translateLyrics ? String(localized: "Выключить перевод") : String(localized: "Включить перевод"),
-                      systemImage: "character.bubble")
-            }
-            if LyricsPictureInPicture.isSupported {
+            Menu {
                 Button {
-                    pip.isActive ? pip.stop() : pip.start()
+                    player.loadLyrics(force: true)
                 } label: {
-                    Label(pip.isActive ? String(localized: "Закрыть окно с текстом") : String(localized: "Текст поверх приложений"),
-                          systemImage: "pip.enter")
+                    Label(String(localized: "Перезагрузить текст"), systemImage: "arrow.clockwise")
                 }
+                Button {
+                    showOwnLyrics = true
+                } label: {
+                    Label(String(localized: "Свой текст (TTML)"), systemImage: "doc.text")
+                }
+                if let url = spotifyURL {
+                    Button {
+                        UIApplication.shared.open(url)
+                    } label: {
+                        Label(String(localized: "Открыть в Spotify"), systemImage: "arrow.up.forward.app")
+                    }
+                }
+            } label: {
+                Label(String(localized: "Ещё"), systemImage: "ellipsis.circle")
             }
-            Divider()
             Button {
                 showSettings = true
             } label: {
@@ -703,8 +711,8 @@ struct NowPlayingView: View {
             let freeHeight = geometry.size.height - topInset - bottomInset
             let lyrics = artworkLyrics
             let lineFont: CGFloat = isLandscape ? 20 : 24
-            // Room for two lines and a translation under the cover.
-            let lineHeight: CGFloat = lyrics == nil ? 0 : lineFont * 3.6
+            // Room for two lines and a backing vocal or a translation under the cover.
+            let lineHeight: CGFloat = lyrics == nil ? 0 : lineFont * 4.4
             let gap: CGFloat = lyrics == nil ? 0 : 20
             let side = max(0, min(geometry.size.width - margin * 2, freeHeight - margin * 2 - lineHeight - gap, 720))
             VStack(spacing: gap) {

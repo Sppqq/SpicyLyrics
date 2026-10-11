@@ -8,9 +8,12 @@ struct CoverVisualizerView: View {
     var reduced = false
     /// The background's darkening, so white lines stay readable on bright covers.
     var dim: Double = 0
+    /// Random colours (a new set for every song) instead of the cover's.
+    var randomColors = false
 
     var body: some View {
-        CoverVisualizer(image: player.backgroundArtwork, imageID: player.artworkID, player: player, reduced: reduced)
+        CoverVisualizer(image: player.backgroundArtwork, imageID: player.artworkID, player: player, reduced: reduced,
+                        randomColors: randomColors)
             .overlay(Color.black.opacity(dim))
             .ignoresSafeArea()
     }
@@ -24,6 +27,7 @@ struct CoverVisualizer: UIViewRepresentable {
     let imageID: String
     let player: PlayerModel
     var reduced = false
+    var randomColors = false
 
     static var isSupported: Bool { VisualizerSurface.isSupported }
 
@@ -42,7 +46,7 @@ struct CoverVisualizer: UIViewRepresentable {
     func updateUIView(_ view: VisualizerSurface, context: Context) {
         view.playing = player.isPlaying
         view.reduced = reduced
-        view.setImage(image, id: imageID)
+        view.setImage(image, id: imageID, random: randomColors)
     }
 }
 
@@ -97,11 +101,16 @@ final class VisualizerSurface: ShaderSurface {
         resetClock()
     }
 
-    func setImage(_ image: UIImage?, id: String) {
-        let key = image == nil ? "" : id
+    func setImage(_ image: UIImage?, id: String, random: Bool = false) {
+        let key = (image == nil ? "" : id) + (random ? "|random" : "")
         guard key != paletteKey else { return }
         paletteKey = key
         processing?.cancel()
+        if random {
+            // Its own colours for every song, the same ones each time it comes back.
+            target = CoverPalette.random(seed: id)
+            return
+        }
         guard let image else {
             target = .fallback
             return
@@ -142,6 +151,22 @@ struct CoverPalette {
 
     static let fallback = CoverPalette(deep: SIMD3(0.05, 0.04, 0.12), vivid: SIMD3(0.55, 0.25, 0.95),
                                        accent: SIMD3(1.0, 0.35, 0.55))
+
+    /// A random but harmonious set, picked by `seed` (the same seed, the same colours).
+    static func random(seed: String) -> CoverPalette {
+        var state: UInt64 = 1_469_598_103_934_665_603
+        for byte in seed.utf8 { state = (state ^ UInt64(byte)) &* 1_099_511_628_211 }
+        func next() -> Float {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return Float(state >> 40) / Float(1 << 24)
+        }
+        let hue: Float = next()
+        let spread: Float = 0.18 + next() * 0.3
+        let deep = rgb(h: fract(hue + 0.55), s: 0.6, v: 0.16)
+        let vivid = rgb(h: hue, s: 0.75, v: 0.95)
+        let accent = rgb(h: fract(hue + spread), s: 0.65, v: 1)
+        return CoverPalette(deep: deep, vivid: vivid, accent: accent)
+    }
 
     func mixed(toward other: CoverPalette, amount: Float) -> CoverPalette {
         CoverPalette(deep: deep + (other.deep - deep) * amount,
