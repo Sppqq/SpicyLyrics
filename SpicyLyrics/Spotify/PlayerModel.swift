@@ -484,7 +484,8 @@ final class PlayerModel {
 
     /// The cover App Remote sent, until (or instead of) the Web API's.
     func setRemoteArtwork(_ image: UIImage, uri: String) {
-        guard track?.uri == uri, lastArtworkURL == nil else { return }
+        // Unless the Web API's cover for this song is already on screen.
+        guard track?.uri == uri, lastArtworkURL == nil || artworkID != lastArtworkURL?.absoluteString else { return }
         artwork = image
         backgroundArtwork = image.downscaled(to: 160)
         artworkID = "remote:" + uri
@@ -805,11 +806,22 @@ final class PlayerModel {
             return
         }
         artworkTask = Task { [weak self] in
-            guard let response = try? await URLSession.shared.data(from: url),
-                  let image = UIImage(data: response.0),
-                  !Task.isCancelled,
-                  let self
-            else { return }
+            // A failed download used to leave the background black for the whole song.
+            var image: UIImage?
+            for delay in [0.0, 1, 3, 8] {
+                if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+                guard !Task.isCancelled else { return }
+                if let data = try? await URLSession.shared.data(from: url).0, let decoded = UIImage(data: data) {
+                    image = decoded
+                    break
+                }
+            }
+            guard let self, !Task.isCancelled else { return }
+            guard let image else {
+                // Try again on the next change; App Remote's cover may fill in meanwhile.
+                if self.lastArtworkURL == url { self.lastArtworkURL = nil }
+                return
+            }
             self.artwork = image
             self.backgroundArtwork = image.downscaled(to: 160)
             self.artworkID = url.absoluteString

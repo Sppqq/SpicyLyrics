@@ -73,6 +73,8 @@ final class CoverBlobsView: UIView {
     private var speed: Double = 1
     /// Size the running animations were built for; other layout passes leave them alone.
     private var animatedSize: CGSize = .zero
+    /// Size the cover layers were laid out for.
+    private var layoutSize: CGSize = .zero
     private var animated = true
     private var processing: Task<Void, Never>?
     private var foregroundObserver: NSObjectProtocol?
@@ -106,8 +108,11 @@ final class CoverBlobsView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         // SwiftUI lays this view out often; restarting here kept snapping the layers back to
-        // their first frame, so the background looked frozen.
-        guard bounds.size != animatedSize else { return }
+        // their first frame, so the background looked frozen. The layers are sized on their own
+        // key: `didMoveToWindow` can start the animations before the first layout, and keying
+        // the sizing on the animations then left the layers at zero size (a black background).
+        guard bounds.size != layoutSize || bounds.size != animatedSize else { return }
+        layoutSize = bounds.size
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         container.frame = bounds
