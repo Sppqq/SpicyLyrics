@@ -792,8 +792,12 @@ final class PiPFrameRenderer {
                 kind = .syllable
             case .letter(let w, let s, let l):
                 let syllable = Self.syllable(visual.lead, w, s)
-                if let letters = syllable?.letters, letters.indices.contains(l) {
-                    glyph = letters[l]
+                if let syllable, syllable.letters.indices.contains(l) {
+                    // The letter rides its word's own scale and lift.
+                    var letter = syllable.letters[l]
+                    letter.scale *= syllable.glyph.scale
+                    letter.yOffset += syllable.glyph.yOffset
+                    glyph = letter
                     kind = .letter
                 } else {
                     glyph = syllable?.glyph ?? GlyphVisual()

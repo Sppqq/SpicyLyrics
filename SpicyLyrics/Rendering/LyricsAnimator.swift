@@ -386,8 +386,14 @@ final class LyricsAnimator {
                 let syllable = words[w].syllables[s]
                 var store = springs[w][s]
                 var visual = visuals[w][s]
-                if let letters = syllable.letters {
-                    stepLetters(syllable, letters, &store, &visual, time: time, dt: dt, snap: snap)
+                if let letters = syllable.letters, let first = letters.first, let last = letters.last {
+                    // A letter group lives on the emphasized range (`Emphasize` ends it 250 ms early),
+                    // and the whole word rides the word springs while its letters ripple on top.
+                    var group = syllable
+                    group.start = first.start
+                    group.end = last.end
+                    stepSyllable(group, &store, &visual, time: time, dt: dt, snap: snap)
+                    stepLetters(group, letters, &store, &visual, time: time, dt: dt, snap: snap)
                 } else {
                     stepSyllable(syllable, &store, &visual, time: time, dt: dt, snap: snap)
                 }

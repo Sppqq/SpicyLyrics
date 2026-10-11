@@ -251,16 +251,30 @@ private struct WordFlowView: View {
             ? visuals[item.w][item.s] : SyllableVisual()
     }
 
+    /// A letter rides its word (the letter group's container in the extension), which has its
+    /// own scale and lift.
+    private func letterVisual(_ item: FlowItem, _ l: Int) -> GlyphVisual {
+        let syllable = visual(item)
+        var letter = syllable.letters.indices.contains(l) ? syllable.letters[l] : GlyphVisual()
+        letter.scale *= syllable.glyph.scale
+        letter.yOffset += syllable.glyph.yOffset
+        return letter
+    }
+
+    /// As the word grows, its letters spread from the word's centre.
+    private func letterSpread(_ item: FlowItem, _ l: Int, count: Int) -> CGFloat {
+        (CGFloat(l) - CGFloat(count - 1) / 2) * 0.58 * fontSize * CGFloat(visual(item).glyph.scale - 1)
+    }
+
     var body: some View {
         FlowLayout(alignment: alignment, spacing: typography.wordGap(fontSize), rowSpacing: 0) {
             ForEach(items) { item in
                 Group {
                     if let l = item.letter, let letters = words[item.w].syllables[item.s].letters {
-                        let letterVisuals = visual(item).letters
-                        GlyphView(text: letters[l].text,
-                                  visual: letterVisuals.indices.contains(l) ? letterVisuals[l] : GlyphVisual(),
+                        GlyphView(text: letters[l].text, visual: letterVisual(item, l),
                                   fontSize: fontSize, font: font, alpha: alpha, fade: typography.fillFade,
-                                  glowKind: .letter, glowScale: typography.glowScale)
+                                  glowKind: .letter, glowScale: typography.glowScale,
+                                  xOffset: letterSpread(item, l, count: letters.count))
                     } else {
                         GlyphView(text: words[item.w].syllables[item.s].text, visual: visual(item).glyph,
                                   fontSize: fontSize, font: font, alpha: alpha, fade: typography.fillFade,
@@ -282,6 +296,7 @@ private struct GlyphView: View {
     let fade: Double
     let glowKind: GlowKind
     let glowScale: Double
+    var xOffset: CGFloat = 0
 
     var body: some View {
         Text(text)
@@ -290,7 +305,7 @@ private struct GlyphView: View {
             .lyricFill(visual.gradient, alpha: alpha, fade: fade)
             .lyricGlow(visual.glow * glowScale, kind: glowKind)
             .scaleEffect(visual.scale)
-            .offset(y: visual.yOffset * fontSize)
+            .offset(x: xOffset, y: visual.yOffset * fontSize)
     }
 }
 
