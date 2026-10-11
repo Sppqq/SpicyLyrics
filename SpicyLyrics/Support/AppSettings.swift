@@ -42,6 +42,15 @@ final class AppSettings {
     /// Translate the lyrics on the device and show the translation under each line.
     var translateLyrics: Bool { didSet { defaults.set(translateLyrics, forKey: Keys.translate) } }
     var translationLanguage: String { didSet { defaults.set(translationLanguage, forKey: Keys.translationLanguage) } }
+    /// `TranslationProvider.rawValue`: where translations come from.
+    var translationProvider: String { didSet { defaults.set(translationProvider, forKey: Keys.translationProvider) } }
+    /// The user's own DeepL API key (kept in the Keychain).
+    var deeplKey: String {
+        didSet {
+            let key = deeplKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            if key.isEmpty { Keychain.delete(Self.deeplKeychainKey) } else { Keychain.write(Self.deeplKeychainKey, data: Data(key.utf8)) }
+        }
+    }
     /// Interface language: "system", "en" or "ru". Applied through `AppleLanguages` on the next launch.
     var appLanguage: String {
         didSet {
@@ -57,6 +66,8 @@ final class AppSettings {
     var pipAnimatedBackground: Bool { didSet { defaults.set(pipAnimatedBackground, forKey: Keys.pipAnimatedBackground) } }
     /// PiP: track and artist under the lyrics.
     var pipShowTitle: Bool { didSet { defaults.set(pipShowTitle, forKey: Keys.pipShowTitle) } }
+    /// `PiPFormat.rawValue`: the window's shape.
+    var pipFormat: String { didSet { defaults.set(pipFormat, forKey: Keys.pipFormat) } }
     /// Spicy Lyrics' Simple Lyrics Mode: calmer word animation, softer fill.
     var simpleLyricsMode: Bool { didSet { defaults.set(simpleLyricsMode, forKey: Keys.simpleMode) } }
     /// Centre the lyrics instead of aligning them left (duets then stay centred too).
@@ -100,8 +111,6 @@ final class AppSettings {
     var autoHideDelay: Double { didSet { defaults.set(autoHideDelay, forKey: Keys.autoHideDelay) } }
     /// `LyricsWeight.rawValue`.
     var lyricsWeight: String { didSet { defaults.set(lyricsWeight, forKey: Keys.lyricsWeight) } }
-    /// Writers, provider and community credits after the last line (app and PiP).
-    var showCredits: Bool { didSet { defaults.set(showCredits, forKey: Keys.showCredits) } }
     /// Where the line being sung sits in the visible lyrics: 0.5 is the middle (the original).
     var activeLinePosition: Double { didSet { defaults.set(activeLinePosition, forKey: Keys.activeLinePosition) } }
     /// × the speed of the glide to the next line.
@@ -146,6 +155,8 @@ final class AppSettings {
             Keys.appLanguage: "system",
             Keys.translationReplaces: false,
             Keys.translationLanguage: Locale.current.language.languageCode?.identifier ?? "en",
+            Keys.translationProvider: TranslationProvider.defaultProvider.rawValue,
+            Keys.pipFormat: PiPFormat.wide.rawValue,
             Keys.centerLyrics: false,
             Keys.lyricsFont: LyricsFont.standard.rawValue,
             Keys.landscapeTitle: true,
@@ -162,7 +173,6 @@ final class AppSettings {
             Keys.backgroundBlur: 1.0,
             Keys.autoHideDelay: 4.0,
             Keys.lyricsWeight: LyricsWeight.bold.rawValue,
-            Keys.showCredits: true,
             Keys.activeLinePosition: 0.5,
             Keys.scrollSpeed: 1.0,
             Keys.translationBrightness: 1.0,
@@ -203,6 +213,9 @@ final class AppSettings {
         translateLyrics = defaults.bool(forKey: Keys.translate)
         translationLanguage = defaults.string(forKey: Keys.translationLanguage) ?? "en"
         translationReplaces = defaults.bool(forKey: Keys.translationReplaces)
+        translationProvider = defaults.string(forKey: Keys.translationProvider) ?? TranslationProvider.defaultProvider.rawValue
+        deeplKey = Keychain.read(Self.deeplKeychainKey).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        pipFormat = defaults.string(forKey: Keys.pipFormat) ?? PiPFormat.wide.rawValue
         appLanguage = defaults.string(forKey: Keys.appLanguage) ?? "system"
         centerLyrics = defaults.bool(forKey: Keys.centerLyrics)
         lyricsFont = defaults.string(forKey: Keys.lyricsFont) ?? LyricsFont.standard.rawValue
@@ -221,7 +234,6 @@ final class AppSettings {
         backgroundBlur = defaults.double(forKey: Keys.backgroundBlur)
         autoHideDelay = defaults.double(forKey: Keys.autoHideDelay)
         lyricsWeight = defaults.string(forKey: Keys.lyricsWeight) ?? LyricsWeight.bold.rawValue
-        showCredits = defaults.bool(forKey: Keys.showCredits)
         activeLinePosition = defaults.double(forKey: Keys.activeLinePosition)
         scrollSpeed = defaults.double(forKey: Keys.scrollSpeed)
         translationBrightness = defaults.double(forKey: Keys.translationBrightness)
@@ -272,6 +284,15 @@ final class AppSettings {
     static let fontRange: ClosedRange<CGFloat> = 22...56
     static let defaultFontSize = 32.0
     static let defaultBackgroundDim = 0.28
+    private static let deeplKeychainKey = "deeplKey"
+
+    var provider: TranslationProvider {
+        let chosen = TranslationProvider(rawValue: translationProvider) ?? .defaultProvider
+        // Apple's on-device translation needs iOS 18: fall back to Google before that.
+        return chosen.isAvailable ? chosen : .google
+    }
+
+    var format: PiPFormat { PiPFormat(rawValue: pipFormat) ?? .wide }
 
     /// Back to the original look: text size, alignment, font and every effect slider.
     func resetLyricsLook() {
@@ -281,7 +302,6 @@ final class AppSettings {
         lineSpacingScale = 1
         translationScale = 1
         lyricsWeight = LyricsWeight.bold.rawValue
-        showCredits = true
         activeLinePosition = 0.5
         scrollSpeed = 1
         translationBrightness = 1
@@ -353,7 +373,8 @@ final class AppSettings {
         static let backgroundBlur = "backgroundBlur"
         static let autoHideDelay = "autoHideDelay"
         static let lyricsWeight = "lyricsWeight"
-        static let showCredits = "showCredits"
+        static let translationProvider = "translationProvider"
+        static let pipFormat = "pipFormat"
         static let activeLinePosition = "activeLinePosition"
         static let scrollSpeed = "scrollSpeed"
         static let translationBrightness = "translationBrightness"

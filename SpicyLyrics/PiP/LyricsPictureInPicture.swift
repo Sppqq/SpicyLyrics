@@ -14,12 +14,14 @@ import UIKit
 /// the main thread and reaches the main-actor player through `MainActor.assumeIsolated`.
 @Observable
 final class LyricsPictureInPicture: NSObject {
-    /// Frame size: 2:1 suits one or two lines of lyrics.
-    static let frameSize = CGSize(width: 800, height: 400)
-
     private(set) var isActive = false
+    /// The window is opening or closing: the app must keep following Spotify meanwhile.
+    private(set) var isTransitioning = false
     private(set) var isPossible = false
     private(set) var lastError: String?
+
+    /// The window is up, or about to be, or on its way out.
+    var keepsAppRunning: Bool { isActive || isTransitioning }
 
     @ObservationIgnored let displayLayer = AVSampleBufferDisplayLayer()
     @ObservationIgnored private var controller: AVPictureInPictureController?
@@ -27,7 +29,10 @@ final class LyricsPictureInPicture: NSObject {
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private weak var player: PlayerModel?
     @ObservationIgnored private var settings: AppSettings?
-    @ObservationIgnored private let renderer = PiPFrameRenderer(size: LyricsPictureInPicture.frameSize)
+    @ObservationIgnored private var renderer = PiPFrameRenderer(format: .wide)
+    /// Until then frames come at the full rate (the app is being left, the window may open).
+    @ObservationIgnored private var warmUntil: CFTimeInterval = 0
+    @ObservationIgnored private var lifecycleObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var lastPlaying: Bool?
     @ObservationIgnored private var lyricsAnimator: LyricsAnimator?
     /// What the animator was built for: comparing whole lyrics every frame was the costliest
@@ -59,14 +64,38 @@ final class LyricsPictureInPicture: NSObject {
             DispatchQueue.main.async { self?.isPossible = controller.isPictureInPicturePossible }
         }
         self.controller = controller
+        // Leaving the app: the window may open on its own any moment now, and it opens on
+        // whatever frame is on the layer. Make that one current and keep them coming.
+        lifecycleObservers.append(NotificationCenter.default.addObserver(
+            forName: UIApplication.willResignActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self, MainActor.assumeIsolated({ self.settings?.autoPictureInPicture ?? false }) else { return }
+            self.warmUp(for: 3)
+        })
         renderFrame()
         scheduleFrames(fps: idleFramesPerSecond)
     }
 
     /// While the window is closed: nothing, unless it may open on its own when leaving the app;
-    /// then a slow trickle keeps a current frame on the layer (PiP cannot start without one).
+    /// then a trickle keeps a fairly current frame on the layer (PiP cannot start without one).
     private var idleFramesPerSecond: Double {
-        MainActor.assumeIsolated { settings?.autoPictureInPicture ?? false } ? 1 : 0
+        MainActor.assumeIsolated { settings?.autoPictureInPicture ?? false } ? 2 : 0
+    }
+
+    /// Full-rate frames for a moment, starting with one right now.
+    private func warmUp(for seconds: Double) {
+        guard controller != nil, !isActive else { return }
+        warmUntil = MediaClock.now() + seconds
+        renderFrame()
+        scheduleFrames(fps: fullFramesPerSecond)
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds + 0.1) { [weak self] in
+            guard let self, !self.keepsAppRunning, !self.previewing else { return }
+            self.scheduleFrames(fps: self.idleFramesPerSecond)
+        }
+    }
+
+    private var fullFramesPerSecond: Double {
+        MainActor.assumeIsolated { settings?.pipFrameRate ?? 30 }
     }
 
     func setAutomaticStart(_ enabled: Bool) {
@@ -80,7 +109,7 @@ final class LyricsPictureInPicture: NSObject {
             lastError = String(localized: "Картинка в картинке не поддерживается на этом устройстве.")
             return
         }
-        renderFrame()
+        warmUp(for: 2)
         if controller.isPictureInPicturePossible {
             controller.startPictureInPicture()
         } else {
@@ -99,6 +128,11 @@ final class LyricsPictureInPicture: NSObject {
 
     func stop() {
         controller?.stopPictureInPicture()
+    }
+
+    /// A setting that changes the frame (its shape) changed: draw one now.
+    func refreshFrame() {
+        renderFrame()
     }
 
     /// Frames at the window's rate without a PiP window, shown in the app instead (Debug only:
@@ -130,6 +164,13 @@ final class LyricsPictureInPicture: NSObject {
         guard let player else { return }
         let output = displayLayer.sampleBufferRenderer
         if output.status == .failed { output.flush() }
+        // A new window shape: frames of the new size from here on.
+        let format = MainActor.assumeIsolated { settings?.format ?? .wide }
+        if renderer.shape != format {
+            SyncLog.log("pip", "format \(format.rawValue)")
+            renderer = PiPFrameRenderer(format: format)
+            output.flush()
+        }
         guard output.isReadyForMoreMediaData else { return }
         let reduced = MainActor.assumeIsolated { (settings?.powerSaving ?? false) || (performance?.constrained ?? false) }
         let snapshot = MainActor.assumeIsolated {
@@ -157,8 +198,10 @@ final class LyricsPictureInPicture: NSObject {
         // Full rate only while something moves: playing, or a line still sliding into place.
         if isActive || previewing {
             let moving = snapshot.isPlaying || renderer.isAnimating
-            let fps = MainActor.assumeIsolated { settings?.pipFrameRate ?? 30 }
+            let fps = fullFramesPerSecond
             scheduleFrames(fps: moving ? (reduced ? min(20, fps) : fps) : 5)
+        } else if isTransitioning || MediaClock.now() < warmUntil {
+            scheduleFrames(fps: fullFramesPerSecond)
         }
 
         // Keep the PiP play/pause button in step with Spotify.
@@ -172,29 +215,58 @@ final class LyricsPictureInPicture: NSObject {
 // MARK: - AVKit delegates
 
 extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
+    /// The window opening or closing is when the clock most often goes wrong (the app changes
+    /// state, the main thread is busy animating): check it against Spotify each time.
+    private func checkClock(_ reason: String) {
+        guard let player else { return }
+        MainActor.assumeIsolated { player.resync(reason) }
+    }
+
+    func pictureInPictureControllerWillStartPictureInPicture(_ controller: AVPictureInPictureController) {
+        SyncLog.log("pip", "starting")
+        isTransitioning = true
+        renderFrame()
+        scheduleFrames(fps: fullFramesPerSecond)
+        checkClock("pip opening")
+    }
+
     func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
         SyncLog.log("pip", "started")
         isActive = true
-        scheduleFrames(fps: 30)
+        isTransitioning = false
+        scheduleFrames(fps: fullFramesPerSecond)
         renderFrame()
+        checkClock("pip opened")
+    }
+
+    func pictureInPictureControllerWillStopPictureInPicture(_ controller: AVPictureInPictureController) {
+        SyncLog.log("pip", "stopping")
+        isTransitioning = true
     }
 
     func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
         SyncLog.log("pip", "stopped")
         isActive = false
+        isTransitioning = false
         scheduleFrames(fps: idleFramesPerSecond)
+        checkClock("pip closed")
     }
 
     func pictureInPictureController(_ controller: AVPictureInPictureController,
                                     failedToStartPictureInPictureWithError error: Error) {
         isActive = false
+        isTransitioning = false
+        scheduleFrames(fps: idleFramesPerSecond)
         SyncLog.log("pip", "failed to start: \(error.localizedDescription)")
         lastError = String(localized: "Не удалось открыть окно: \(error.localizedDescription)")
     }
 
     func pictureInPictureController(_ controller: AVPictureInPictureController,
                                     restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
-        completionHandler(true)
+        // Back to the app: let it catch up with the song and lay itself out first, so the window
+        // shrinks back onto lyrics that are already where they should be.
+        checkClock("back from pip")
+        DispatchQueue.main.async { completionHandler(true) }
     }
 }
 
@@ -232,6 +304,35 @@ extension LyricsPictureInPicture: AVPictureInPictureSampleBufferPlaybackDelegate
 
 // MARK: - What a frame shows
 
+/// Shape of the floating window: iOS sizes the window to the video's frame.
+enum PiPFormat: String, CaseIterable, Identifiable {
+    case wide, square, portrait, tall
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .wide: return String(localized: "Широкое 2:1")
+        case .square: return String(localized: "Квадрат 1:1")
+        case .portrait: return String(localized: "Вертикальное 3:4")
+        case .tall: return String(localized: "Высокое 9:16")
+        }
+    }
+
+    /// Frame size in pixels: about the same pixel count each, so every shape costs the same.
+    var frameSize: CGSize {
+        switch self {
+        case .wide: return CGSize(width: 800, height: 400)
+        case .square: return CGSize(width: 560, height: 560)
+        case .portrait: return CGSize(width: 480, height: 640)
+        case .tall: return CGSize(width: 432, height: 768)
+        }
+    }
+
+    /// Width ÷ height.
+    var aspect: CGFloat { frameSize.width / frameSize.height }
+}
+
 /// How the app draws its lyrics, from the settings.
 struct PiPStyle: Equatable {
     var design: UIFontDescriptor.SystemDesign = .default
@@ -246,7 +347,6 @@ struct PiPStyle: Equatable {
     /// Lyric size multiplier for the window.
     var textScale: CGFloat = 1
     var weight: UIFont.Weight = .bold
-    var showCredits = true
 
     /// Same as the app's `LyricsTypography.opacity`.
     func opacity(_ value: Double) -> CGFloat {
@@ -308,7 +408,6 @@ struct PiPSnapshot: @unchecked Sendable {
             style.lineSpacing = CGFloat(settings.lineSpacingScale)
             style.translationScale = CGFloat(settings.translationScale)
             style.weight = (LyricsWeight(rawValue: settings.lyricsWeight) ?? .bold).uiWeight
-            style.showCredits = settings.showCredits
             backgroundSaturation = settings.backgroundSaturation
         }
 
@@ -348,6 +447,7 @@ struct PiPSnapshot: @unchecked Sendable {
 /// distance blur and spring scroll, with the credits after the last line. Every row is laid
 /// out and rasterized once, so a frame is a copy of the cached background plus a few mask fills.
 final class PiPFrameRenderer {
+    let shape: PiPFormat
     private let size: CGSize
     private var pool: CVPixelBufferPool?
     private var format: CMVideoFormatDescription?
@@ -357,15 +457,33 @@ final class PiPFrameRenderer {
     private var fonts: [String: UIFont] = [:]
     private var gradients: [String: CGGradient] = [:]
 
-    // Layout of the 800×400 frame.
+    // Layout of the frame (pixels). Every shape keeps the same lyric size: iOS gives a tall
+    // window about the same area as a wide one, so the words come out as big on screen.
     private static let inset: CGFloat = 36
     /// Lyric size in frame pixels (the app's 32 pt on a phone, scaled to the window), times the
     /// window's text size setting.
     private static let baseLeadSize: CGFloat = 56
     private var leadSize: CGFloat = 56
-    /// Where the line in focus sits, from the top.
-    private static let anchor: CGFloat = 28
     private static let clipTop: CGFloat = 12
+
+    /// Where the line in focus sits, from the top of the lyrics: near the top in a wide window
+    /// (one or two lines show), about a third of the way down in a tall one.
+    private static func anchor(viewport: CGFloat) -> CGFloat {
+        max(28, (viewport - 300) * 0.4)
+    }
+
+    private static func clipBottom(height: CGFloat, showTitle: Bool) -> CGFloat {
+        height - (showTitle ? 62 : 10)
+    }
+
+    /// Where the middle of the line in focus sits, as a fraction of the frame's height: the app
+    /// puts the window's source there, so it opens from and closes onto the app's own lyrics.
+    static func focusFraction(format: PiPFormat, showTitle: Bool, textScale: Double) -> CGFloat {
+        let height = format.frameSize.height
+        let viewport = clipBottom(height: height, showTitle: showTitle) - clipTop
+        let lead = (baseLeadSize * CGFloat(textScale)).rounded()
+        return (clipTop + anchor(viewport: viewport) + lead * 0.6) / height
+    }
     /// Radius the soft masks are blurred with (frame pixels).
     private static let softRadius: CGFloat = 6
 
@@ -409,9 +527,9 @@ final class PiPFrameRenderer {
     /// The column is still gliding to its line.
     private(set) var isAnimating = false
 
-    // The animated background is drawn small (200×100, ten times a second), stretched into a
-    // cached full-size backdrop, and that backdrop is copied into every frame.
-    private static let backgroundSize = CGSize(width: 200, height: 100)
+    // The animated background is drawn small (a quarter of the frame, ten times a second),
+    // stretched into a cached full-size backdrop, and that backdrop is copied into every frame.
+    private var backgroundSize: CGSize { CGSize(width: (size.width / 4).rounded(), height: (size.height / 4).rounded()) }
     private static let backgroundInterval: CFTimeInterval = 0.1
     /// Same layers as the app's `CoverBlobsView`: size × diagonal, centre, rotation period (s),
     /// drift radii and period (s), whether the layer is a soft blob.
@@ -427,7 +545,9 @@ final class PiPFrameRenderer {
     private var backdropKey: (artworkID: String, animated: Bool, hasArtwork: Bool, dim: CGFloat)?
     private var backdropRenderedAt: CFTimeInterval = 0
 
-    init(size: CGSize) {
+    init(format: PiPFormat) {
+        self.shape = format
+        let size = format.frameSize
         self.size = size
         let attributes: [CFString: Any] = [
             kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA,
@@ -504,7 +624,7 @@ final class PiPFrameRenderer {
 
     private func drawContent(_ snapshot: PiPSnapshot, in rect: CGRect, now: CFTimeInterval, context: CGContext) {
         let inset = Self.inset
-        clipBottom = rect.height - (snapshot.showTitle ? 62 : 10)
+        clipBottom = Self.clipBottom(height: rect.height, showTitle: snapshot.showTitle)
 
         // Footer: track and artist (can be switched off).
         if snapshot.showTitle {
@@ -607,7 +727,8 @@ final class PiPFrameRenderer {
                        runs: runs, fontSize: CTFontGetSize(font), anchor: alignment, isBackground: line.isBackground)
         }
         lastLyricEnd = lyrics.kind == .static ? 0 : lyrics.lines.map(\.end).max() ?? 0
-        credits = style.showCredits ? creditsLayout(lyrics, width: column - cqw * 5, design: style.design) : nil
+        // Spicy Lyrics always credits the writers and the people who synced the lyrics.
+        credits = creditsLayout(lyrics, width: column - cqw * 5, design: style.design)
     }
 
     /// The block after the last line, as in the app (`LyricsCreditsView`).
@@ -676,19 +797,23 @@ final class PiPFrameRenderer {
 
         // Scroll target: the line in focus at the anchor, the credits once the song is sung.
         let viewport = clipBottom - Self.clipTop
+        let anchor = Self.anchor(viewport: viewport)
         var target: CGFloat
         if lyrics.kind == .static {
             let progress = snapshot.duration > 0 ? CGFloat(clamp(snapshot.position / snapshot.duration, 0, 1)) : 0
-            target = max(0, creditsTop - viewport * 0.5) * progress - Self.anchor
+            target = max(0, creditsTop - viewport * 0.5) * progress - anchor
         } else if snapshot.position > lastLyricEnd + 0.6, credits != nil {
-            target = creditsTop - Self.anchor
+            target = creditsTop - anchor
         } else {
-            target = (tops.indices.contains(snapshot.focus) ? tops[snapshot.focus] : 0) - Self.anchor
+            target = (tops.indices.contains(snapshot.focus) ? tops[snapshot.focus] : 0) - anchor
         }
         target = target.rounded()
+        // No frames for a while (the window was closed, the phone stalled): the column jumps to
+        // its line instead of gliding there from wherever it was left.
+        let resumed = lastStep.map { now - $0 > 0.4 } ?? true
         let dt = min(1.0 / 15, max(0, now - (lastStep ?? now)))
         lastStep = now
-        if scrollRevision != snapshot.revision || abs(target - scroll) > viewport * 2.5
+        if scrollRevision != snapshot.revision || abs(target - scroll) > viewport * 2.5 || resumed
             || UIAccessibility.isReduceMotionEnabled {
             scroll = target
             velocity = 0
@@ -1004,7 +1129,7 @@ final class PiPFrameRenderer {
 
     /// One frame of the drifting cover, at low resolution.
     private func renderBackground(_ images: (id: String, base: CGImage, blob: CGImage), time t: CFTimeInterval) -> CGImage? {
-        let size = Self.backgroundSize
+        let size = backgroundSize
         guard let small = CGContext(
             data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0,
             space: Self.sRGB, bitmapInfo: Self.bitmapInfo
@@ -1047,7 +1172,11 @@ struct PictureInPictureHost: UIViewRepresentable {
     final class HostView: UIView {
         override func layoutSubviews() {
             super.layoutSubviews()
+            // Follows the lyrics as the controls come and go; no implicit layer animation.
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
             layer.sublayers?.forEach { $0.frame = bounds }
+            CATransaction.commit()
         }
     }
 }

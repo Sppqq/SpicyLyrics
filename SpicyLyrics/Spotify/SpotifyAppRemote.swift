@@ -58,6 +58,7 @@ final class SpotifyAppRemote: NSObject {
     func start(player: PlayerModel) {
         self.player = player
         player.onRemoteStale = { [weak self] in self?.reconnect() }
+        player.onRemoteQueryNow = { [weak self] in self?.query() }
         wanted = true
         // Called on every scene change; a second `connect()` mid-attempt cancels the first.
         guard remote?.isConnected != true, status != .connecting else { return }
@@ -264,7 +265,8 @@ final class SpotifyAppRemote: NSObject {
         playerAPI.getPlayerState { [weak self] result, _ in
             let receivedAt = CACurrentMediaTime()
             guard let state = result as? SPTAppRemotePlayerState else { return }
-            let sample = Sample(state, at: sentAt + (receivedAt - sentAt) / 2, event: false)
+            let sample = Sample(state, at: sentAt + (receivedAt - sentAt) / 2, event: false,
+                                roundTrip: receivedAt - sentAt)
             Task { @MainActor in self?.player?.applyRemote(sample) }
         }
     }
@@ -294,8 +296,10 @@ final class SpotifyAppRemote: NSObject {
         var measuredAt: CFTimeInterval
         /// Pushed by Spotify on a change (exact), rather than asked for.
         var event: Bool
+        /// Queries: how long the answer took (`measuredAt` is only this exact).
+        var roundTrip: Double
 
-        init(_ state: SPTAppRemotePlayerState, at time: CFTimeInterval, event: Bool) {
+        init(_ state: SPTAppRemotePlayerState, at time: CFTimeInterval, event: Bool, roundTrip: Double = 0) {
             uri = state.track.uri
             name = state.track.name
             artist = state.track.artist.name
@@ -307,6 +311,7 @@ final class SpotifyAppRemote: NSObject {
             paused = state.isPaused
             measuredAt = time
             self.event = event
+            self.roundTrip = roundTrip
         }
 
         /// What App Remote knows of the song, enough for lyrics (the cover comes separately).

@@ -39,10 +39,13 @@ struct NowPlayingView: View {
             // Side by side in landscape, and on iPad in any orientation (wide enough for both).
             let landscape = (size.width > size.height && size.width > 560) || size.width >= 700
             ZStack {
-                // The PiP layer has to be in the window; it sits behind everything.
+                // The PiP layer has to be in the window; it sits behind everything, right under
+                // the lyrics: the floating window opens out of it and closes back into it.
                 if !pip.previewing {
+                    let source = pipSource(in: size, landscape: landscape)
                     PictureInPictureHost(pip: pip)
-                        .frame(width: 80, height: 40)
+                        .frame(width: source.width, height: source.height)
+                        .position(x: source.midX, y: source.midY)
                         .allowsHitTesting(false)
                 }
 
@@ -103,6 +106,7 @@ struct NowPlayingView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Self.relayoutWindows() }
         }
+        .onChange(of: settings.pipFormat) { _, _ in pip.refreshFrame() }
         .onChange(of: lyricsOnly) { _, value in
             if value { hideChrome() }
         }
@@ -226,6 +230,37 @@ struct NowPlayingView: View {
 
     /// Low Power Mode, a hot phone, or the battery saver setting.
     private var reduced: Bool { settings.powerSaving || performance.constrained }
+
+    /// Where the floating window opens from and closes back onto: across the lyrics, with the
+    /// window's line in focus on the app's active line, so the window seems to lift the lyrics
+    /// off the screen and put them back.
+    private func pipSource(in size: CGSize, landscape: Bool) -> CGRect {
+        let format = settings.format
+        let area: CGRect
+        var top: CGFloat = 0, bottom: CGFloat = 0
+        if landscape {
+            let column = min(size.width * 0.4, 420) + 12
+            area = CGRect(x: column, y: 0, width: max(1, size.width - column), height: size.height)
+        } else {
+            area = CGRect(origin: .zero, size: size)
+            top = chromeVisible ? headerHeight : 0
+            bottom = chromeVisible ? controlsHeight : 0
+        }
+        // `LyricsView.anchor`: the active line sits 30 pt above this spot in the visible lyrics.
+        let visible = max(area.height - top - bottom, 1)
+        let activeY = area.minY + top + visible * CGFloat(clamp(settings.activeLinePosition, 0.2, 0.8)) - 20
+        var width = max(area.width, 1)
+        var height = width / format.aspect
+        // Kept on screen: AVKit animates from the part of the layer it can see.
+        if height > size.height {
+            height = size.height
+            width = height * format.aspect
+        }
+        let fraction = PiPFrameRenderer.focusFraction(format: format, showTitle: settings.pipShowTitle,
+                                                      textScale: settings.pipTextScale)
+        let y = min(max(0, activeY - fraction * height), max(0, size.height - height))
+        return CGRect(x: area.midX - width / 2, y: y, width: width, height: height)
+    }
 
     private var lyricsLoaded: Bool {
         if case .loaded = player.lyricsState { return true }
@@ -522,13 +557,11 @@ struct NowPlayingView: View {
             } label: {
                 Label(String(localized: "Свой текст (TTML)"), systemImage: "doc.text")
             }
-            if #available(iOS 18.0, *) {
-                Button {
-                    settings.translateLyrics.toggle()
-                } label: {
-                    Label(settings.translateLyrics ? String(localized: "Выключить перевод") : String(localized: "Включить перевод"),
-                          systemImage: "character.bubble")
-                }
+            Button {
+                settings.translateLyrics.toggle()
+            } label: {
+                Label(settings.translateLyrics ? String(localized: "Выключить перевод") : String(localized: "Включить перевод"),
+                      systemImage: "character.bubble")
             }
             if LyricsPictureInPicture.isSupported {
                 Button {

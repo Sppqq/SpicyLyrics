@@ -43,6 +43,8 @@ struct PlaybackSnapshot {
     var progress: Double
     /// When the progress value was valid, in `CACurrentMediaTime()` seconds (latency compensated).
     var measuredAt: CFTimeInterval
+    /// How long the answering request took: `measuredAt` is only this exact (± half of it).
+    var roundTrip: Double
     /// The album / playlist / artist being played, e.g. `spotify:playlist:…`.
     var contextURI: String?
     var deviceName: String?
@@ -115,8 +117,11 @@ final class SpotifyAPI {
     /// `nil` when nothing is playing (HTTP 204). Uses `/me/player`, whose `is_playing` follows
     /// pauses much more reliably than `/me/player/currently-playing`.
     func playbackState() async throws -> PlaybackSnapshot? {
-        let sentAt = CACurrentMediaTime()
-        let (data, status) = try await send("GET", "/me/player?additional_types=track,episode")
+        // Timed from the request that answered: a token refresh or a retry on a fresh connection
+        // (both common right after returning to the app) must not count as network delay.
+        var sentAt = CACurrentMediaTime()
+        let (data, status) = try await send("GET", "/me/player?additional_types=track,episode",
+                                            onRequest: { sentAt = $0 })
         let receivedAt = CACurrentMediaTime()
         if status == 204 || data.isEmpty { return nil }
         try check(status, data)
@@ -146,6 +151,7 @@ final class SpotifyAPI {
             isPlaying: payload.is_playing,
             progress: Double(payload.progress_ms ?? 0) / 1000,
             measuredAt: measuredAt,
+            roundTrip: receivedAt - sentAt,
             contextURI: payload.context?.uri,
             deviceName: payload.device?.name,
             deviceType: payload.device?.type,
@@ -284,7 +290,7 @@ final class SpotifyAPI {
     }
 
     private func send(_ method: String, _ path: String, body: Data? = nil, idempotent: Bool = true,
-                      retried: Bool = false) async throws -> (Data, Int) {
+                      retried: Bool = false, onRequest: (CFTimeInterval) -> Void = { _ in }) async throws -> (Data, Int) {
         let token = try await auth.accessToken()
         var request = URLRequest(url: URL(string: "https://api.spotify.com/v1" + path)!)
         request.httpMethod = method
@@ -296,12 +302,12 @@ final class SpotifyAPI {
             if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         }
 
-        let (data, response) = try await perform(request, idempotent: idempotent || method == "GET")
+        let (data, response) = try await perform(request, idempotent: idempotent || method == "GET", onRequest: onRequest)
         let http = response as? HTTPURLResponse
         let status = http?.statusCode ?? 0
         if status == 401 && !retried {
             _ = try await auth.accessToken(forceRefresh: true)
-            return try await send(method, path, body: body, idempotent: idempotent, retried: true)
+            return try await send(method, path, body: body, idempotent: idempotent, retried: true, onRequest: onRequest)
         }
         if status == 429 {
             let retryAfter = Double(http?.value(forHTTPHeaderField: "Retry-After") ?? "") ?? 5
@@ -314,10 +320,12 @@ final class SpotifyAPI {
 
     /// Runs a request, retrying transient connection failures (a dropped VPN, a stale pooled
     /// connection after the app was in the background, a failed TLS handshake) on a fresh session.
-    private func perform(_ request: URLRequest, idempotent: Bool) async throws -> (Data, URLResponse) {
+    private func perform(_ request: URLRequest, idempotent: Bool,
+                         onRequest: (CFTimeInterval) -> Void = { _ in }) async throws -> (Data, URLResponse) {
         var attempt = 0
         while true {
             do {
+                onRequest(CACurrentMediaTime())
                 return try await session.data(for: request)
             } catch let error as URLError {
                 attempt += 1

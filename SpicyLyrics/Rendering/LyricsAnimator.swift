@@ -198,6 +198,11 @@ final class LyricsAnimator {
     private var springs: [LineSprings]
     private var lastFrame: CFTimeInterval?
     private var lastPosition: Double?
+    /// The last step jumped to the clock instead of animating (a seek, a resume, `snapNext()`).
+    private(set) var snapped = true
+
+    /// The next step jumps straight to the clock (it was just checked and may have moved).
+    func snapNext() { lastPosition = nil }
 
     init(lyrics: PreparedLyrics, simple: Bool = false) {
         self.lyrics = lyrics
@@ -211,11 +216,15 @@ final class LyricsAnimator {
         let position = position + (simple ? Curves.simplePositionOffset : 0)
         var dt = lastFrame.map { now - $0 } ?? (1.0 / 60)
         if dt <= 0 { return }
+        // No frames for a while (the app or the floating window was hidden, the phone stalled):
+        // whatever the springs were doing is stale, so snap like after a seek.
+        let resumed = dt > 0.4
         dt = min(dt, 1.0 / 15)
         // A seek: snap everything instead of animating across the whole song.
-        let jumped = lastPosition.map { abs(position - $0) > 1.5 } ?? true
+        let jumped = resumed || lastPosition.map { abs(position - $0) > 1.5 } ?? true
         lastFrame = now
         lastPosition = position
+        snapped = jumped
 
         if lyrics.kind == .static {
             guard jumped else { return }

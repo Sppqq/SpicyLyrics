@@ -126,10 +126,9 @@ struct LyricsView: View {
                                     .contextMenu { lineMenu(line) }
                                     .id(line.id)
                             }
-                            if settings.showCredits {
-                                LyricsCreditsView(lyrics: shown, lyricSize: typography.fontSize)
-                                    .padding(.top, typography.fontSize * 0.45)
-                            }
+                            // Spicy Lyrics always credits the writers and whoever synced the lyrics.
+                            LyricsCreditsView(lyrics: shown, lyricSize: typography.fontSize)
+                                .padding(.top, typography.fontSize * 0.45)
                         }
                         .padding(.horizontal, horizontalPadding)
                         .padding(.vertical, geometry.size.height * 0.6)
@@ -137,9 +136,24 @@ struct LyricsView: View {
                         .onTapGesture { onBackgroundTap() }
                         .onChange(of: focus) { _, newFocus in
                             guard shown.kind != .static, !userScrolling, Date() >= resumeAutoScrollAt else { return }
-                            withAnimation(scrollAnimation) {
+                            // After a seek or a gap (back from the background or PiP) jump to the
+                            // line: gliding across half the song would show it was ever behind.
+                            if animator.snapped {
                                 proxy.scrollTo(newFocus, anchor: anchor)
+                            } else {
+                                withAnimation(scrollAnimation) {
+                                    proxy.scrollTo(newFocus, anchor: anchor)
+                                }
                             }
+                        }
+                        // The clock was just checked (app or PiP opened or closed, a stall).
+                        .onChange(of: player.snapToken) { _, _ in
+                            animator.snapNext()
+                            let now = MediaClock.now()
+                            animator.step(position: player.position(at: now), now: now,
+                                          blurEnabled: settings.blurInactiveLines && !userScrolling && !reduced)
+                            guard shown.kind != .static, !userScrolling else { return }
+                            proxy.scrollTo(animator.focusIndex, anchor: anchor)
                         }
                         // The visible area changes when the controls show or hide: re-centre.
                         .onChange(of: anchor.y) { _, _ in

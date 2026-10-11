@@ -175,12 +175,6 @@ private struct TextLookSettings: View {
                 Text(String(localized: "Где держится строка, которую поют, и как быстро текст доезжает до следующей."))
             }
 
-            Section {
-                Toggle(String(localized: "Авторы в конце текста"), isOn: $settings.showCredits)
-            } footer: {
-                Text(String(localized: "Авторы песни, источник текста и кто его синхронизировал — после последней строки, в приложении и в PiP."))
-            }
-
             ResetSection(title: String(localized: "Вернуть как было")) { settings.resetLyricsLook() }
         }
     }
@@ -270,6 +264,18 @@ private struct BackgroundSettings: View {
 
 private struct LanguageSettings: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(PlayerModel.self) private var player
+
+    private var providerNote: String {
+        switch settings.provider {
+        case .apple:
+            return String(localized: "Apple переводит прямо на телефоне (iOS 18 и новее), без интернета. Строки, которые уже на выбранном языке, не переводятся. При первом использовании iOS предложит скачать языковую модель.")
+        case .google, .yandex:
+            return String(localized: "Строки текста отправляются в онлайн-переводчик. Нужен интернет; переводы запоминаются до перезапуска приложения. Строки, которые уже на выбранном языке, не переводятся.")
+        case .deepl:
+            return String(localized: "DeepL переводит лучше всех, но нужен свой ключ API: бесплатного тарифа (500 000 символов в месяц) хватает с запасом. Ключ хранится в связке ключей iOS.")
+        }
+    }
 
     var body: some View {
         @Bindable var settings = settings
@@ -283,6 +289,19 @@ private struct LanguageSettings: View {
             Section {
                 Toggle(String(localized: "Переводить текст"), isOn: $settings.translateLyrics)
                 if settings.translateLyrics {
+                    Picker(String(localized: "Переводчик"), selection: $settings.translationProvider) {
+                        ForEach(TranslationProvider.allCases.filter(\.isAvailable)) { provider in
+                            Text(provider.title).tag(provider.rawValue)
+                        }
+                    }
+                    if settings.provider == .deepl {
+                        SecureField(String(localized: "Ключ DeepL API"), text: $settings.deeplKey)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .font(.body.monospaced())
+                        Link(String(localized: "Получить бесплатный ключ DeepL"),
+                             destination: URL(string: "https://www.deepl.com/your-account/keys")!)
+                    }
                     Picker(String(localized: "Язык перевода"), selection: $settings.translationLanguage) {
                         ForEach(LyricsTranslation.languages, id: \.id) { language in
                             Text(language.name).tag(language.id)
@@ -298,9 +317,16 @@ private struct LanguageSettings: View {
                     }
                 }
             } footer: {
-                Text(settings.translateLyrics && settings.translationReplaces
-                     ? String(localized: "Перевод заменяет оригинал, а слова подсвечиваются по ритму исходной строки: время каждой строки делится между новыми словами по их длине. Перевод Apple на устройстве (iOS 18 и новее).")
-                     : String(localized: "Перевод Apple на устройстве (iOS 18 и новее). Строки, которые уже на выбранном языке, не переводятся. При первом использовании iOS предложит скачать языковую модель."))
+                VStack(alignment: .leading, spacing: 6) {
+                    if let error = player.translationError, settings.translateLyrics {
+                        Text(String(localized: "Последняя ошибка: \(error)"))
+                            .foregroundStyle(.orange)
+                    }
+                    if settings.translateLyrics && settings.translationReplaces {
+                        Text(String(localized: "Перевод заменяет оригинал, а слова подсвечиваются по ритму исходной строки: время каждой строки делится между новыми словами по их длине."))
+                    }
+                    Text(providerNote)
+                }
             }
         }
     }
@@ -394,12 +420,17 @@ private struct PictureInPictureSettings: View {
             }
 
             Section {
+                Picker(String(localized: "Форма окна"), selection: $settings.pipFormat) {
+                    ForEach(PiPFormat.allCases) { format in
+                        Text(format.title).tag(format.rawValue)
+                    }
+                }
                 Toggle(String(localized: "Анимированный фон"), isOn: $settings.pipAnimatedBackground)
                 Toggle(String(localized: "Название песни"), isOn: $settings.pipShowTitle)
             } header: {
                 Text(String(localized: "Окно"))
             } footer: {
-                Text(String(localized: "Анимированный фон — плавающая обложка, как в приложении. На слабых устройствах выключите его; в режиме экономии он и так неподвижен."))
+                Text(String(localized: "Широкое окно показывает одну-две строки, вертикальное — больше строк, как в плеере. Анимированный фон — плавающая обложка, как в приложении. На слабых устройствах выключите его; в режиме экономии он и так неподвижен."))
             }
 
             Section {
@@ -421,6 +452,7 @@ private struct PictureInPictureSettings: View {
             }
 
             ResetSection(title: String(localized: "Сбросить вид окна")) {
+                settings.pipFormat = PiPFormat.wide.rawValue
                 settings.pipTextScale = 1
                 settings.pipBackgroundDim = 0.42
                 settings.pipFrameRate = 30

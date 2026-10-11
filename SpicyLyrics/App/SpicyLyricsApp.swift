@@ -46,6 +46,9 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(LyricsPictureInPicture.self) private var pip
     @Environment(SpotifyAppRemote.self) private var appRemote
+    /// Letting go of Spotify after the app went to the background, unless the floating window
+    /// turns up meanwhile.
+    @State private var stopTask: Task<Void, Never>?
 
     var body: some View {
         Group {
@@ -55,10 +58,14 @@ struct RootView: View {
                 OnboardingView()
             }
         }
-        .onChange(of: scenePhase, initial: true) { _, phase in updateActivity(phase) }
+        .onChange(of: scenePhase, initial: true) { old, phase in
+            updateActivity(phase)
+            // Back in the app: the lyrics on screen were last drawn a while ago.
+            if phase == .active, old != .active { player.resync("app active") }
+        }
         .onChange(of: auth.isLoggedIn) { _, _ in updateActivity(scenePhase) }
         .onChange(of: settings.keepScreenOn) { _, _ in updateActivity(scenePhase) }
-        .onChange(of: pip.isActive) { _, _ in updateActivity(scenePhase) }
+        .onChange(of: pip.keepsAppRunning) { _, _ in updateActivity(scenePhase) }
         .onChange(of: settings.useAppRemote) { _, _ in appRemote.refresh() }
         .onChange(of: settings.syncLogEnabled) { _, enabled in SyncLog.shared.enabled = enabled }
         .onOpenURL { url in appRemote.handle(url) }
@@ -77,16 +84,42 @@ struct RootView: View {
         #endif
     }
 
+    /// Following Spotify is wanted: the app is on screen (Control Center or the app switcher
+    /// over it count), or the floating window is up or on its way.
+    private func wantsToFollow(_ phase: ScenePhase) -> Bool {
+        auth.isLoggedIn && (phase != .background || pip.keepsAppRunning)
+    }
+
     private func updateActivity(_ phase: ScenePhase) {
-        let active = phase == .active && auth.isLoggedIn
-        // The floating lyrics window keeps following Spotify while the app is in the background.
-        if active || (pip.isActive && auth.isLoggedIn) {
+        UIApplication.shared.isIdleTimerDisabled = phase == .active && auth.isLoggedIn && settings.keepScreenOn
+        if wantsToFollow(phase) {
+            stopTask?.cancel()
+            stopTask = nil
             player.startPolling()
             if settings.useAppRemote { appRemote.start(player: player) }
-        } else {
-            player.stopPolling()
-            appRemote.stop()
+            return
         }
-        UIApplication.shared.isIdleTimerDisabled = active && settings.keepScreenOn
+        guard auth.isLoggedIn else {
+            stopFollowing()
+            return
+        }
+        // Leaving the app: the floating window may still be opening (iOS only says so after its
+        // animation). Dropping App Remote right then and reconnecting a moment later was what
+        // threw the timing off: wait a little and look again.
+        guard stopTask == nil else { return }
+        stopTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            stopTask = nil
+            let phase: ScenePhase = UIApplication.shared.applicationState == .background ? .background : .active
+            if !wantsToFollow(phase) { stopFollowing() }
+        }
+    }
+
+    private func stopFollowing() {
+        stopTask?.cancel()
+        stopTask = nil
+        player.stopPolling()
+        appRemote.stop()
     }
 }
