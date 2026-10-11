@@ -17,6 +17,7 @@ struct NowPlayingView: View {
     @State private var skipFeedback: SkipDirection?
     @State private var skipCount = 0
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.scenePhase) private var scenePhase
     #if DEBUG
     @State private var chromeVisible = !UserDefaults.standard.bool(forKey: "demoHideChrome")
     #else
@@ -34,7 +35,7 @@ struct NowPlayingView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let size = geometry.size
+            let size = Self.clampedToWindow(geometry.size)
             // Side by side in landscape, and on iPad in any orientation (wide enough for both).
             let landscape = (size.width > size.height && size.width > 560) || size.width >= 700
             ZStack {
@@ -56,9 +57,9 @@ struct NowPlayingView: View {
                 )
 
                 if landscape {
-                    landscapeLayout(geometry.size)
+                    landscapeLayout(size)
                 } else {
-                    portraitLayout(geometry.size)
+                    portraitLayout(size)
                 }
 
                 Color.clear
@@ -93,6 +94,14 @@ struct NowPlayingView: View {
         .onChange(of: player.isPlaying) { _, playing in
             // Pausing brings the controls back, like Apple Music (not in lyrics-only mode).
             if !playing && !lyricsOnly { showChrome() }
+        }
+        .onChange(of: pip.isActive) { _, active in
+            // Coming back from the floating window can leave the hosting view at the size it had
+            // during the restore animation (wider than the screen): lay the window out again.
+            if !active { Self.relayoutWindows() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Self.relayoutWindows() }
         }
         .onChange(of: lyricsOnly) { _, value in
             if value { hideChrome() }
@@ -183,6 +192,36 @@ struct NowPlayingView: View {
     private struct AutoHideKey: Hashable {
         var tick: Int
         var eligible: Bool
+    }
+
+    /// The app's window, or nil before it exists.
+    private static var keyWindow: UIWindow? {
+        UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+            .first
+    }
+
+    /// Never lay out wider or taller than the window itself: after Picture in Picture the
+    /// proposed size could briefly be the restore animation's and the layout would stick to it.
+    private static func clampedToWindow(_ size: CGSize) -> CGSize {
+        guard let bounds = keyWindow?.bounds, bounds.width > 0, bounds.height > 0 else { return size }
+        return CGSize(width: min(size.width, bounds.width), height: min(size.height, bounds.height))
+    }
+
+    private static func relayoutWindows() {
+        DispatchQueue.main.async {
+            for scene in UIApplication.shared.connectedScenes {
+                guard let scene = scene as? UIWindowScene else { continue }
+                for window in scene.windows {
+                    if let root = window.rootViewController?.view, root.frame != window.bounds {
+                        SyncLog.log("pip", "root view \(root.frame.size) ≠ window \(window.bounds.size), fixing")
+                        root.frame = window.bounds
+                    }
+                    window.setNeedsLayout()
+                    window.layoutIfNeeded()
+                }
+            }
+        }
     }
 
     /// Low Power Mode, a hot phone, or the battery saver setting.
