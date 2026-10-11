@@ -18,6 +18,9 @@ struct LyricsView: View {
     var onInteraction: () -> Void = {}
     /// A tap on empty space between lines (toggles the controls).
     var onBackgroundTap: () -> Void = {}
+    /// Tapping a line seeks to it. Off while the controls are hidden: the first tap only brings
+    /// them back, so reaching the buttons from full-screen lyrics never rewinds the song.
+    var tapSeeks = true
 
     @State private var animator: LyricsAnimator
     @State private var userScrolling = false
@@ -31,7 +34,8 @@ struct LyricsView: View {
     init(lyrics: PreparedLyrics, player: PlayerModel, settings: AppSettings,
          topInset: CGFloat = 0, bottomInset: CGFloat = 0, horizontalPadding: CGFloat = 24,
          reduced: Bool = false, fontScale: CGFloat = 1,
-         onInteraction: @escaping () -> Void = {}, onBackgroundTap: @escaping () -> Void = {}) {
+         onInteraction: @escaping () -> Void = {}, onBackgroundTap: @escaping () -> Void = {},
+         tapSeeks: Bool = true) {
         self.lyrics = lyrics
         self.player = player
         self.settings = settings
@@ -42,6 +46,7 @@ struct LyricsView: View {
         self.fontScale = fontScale
         self.onInteraction = onInteraction
         self.onBackgroundTap = onBackgroundTap
+        self.tapSeeks = tapSeeks
         _animator = State(initialValue: LyricsAnimator(lyrics: lyrics, simple: settings.simpleLyricsMode))
     }
 
@@ -103,6 +108,7 @@ struct LyricsView: View {
                                     .equatable()
                                     .contentShape(Rectangle())
                                     .onTapGesture {
+                                        guard tapSeeks else { return onBackgroundTap() }
                                         onInteraction()
                                         guard shown.kind != .static else { return }
                                         resumeAutoScrollAt = .distantPast

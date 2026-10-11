@@ -244,9 +244,9 @@ struct NowPlayingView: View {
             // lyrics. A tap there brings them back instead of seeking to a line.
             if !chromeVisible {
                 VStack(spacing: 0) {
-                    wakeZone.frame(height: headerHeight)
+                    wakeZone.frame(height: headerHeight + 24)
                     Spacer(minLength: 0)
-                    wakeZone.frame(height: controlsHeight)
+                    wakeZone.frame(height: controlsHeight + 24)
                 }
             }
         }
@@ -333,7 +333,7 @@ struct NowPlayingView: View {
     // MARK: Header
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 4) {
             trackInfo
             moreMenu
         }
@@ -357,14 +357,15 @@ struct NowPlayingView: View {
             showPicker = true
         }
         .gesture(
-            DragGesture(minimumDistance: 20)
+            DragGesture(minimumDistance: 28)
                 .onChanged { value in
-                    guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                    guard abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }
                     headerSwipe = value.translation.width * 0.5
                 }
                 .onEnded { value in
                     let width = value.translation.width
-                    if abs(width) > 70, abs(width) > abs(value.translation.height) {
+                    // A deliberate, mostly horizontal swipe: a sloppy tap near "•••" must not skip.
+                    if abs(width) > 110, abs(width) > abs(value.translation.height) * 2 {
                         if width < 0 { player.next() } else { player.previous() }
                     }
                     showChrome()
@@ -458,6 +459,9 @@ struct NowPlayingView: View {
                 .foregroundStyle(.white)
                 .frame(width: 30, height: 30)
                 .background(.white.opacity(0.18), in: Circle())
+                // 48 pt touch target around the 30 pt circle.
+                .frame(width: 48, height: 48)
+                .contentShape(Rectangle())
                 .hoverEffect(.highlight)
         }
         .simultaneousGesture(TapGesture().onEnded { showChrome() })
@@ -531,7 +535,8 @@ struct NowPlayingView: View {
                 topInset: topInset, bottomInset: bottomInset,
                 horizontalPadding: horizontalPadding, reduced: reduced, fontScale: lyricFontScale,
                 onInteraction: { showChrome() },
-                onBackgroundTap: { toggleChrome() }
+                onBackgroundTap: { toggleChrome() },
+                tapSeeks: chromeVisible || lyricsOnly
             )
             .id(player.lyricsRevision)
             .overlay(alignment: .topTrailing) {
