@@ -370,13 +370,6 @@
 "Большая обложка" = "Big Artwork";
 "Вместо текста" = "Instead of Lyrics";
 "Пропущено песен без синхронизации: %lld" = "Skipped songs without sync: %lld";
-"Экран блокировки" = "Lock Screen";
-"Текст на экране блокировки" = "Lyrics on the Lock Screen";
-"Убрать текст с экрана блокировки" = "Remove Lyrics from the Lock Screen";
-"Live Activities выключены для Spicy Lyrics в настройках iOS." = "Live Activities are off for Spicy Lyrics in iOS Settings.";
-"Текущая строка на экране блокировки и в Dynamic Island (Live Activity). Пока она включена, приложение работает в фоне и следит за Spotify (играет беззвучный звук, который не мешает музыке), поэтому батарея тратится чуть быстрее. Если смахнуть её с экрана блокировки, она вернётся при следующем открытии приложения." = "The current line on the Lock Screen and in the Dynamic Island (Live Activity). While it is on, the app runs in the background and keeps following Spotify (it plays a silent sound that doesn't disturb the music), so the battery drains a little faster. Swipe it away on the Lock Screen and it comes back the next time you open the app.";
-"Следующая строка" = "Next Line";
-"Что показывать" = "Show";
 "Большая обложка — во весь экран поверх туманности в цветах обложки, как в Apple Music: становится больше, когда кнопки прячутся, и чуть уменьшается на паузе. Туманность течёт, пока песня играет, и почти замирает на паузе." = "Big artwork fills the screen over a nebula in the cover's colours, like Apple Music: it grows when the controls hide and shrinks a little on pause. The nebula flows while the song plays and nearly stops on pause.";
 "Строка текста под обложкой" = "Lyric Line Under the Artwork";
 "Кнопка с цитатой внизу слева переключает текст и большую обложку. Под обложкой — строка, которую поют, с теми же анимациями, что и в тексте." = "The quote button at the bottom left switches between the lyrics and the big artwork. Under the artwork is the line being sung, with the same animations as the lyrics.";
