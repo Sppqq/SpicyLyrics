@@ -118,12 +118,7 @@ struct NowPlayingView: View {
         .background { keyboardShortcuts }
         .statusBarHidden(!chromeVisible)
         .persistentSystemOverlays(chromeVisible ? .automatic : .hidden)
-        .task(id: AutoHideKey(tick: interactionTick, eligible: canAutoHide)) {
-            guard canAutoHide else { return }
-            try? await Task.sleep(for: .seconds(lyricsOnly ? 4 : settings.autoHideDelay))
-            guard !Task.isCancelled, canAutoHide else { return }
-            withAnimation(Self.chromeAnimation) { chromeVisible = false }
-        }
+        .task(id: AutoHideKey(tick: interactionTick, eligible: canAutoHide)) { await autoHideAfterDelay() }
         .onChange(of: player.isPlaying) { _, playing in
             // Pausing brings the controls back, like Apple Music (not in lyrics-only mode).
             if !playing && !lyricsOnly { showChrome() }
@@ -204,22 +199,7 @@ struct NowPlayingView: View {
         }
         #endif
         .onChange(of: settings.autoPictureInPicture) { _, enabled in pip.setAutomaticStart(enabled) }
-        .alert(String(localized: "Картинка в картинке"), isPresented: Binding(
-            get: { pip.lastError != nil && !pip.isActive },
-            set: { _ in }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(pip.lastError ?? "")
-        }
-        .alert("Spotify", isPresented: Binding(
-            get: { player.transientError != nil },
-            set: { if !$0 { player.transientError = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(player.transientError ?? "")
-        }
+        .modifier(NowPlayingAlerts(pip: pip, player: player))
     }
 
     // MARK: Chrome visibility
@@ -321,6 +301,14 @@ struct NowPlayingView: View {
     private var canAutoHide: Bool {
         guard chromeVisible, !showSettings, !showPicker, !showSetupGuide, !showOwnLyrics else { return false }
         return lyricsOnly || backgroundOnly || (settings.autoHideControls && player.isPlaying && lyricsLoaded)
+    }
+
+    /// Hides the controls after the set delay, unless something brought them back meanwhile.
+    private func autoHideAfterDelay() async {
+        guard canAutoHide else { return }
+        try? await Task.sleep(for: .seconds(lyricsOnly ? 4 : settings.autoHideDelay))
+        guard !Task.isCancelled, canAutoHide else { return }
+        withAnimation(Self.chromeAnimation) { chromeVisible = false }
     }
 
     private func showChrome() {
@@ -823,6 +811,37 @@ struct NowPlayingView: View {
         .foregroundStyle(.white)
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// The player's two alerts, kept out of its long modifier chain (older compilers took too long
+/// to type-check them inline).
+private struct NowPlayingAlerts: ViewModifier {
+    let pip: LyricsPictureInPicture
+    let player: PlayerModel
+
+    private var pipErrorShown: Binding<Bool> {
+        Binding(get: { pip.lastError != nil && !pip.isActive }, set: { _ in })
+    }
+
+    private var transientErrorShown: Binding<Bool> {
+        Binding(get: { player.transientError != nil }, set: { shown in
+            if !shown { player.transientError = nil }
+        })
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .alert(String(localized: "Картинка в картинке"), isPresented: pipErrorShown) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(pip.lastError ?? "")
+            }
+            .alert("Spotify", isPresented: transientErrorShown) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(player.transientError ?? "")
+            }
     }
 }
 

@@ -176,13 +176,23 @@ struct CoverPalette {
             return true
         }
         guard drawn else { return fallback }
-        let pixels = (0..<(n * n)).map {
-            SIMD3(Float(bytes[$0 * 4]), Float(bytes[$0 * 4 + 1]), Float(bytes[$0 * 4 + 2])) / 255
+        // Spelled out step by step: older compilers time out type-checking the compact forms.
+        var pixels: [SIMD3<Float>] = []
+        pixels.reserveCapacity(n * n)
+        for i in 0..<(n * n) {
+            let r = Float(bytes[i * 4]) / 255
+            let g = Float(bytes[i * 4 + 1]) / 255
+            let b = Float(bytes[i * 4 + 2]) / 255
+            pixels.append(SIMD3<Float>(r, g, b))
         }
 
         // k-means with k = 5, seeded along brightness.
         let sorted = pixels.sorted { luma($0) < luma($1) }
-        var centers = (0..<5).map { sorted[min(sorted.count - 1, ($0 * 2 + 1) * sorted.count / 10)] }
+        var centers: [SIMD3<Float>] = []
+        for k in 0..<5 {
+            let index: Int = min(sorted.count - 1, (k * 2 + 1) * sorted.count / 10)
+            centers.append(sorted[index])
+        }
         var counts = [Int](repeating: 0, count: centers.count)
         for _ in 0..<8 {
             var sums = [SIMD3<Float>](repeating: .zero, count: centers.count)
@@ -191,8 +201,8 @@ struct CoverPalette {
                 var best = 0
                 var bestDistance = Float.infinity
                 for (index, center) in centers.enumerated() {
-                    let d = pixel - center
-                    let distance = (d * d).sum()
+                    let d: SIMD3<Float> = pixel - center
+                    let distance: Float = d.x * d.x + d.y * d.y + d.z * d.z
                     if distance < bestDistance { bestDistance = distance; best = index }
                 }
                 sums[best] += pixel
@@ -202,7 +212,11 @@ struct CoverPalette {
                 centers[index] = sums[index] / Float(counts[index])
             }
         }
-        let clusters = centers.indices.filter { counts[$0] > 0 }.map { (color: centers[$0], share: Float(counts[$0]) / Float(pixels.count)) }
+        var clusters: [(color: SIMD3<Float>, share: Float)] = []
+        for index in centers.indices where counts[index] > 0 {
+            let share = Float(counts[index]) / Float(pixels.count)
+            clusters.append((color: centers[index], share: share))
+        }
         guard !clusters.isEmpty else { return fallback }
 
         func vividness(_ cluster: (color: SIMD3<Float>, share: Float)) -> Float {
