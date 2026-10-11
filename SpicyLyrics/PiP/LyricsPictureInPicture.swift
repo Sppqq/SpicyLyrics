@@ -497,16 +497,16 @@ final class PiPFrameRenderer {
     private func draw(_ snapshot: PiPSnapshot, in rect: CGRect, context: CGContext) {
         drawBackground(snapshot, in: rect, context: context)
 
-        let inset: CGFloat = 40
+        let inset = Self.inset
         let textWidth = rect.width - inset * 2
 
         // Footer: track and artist (can be switched off).
         if snapshot.showTitle {
             let footer = NSAttributedString(
                 string: snapshot.artist.isEmpty ? snapshot.title : "\(snapshot.title) — \(snapshot.artist)",
-                attributes: [.font: font(20, .semibold, snapshot.fontDesign), .foregroundColor: UIColor.white.withAlphaComponent(0.55)]
+                attributes: [.font: font(24, .semibold, snapshot.fontDesign), .foregroundColor: UIColor.white.withAlphaComponent(0.55)]
             )
-            footer.draw(with: CGRect(x: inset, y: rect.height - 46, width: textWidth, height: 28),
+            footer.draw(with: CGRect(x: inset, y: rect.height - 50, width: textWidth, height: 32),
                         options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
         }
 
@@ -525,28 +525,38 @@ final class PiPFrameRenderer {
         let progress = UIAccessibility.isReduceMotionEnabled ? 1 : min(1, max(0, (now - transitionStart) / 0.42))
         let eased = CGFloat(1 - pow(1 - progress, 3))
         context.saveGState()
-        context.clip(to: CGRect(x: inset - 8, y: 24, width: textWidth + 16,
-                                height: rect.height - (snapshot.showTitle ? 88 : 40)))
+        context.clip(to: CGRect(x: inset - 12, y: 14, width: textWidth + 24,
+                                height: rect.height - (snapshot.showTitle ? 72 : 28)))
         drawLyrics(snapshot, from: outgoingSnapshot, progress: eased, in: rect, context: context)
         context.restoreGState()
         if progress >= 1 { outgoingSnapshot = nil }
     }
 
+    // A PiP window on a phone is small: the frame shows the current line big, the next ones
+    // smaller, and nothing above. Every row is laid out once at the active size and only scaled
+    // while it moves, so its words never re-wrap mid-animation.
+    private static let inset: CGFloat = 36
+    private static let top: CGFloat = 26
+    private static let activeSize: CGFloat = 66
+    private static let activeMaxHeight: CGFloat = 176
+    /// Upcoming lines are the active layout at this scale.
+    private static let neighborScale: CGFloat = 0.6
+
     private func drawLyrics(_ snapshot: PiPSnapshot, from previous: PiPSnapshot?, progress: CGFloat,
                             in rect: CGRect, context: CGContext) {
-        let inset: CGFloat = 40
+        let inset = Self.inset
         let width = rect.width - inset * 2
         if let message = snapshot.message, snapshot.current.isEmpty, !snapshot.interlude {
             NSAttributedString(string: message, attributes: [
-                .font: font(36, .bold, snapshot.fontDesign),
+                .font: font(48, .bold, snapshot.fontDesign),
                 .foregroundColor: UIColor.white.withAlphaComponent(0.85),
-            ]).draw(with: CGRect(x: inset, y: 116, width: width, height: 110),
+            ]).draw(with: CGRect(x: inset, y: 100, width: width, height: 130),
                     options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
             return
         }
 
-        // Match rows by lyric identity: the upcoming row moves into the active slot,
-        // and the active row moves above it instead of replacing the entire frame.
+        // Match rows by lyric identity: the upcoming row moves into the active slot and the
+        // active one slides up and out.
         struct Row {
             var id: String
             var text: String
@@ -554,35 +564,32 @@ final class PiPFrameRenderer {
         }
         func rows(_ value: PiPSnapshot) -> [Row] {
             [Row(id: value.lineID, text: value.interlude ? "•  •  •" : value.current.map(\.text).joined(), offset: 0)] +
-                value.neighbors.map { Row(id: $0.id, text: $0.text, offset: $0.offset) }
+                value.neighbors.filter { $0.offset > 0 }.map { Row(id: $0.id, text: $0.text, offset: $0.offset) }
         }
-        // Room for the small rows under the active line (translation, backing vocals): half from
-        // the active slot, the rest by moving the rows below it down.
-        // The active line gives up at most 60 pt (it keeps room for two rows of text).
-        func extra(_ value: PiPSnapshot) -> CGFloat { CGFloat(value.underRows) * Self.backgroundRowHeight }
-        func shrink(_ value: PiPSnapshot) -> CGFloat { min(extra(value) / 2, 60) }
-        // The rows below start right under what the active line really takes (its text and the
-        // small rows), instead of at a fixed place sized for a three-row line.
+        let design = snapshot.fontDesign
+        /// The one size a row is laid out at, whether it is active or not.
+        func size(_ text: String) -> CGFloat {
+            fittedSize(text, preferred: Self.activeSize, weight: .bold, design: design,
+                       box: CGSize(width: width, height: Self.activeMaxHeight))
+        }
+        func textHeight(_ text: String) -> CGFloat {
+            min(Self.activeMaxHeight, measuredHeight(text, size: size(text), design: design, width: width))
+        }
         func activeBlock(_ value: PiPSnapshot) -> CGFloat {
-            let maxHeight = 116 - shrink(value)
-            var text: CGFloat = 60
             let line = value.current.map(\.text).joined()
-            if !value.interlude, !line.isEmpty {
-                let size = fittedSize(line, preferred: 44, weight: .bold, design: value.fontDesign,
-                                      box: CGSize(width: width, height: maxHeight))
-                text = min(maxHeight, measuredHeight(line, size: size, design: value.fontDesign, width: width))
-            }
-            return text + (value.underRows > 0 ? 4 + extra(value) : 0)
+            let text = value.interlude || line.isEmpty ? 70 : textHeight(line)
+            return text + (value.underRows > 0 ? 6 + CGFloat(value.underRows) * Self.backgroundRowHeight : 0)
         }
         func y(_ offset: Int, _ value: PiPSnapshot) -> CGFloat {
-            switch offset {
-            case ..<0: return 34
-            case 0: return 104
-            default: return 104 + activeBlock(value) + 22 + CGFloat(offset - 1) * 54
+            guard offset > 0 else { return Self.top }
+            var y = Self.top + activeBlock(value) + 20
+            for row in rows(value) where row.offset > 0 && row.offset < offset {
+                y += textHeight(row.text) * Self.neighborScale + 12
             }
+            return y
         }
-        let activeHeight = 116 - shrink(snapshot)
         func emphasis(_ offset: Int) -> CGFloat { offset == 0 ? 1 : 0 }
+
         let targetRows = rows(snapshot)
         let oldRows = previous.map(rows) ?? targetRows
         let oldByID = Dictionary(oldRows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -591,39 +598,35 @@ final class PiPFrameRenderer {
         for row in allRows where !row.text.isEmpty {
             let old = oldByID[row.id]
             let exists = targetIDs.contains(row.id)
-            let startY = old.map { y($0.offset, previous ?? snapshot) } ?? (y(row.offset, snapshot) + 44)
-            let endY = exists ? y(row.offset, snapshot) : -50
+            let startY = old.map { y($0.offset, previous ?? snapshot) } ?? (y(row.offset, snapshot) + 40)
+            let endY = exists ? y(row.offset, snapshot) : Self.top - textHeight(row.text) - 20
             let rowY = startY + (endY - startY) * progress
             let startEmphasis = old.map { emphasis($0.offset) } ?? 0
             let endEmphasis = exists ? emphasis(row.offset) : 0
             let active = startEmphasis + (endEmphasis - startEmphasis) * progress
             let alpha: CGFloat = exists ? (old == nil ? progress : 1) : 1 - progress
+            let scale = Self.neighborScale + (1 - Self.neighborScale) * active
+            let textFont = font(size(row.text), .bold, design)
+            let box = CGRect(x: 0, y: 0, width: width, height: Self.activeMaxHeight)
+
             context.saveGState()
             context.setAlpha(alpha)
-            let weight: UIFont.Weight = active > 0.5 ? .bold : .semibold
-            let box = CGRect(x: inset, y: rowY, width: width, height: 48 + (activeHeight - 48) * active)
-            // Long lines get a smaller font instead of being cut off with "…". Sizes are fitted
-            // for the two slots and blended while a row moves between them.
-            let small = fittedSize(row.text, preferred: 32, weight: .semibold, design: snapshot.fontDesign,
-                                   box: CGSize(width: width, height: 48))
-            let large = fittedSize(row.text, preferred: 44, weight: .bold, design: snapshot.fontDesign,
-                                   box: CGSize(width: width, height: activeHeight))
-            let size = (small + (large - small) * active).rounded()
-            let textFont = font(size, weight, snapshot.fontDesign)
+            context.translateBy(x: inset, y: rowY)
+            context.scaleBy(x: scale, y: scale)
             if row.offset == 0, exists, snapshot.interlude, !snapshot.dots.isEmpty {
-                drawDots(snapshot, in: box, context: context)
+                context.scaleBy(x: 1.6, y: 1.6)
+                drawDots(snapshot, in: CGRect(x: 0, y: 0, width: width, height: 60), context: context)
             } else if row.offset == 0, exists, !snapshot.interlude {
                 let used = drawSyllables(snapshot, font: textFont, in: box, context: context)
-                var top = box.minY + used + 4
+                var top = used + 6
                 if let translation = snapshot.translation {
-                    drawTranslation(translation, at: top, size: 24, alpha: 0.6, snapshot: snapshot, inset: inset, width: width)
+                    drawTranslation(translation, at: top, size: 34, alpha: 0.6, snapshot: snapshot, inset: 0, width: width)
                     top += Self.backgroundRowHeight
                 }
-                drawBackgroundVocals(snapshot, below: top, inset: inset, width: width, context: context)
+                drawBackgroundVocals(snapshot, below: top, inset: 0, width: width, context: context)
             } else {
-                let opacity: CGFloat = 0.28 + 0.65 * active
                 NSAttributedString(string: row.text, attributes: [
-                    .font: textFont, .foregroundColor: UIColor.white.withAlphaComponent(opacity),
+                    .font: textFont, .foregroundColor: UIColor.white.withAlphaComponent(0.4 + 0.55 * active),
                 ]).draw(with: box, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
             }
             context.restoreGState()
@@ -725,7 +728,7 @@ final class PiPFrameRenderer {
         return usedHeight
     }
 
-    private static let backgroundRowHeight: CGFloat = 32
+    private static let backgroundRowHeight: CGFloat = 48
 
     /// Backing vocals under the active line, smaller and dimmer (`.bg-line` is 0.75× the lead
     /// size, `--gradient-alpha` 0.6 / 0.3), animated like the lead: fill, lift, scale and glow.
@@ -738,7 +741,7 @@ final class PiPFrameRenderer {
                 ? plain.map { PiPSnapshot.AnimatedRun(text: $0.text, visual: GlyphVisual(gradient: $0.lit)) }
                 : animated
             let text = runs.map(\.text).joined()
-            let size = fittedSize(text, preferred: 26, weight: .bold, design: snapshot.fontDesign,
+            let size = fittedSize(text, preferred: 40, weight: .bold, design: snapshot.fontDesign,
                                   box: CGSize(width: width, height: Self.backgroundRowHeight))
             drawRuns(runs, slot: "bg\(index)", simple: snapshot.simple, font: font(size, .bold, snapshot.fontDesign),
                      in: CGRect(x: inset, y: top, width: width, height: Self.backgroundRowHeight),
@@ -746,7 +749,7 @@ final class PiPFrameRenderer {
             top += Self.backgroundRowHeight
             if snapshot.backgroundTranslations.indices.contains(index),
                let translation = snapshot.backgroundTranslations[index] {
-                drawTranslation(translation, at: top, size: 20, alpha: 0.45, snapshot: snapshot, inset: inset, width: width)
+                drawTranslation(translation, at: top, size: 30, alpha: 0.45, snapshot: snapshot, inset: inset, width: width)
                 top += Self.backgroundRowHeight
             }
         }
