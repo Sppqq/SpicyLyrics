@@ -16,7 +16,7 @@ struct OnboardingView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Spicy Lyrics")
                             .font(.system(size: 40, weight: .heavy))
-                        Text("Синхронные по словам тексты для того, что играет у вас в Spotify.")
+                        Text(String(localized: "Синхронные по словам тексты для того, что играет у вас в Spotify."))
                             .font(.title3.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
@@ -36,7 +36,7 @@ struct OnboardingView: View {
                     NavigationLink {
                         SpotifySetupGuideView()
                     } label: {
-                        Label(canLogIn ? "Сменить Client ID" : "Настроить доступ к Spotify (5 минут)",
+                        Label(canLogIn ? String(localized: "Сменить Client ID") : String(localized: "Настроить доступ к Spotify (5 минут)"),
                               systemImage: "key.horizontal")
                             .font(.headline)
                             .frame(maxWidth: .infinity)
@@ -45,7 +45,7 @@ struct OnboardingView: View {
                             .foregroundStyle(canLogIn ? .white : .black)
                     }
 
-                    Text("Приложение не связано со Spotify AB и с авторами Spicy Lyrics. Это неофициальный порт расширения Spicy Lyrics под AGPL-3.0.")
+                    Text(String(localized: "Приложение не связано со Spotify AB и с авторами Spicy Lyrics. Это неофициальный порт расширения Spicy Lyrics под AGPL-3.0."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -65,7 +65,7 @@ struct OnboardingView: View {
         } label: {
             HStack {
                 if busy { ProgressView().tint(.black) }
-                Text("Войти через Spotify")
+                Text(String(localized: "Войти через Spotify"))
                     .font(.headline)
             }
             .frame(maxWidth: .infinity)
@@ -79,11 +79,11 @@ struct OnboardingView: View {
     @ViewBuilder
     private var accessExplanation: some View {
         if canLogIn {
-            Text("Используется ваш Client ID …\(String(settings.spotifyClientID.suffix(4))).")
+            Text(String(localized: "Используется ваш Client ID …\(String(settings.spotifyClientID.suffix(4)))."))
                 .font(.callout)
                 .foregroundStyle(.white.opacity(0.7))
         } else {
-            Text("Чтобы приложение видело, что играет в Spotify, нужно своё приложение в бесплатном кабинете разработчика Spotify и его Client ID. Это обязательно и занимает около 5 минут (нужен Spotify Premium). Пошаговая инструкция — по кнопке ниже.")
+            Text(String(localized: "Чтобы приложение видело, что играет в Spotify, нужно своё приложение в бесплатном кабинете разработчика Spotify и его Client ID. Это обязательно и занимает около 5 минут (нужен Spotify Premium). Пошаговая инструкция — по кнопке ниже."))
                 .font(.callout)
                 .foregroundStyle(.white.opacity(0.7))
         }

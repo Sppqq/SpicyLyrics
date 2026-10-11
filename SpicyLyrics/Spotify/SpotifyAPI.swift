@@ -66,25 +66,25 @@ enum SpotifyAPIError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .premiumRequired: return "Управление воспроизведением через Web API доступно только с Spotify Premium."
-        case .noActiveDevice: return "Нет активного устройства Spotify. Включите музыку в приложении Spotify."
-        case .rateLimited: return "Spotify временно ограничил запросы, повторим позже."
+        case .premiumRequired: return String(localized: "Управление воспроизведением через Web API доступно только с Spotify Premium.")
+        case .noActiveDevice: return String(localized: "Нет активного устройства Spotify. Включите музыку в приложении Spotify.")
+        case .rateLimited: return String(localized: "Spotify временно ограничил запросы, повторим позже.")
         case .quotaExceeded:
-            return "У вашего Client ID закончился лимит запросов Spotify. Подождите немного."
+            return String(localized: "У вашего Client ID закончился лимит запросов Spotify. Подождите немного.")
         case .userNotRegistered:
-            return "Этот аккаунт Spotify не добавлен в ваше приложение Spotify. В developer.spotify.com откройте приложение → Settings → User Management и добавьте e-mail этого аккаунта."
-        case .missingScope: return "Нужно заново войти в Spotify, чтобы выдать приложению новое разрешение."
+            return String(localized: "Этот аккаунт Spotify не добавлен в ваше приложение Spotify. В developer.spotify.com откройте приложение → Settings → User Management и добавьте e-mail этого аккаунта.")
+        case .missingScope: return String(localized: "Нужно заново войти в Spotify, чтобы выдать приложению новое разрешение.")
         case .network(let error):
             switch error.code {
             case .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
                  .serverCertificateNotYetValid, .serverCertificateHasUnknownRoot, .clientCertificateRejected:
-                return "Не удалось установить защищённое соединение (TLS) со Spotify. Если включён VPN или прокси, попробуйте переподключить его."
+                return String(localized: "Не удалось установить защищённое соединение (TLS) со Spotify. Если включён VPN или прокси, попробуйте переподключить его.")
             case .notConnectedToInternet:
-                return "Нет подключения к интернету."
+                return String(localized: "Нет подключения к интернету.")
             case .timedOut:
-                return "Spotify не ответил вовремя. Попробуйте ещё раз."
+                return String(localized: "Spotify не ответил вовремя. Попробуйте ещё раз.")
             default:
-                return "Не удалось связаться со Spotify: \(error.localizedDescription)"
+                return String(localized: "Не удалось связаться со Spotify: \(error.localizedDescription)")
             }
         case .http(let code, let message): return "Spotify API: HTTP \(code) \(message)"
         }

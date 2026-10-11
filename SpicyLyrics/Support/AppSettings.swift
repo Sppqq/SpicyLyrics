@@ -25,6 +25,13 @@ final class AppSettings {
     /// Translate the lyrics on the device and show the translation under each line.
     var translateLyrics: Bool { didSet { defaults.set(translateLyrics, forKey: Keys.translate) } }
     var translationLanguage: String { didSet { defaults.set(translationLanguage, forKey: Keys.translationLanguage) } }
+    /// Interface language: "system", "en" or "ru". Applied through `AppleLanguages` on the next launch.
+    var appLanguage: String {
+        didSet {
+            defaults.set(appLanguage, forKey: Keys.appLanguage)
+            Self.applyLanguage(appLanguage)
+        }
+    }
     /// Show the translation instead of the original line (re-timed), not under it.
     var translationReplaces: Bool { didSet { defaults.set(translationReplaces, forKey: Keys.translationReplaces) } }
     /// Open the floating lyrics window when leaving the app.
@@ -96,6 +103,7 @@ final class AppSettings {
             Keys.simpleMode: false,
             Keys.autoPiP: false,
             Keys.translate: false,
+            Keys.appLanguage: "system",
             Keys.translationReplaces: false,
             Keys.translationLanguage: Locale.current.language.languageCode?.identifier ?? "en",
             Keys.centerLyrics: false,
@@ -133,6 +141,7 @@ final class AppSettings {
         translateLyrics = defaults.bool(forKey: Keys.translate)
         translationLanguage = defaults.string(forKey: Keys.translationLanguage) ?? "en"
         translationReplaces = defaults.bool(forKey: Keys.translationReplaces)
+        appLanguage = defaults.string(forKey: Keys.appLanguage) ?? "system"
         centerLyrics = defaults.bool(forKey: Keys.centerLyrics)
         lyricsFont = defaults.string(forKey: Keys.lyricsFont) ?? LyricsFont.standard.rawValue
         landscapeArtwork = defaults.bool(forKey: Keys.landscapeArtwork)
@@ -173,6 +182,16 @@ final class AppSettings {
         let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard key.hasPrefix("sl_pk_"), key.count >= 14 else { return nil }
         return key
+    }
+
+    /// The app follows the phone's language (English unless it is Russian) or a fixed choice.
+    /// iOS reads `AppleLanguages` at launch, so a change shows after the app restarts.
+    static func applyLanguage(_ language: String) {
+        if language == "en" || language == "ru" {
+            UserDefaults.standard.set([language], forKey: "AppleLanguages")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        }
     }
 
     /// Lyric font size limits (settings slider and pinch).
@@ -226,6 +245,7 @@ final class AppSettings {
         static let translate = "translateLyrics"
         static let translationLanguage = "translationLanguage"
         static let translationReplaces = "translationReplaces"
+        static let appLanguage = "appLanguage"
         static let centerLyrics = "centerLyrics"
         static let lyricsFont = "lyricsFont"
         static let landscapeArtwork = "landscapeArtwork"

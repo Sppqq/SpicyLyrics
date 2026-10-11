@@ -179,7 +179,7 @@ final class CoverBlobsView: UIView {
 
     /// Small, saturated, pre-blurred copies: one opaque, one fading out radially for the blobs.
     /// Scaled up to fill the screen, a tiny image looks exactly like a heavy blur.
-    static func render(_ image: UIImage, blur: Double = 1) -> (base: CGImage, blob: CGImage)? {
+    nonisolated static func render(_ image: UIImage, blur: Double = 1) -> (base: CGImage, blob: CGImage)? {
         let blur = clamp(blur, 0.3, 3)
         guard let cgImage = image.downscaled(to: CGFloat(96 / blur)).cgImage else { return nil }
         let input = CIImage(cgImage: cgImage)

@@ -12,48 +12,48 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Вид текста") {
-                    category("Текст", "textformat.size", .purple,
+                Section(String(localized: "Вид текста")) {
+                    category(String(localized: "Текст"), "textformat.size", .purple,
                              value: "\(Int(settings.fontSize)) pt") { TextLookSettings() }
-                    category("Эффекты", "sparkles", .pink,
+                    category(String(localized: "Эффекты"), "sparkles", .pink,
                              value: settings.simpleLyricsMode ? "Simple" : nil) { EffectsSettings() }
-                    category("Фон", "photo.fill", .indigo,
-                             value: settings.dynamicBackground ? nil : "Выкл.") { BackgroundSettings() }
-                    category("Перевод и романизация", "character.bubble.fill", .blue,
+                    category(String(localized: "Фон"), "photo.fill", .indigo,
+                             value: settings.dynamicBackground ? nil : String(localized: "Выкл.")) { BackgroundSettings() }
+                    category(String(localized: "Перевод и романизация"), "character.bubble.fill", .blue,
                              value: translationSummary) { LanguageSettings() }
                 }
 
-                Section("Экран плеера") {
-                    category("Интерфейс", "rectangle.bottomhalf.inset.filled", .orange) { InterfaceSettings() }
-                    category("Горизонтальный режим", "rectangle.landscape.rotate", .teal,
-                             value: settings.landscapeLyricsOnly ? "Только текст" : nil) { LandscapeSettings() }
-                    category("Жесты", "hand.draw.fill", .red,
-                             value: settings.gesturesEnabled ? "Вкл." : "Выкл.") { GestureSettings() }
-                    category("Картинка в картинке", "pip.fill", .green,
-                             value: settings.autoPictureInPicture ? "Авто" : nil) { PictureInPictureSettings() }
+                Section(String(localized: "Экран плеера")) {
+                    category(String(localized: "Интерфейс"), "rectangle.bottomhalf.inset.filled", .orange) { InterfaceSettings() }
+                    category(String(localized: "Горизонтальный режим"), "rectangle.landscape.rotate", .teal,
+                             value: settings.landscapeLyricsOnly ? String(localized: "Только текст") : nil) { LandscapeSettings() }
+                    category(String(localized: "Жесты"), "hand.draw.fill", .red,
+                             value: settings.gesturesEnabled ? String(localized: "Вкл.") : String(localized: "Выкл.")) { GestureSettings() }
+                    category(String(localized: "Картинка в картинке"), "pip.fill", .green,
+                             value: settings.autoPictureInPicture ? String(localized: "Авто") : nil) { PictureInPictureSettings() }
                 }
 
-                Section("Работа") {
-                    category("Синхронизация", "timer", .cyan,
-                             value: settings.timingOffsetMs == 0 ? nil : "\(Int(settings.timingOffsetMs)) мс") { SyncSettings() }
-                    category("Батарея и нагрев", "bolt.fill", .yellow,
-                             value: settings.powerSaving ? "Экономия" : (performance.constrained ? "Авто-экономия" : nil)) {
+                Section(String(localized: "Работа")) {
+                    category(String(localized: "Синхронизация"), "timer", .cyan,
+                             value: settings.timingOffsetMs == 0 ? nil : String(localized: "\(Int(settings.timingOffsetMs)) мс")) { SyncSettings() }
+                    category(String(localized: "Батарея и нагрев"), "bolt.fill", .yellow,
+                             value: settings.powerSaving ? String(localized: "Экономия") : (performance.constrained ? String(localized: "Авто-экономия") : nil)) {
                         PerformanceSettings()
                     }
-                    category("Источники текстов", "doc.text.fill", .brown) { SourceSettings() }
+                    category(String(localized: "Источники текстов"), "doc.text.fill", .brown) { SourceSettings() }
                     category("Spotify", "music.note", Color(red: 0.12, green: 0.84, blue: 0.38),
-                             value: settings.hasValidClientID ? "…" + String(settings.spotifyClientID.suffix(4)) : "Не настроен") { SpotifySettings() }
+                             value: settings.hasValidClientID ? "…" + String(settings.spotifyClientID.suffix(4)) : String(localized: "Не настроен")) { SpotifySettings() }
                 }
 
                 Section {
-                    category("О приложении", "info.circle.fill", .gray, value: AppVersion.display) { AboutSettings() }
+                    category(String(localized: "О приложении"), "info.circle.fill", .gray, value: AppVersion.display) { AboutSettings() }
                 }
             }
-            .navigationTitle("Настройки")
+            .navigationTitle(String(localized: "Настройки"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Готово") { dismiss() }
+                    Button(String(localized: "Готово")) { dismiss() }
                 }
             }
         }
@@ -61,9 +61,9 @@ struct SettingsView: View {
 
     private var translationSummary: String? {
         switch (settings.translateLyrics, settings.showRomanization) {
-        case (true, true): return "Оба"
-        case (true, false): return "Перевод"
-        case (false, true): return "Романизация"
+        case (true, true): return String(localized: "Оба")
+        case (true, false): return String(localized: "Перевод")
+        case (false, true): return String(localized: "Романизация")
         case (false, false): return nil
         }
     }
@@ -141,24 +141,24 @@ private struct TextLookSettings: View {
         @Bindable var settings = settings
         Form {
             Section {
-                Picker("Шрифт", selection: $settings.lyricsFont) {
+                Picker(String(localized: "Шрифт"), selection: $settings.lyricsFont) {
                     ForEach(LyricsFont.allCases) { font in
                         Text(font.title).tag(font.rawValue)
                     }
                 }
-                SliderRow(title: "Размер", value: $settings.fontSize,
+                SliderRow(title: String(localized: "Размер"), value: $settings.fontSize,
                           range: Double(AppSettings.fontRange.lowerBound)...Double(AppSettings.fontRange.upperBound),
                           step: 1, format: { "\(Int($0)) pt" })
-                Toggle("По центру", isOn: $settings.centerLyrics)
+                Toggle(String(localized: "По центру"), isOn: $settings.centerLyrics)
             } footer: {
-                Text("Размер можно менять и щипком двумя пальцами прямо по тексту. После этого на пару секунд появится кнопка «Сбросить размер».")
+                Text(String(localized: "Размер можно менять и щипком двумя пальцами прямо по тексту. После этого на пару секунд появится кнопка «Сбросить размер»."))
             }
 
-            Section("Расстояния") {
-                SliderRow(title: "Между строками", value: $settings.lineSpacingScale, range: 0...4, step: 0.25)
+            Section(String(localized: "Расстояния")) {
+                SliderRow(title: String(localized: "Между строками"), value: $settings.lineSpacingScale, range: 0...4, step: 0.25)
             }
 
-            ResetSection(title: "Вернуть как было") { settings.resetLyricsLook() }
+            ResetSection(title: String(localized: "Вернуть как было")) { settings.resetLyricsLook() }
         }
     }
 }
@@ -172,33 +172,33 @@ private struct EffectsSettings: View {
             Section {
                 Toggle("Simple Lyrics Mode", isOn: $settings.simpleLyricsMode)
             } footer: {
-                Text("Спокойная анимация из оригинального расширения: слова не подпрыгивают и не светятся, заливка мягче.")
+                Text(String(localized: "Спокойная анимация из оригинального расширения: слова не подпрыгивают и не светятся, заливка мягче."))
             }
 
             Section {
-                Toggle("Размывать неактивные строки", isOn: $settings.blurInactiveLines)
+                Toggle(String(localized: "Размывать неактивные строки"), isOn: $settings.blurInactiveLines)
                 if settings.blurInactiveLines {
-                    SliderRow(title: "Сила размытия", value: $settings.blurStrength, range: 0.25...2.5)
+                    SliderRow(title: String(localized: "Сила размытия"), value: $settings.blurStrength, range: 0.25...2.5)
                 }
             } header: {
-                Text("Размытие")
+                Text(String(localized: "Размытие"))
             } footer: {
-                Text("Строки размываются тем сильнее, чем дальше они от текущей.")
+                Text(String(localized: "Строки размываются тем сильнее, чем дальше они от текущей."))
             }
 
             Section {
-                SliderRow(title: "Свечение слов", value: $settings.glowStrength, range: 0...2)
+                SliderRow(title: String(localized: "Свечение слов"), value: $settings.glowStrength, range: 0...2)
                     .disabled(settings.simpleLyricsMode)
-                SliderRow(title: "Яркость остальных строк", value: $settings.inactiveBrightness, range: 0.5...1.5)
+                SliderRow(title: String(localized: "Яркость остальных строк"), value: $settings.inactiveBrightness, range: 0.5...1.5)
             } header: {
-                Text("Свет")
+                Text(String(localized: "Свет"))
             } footer: {
                 Text(settings.simpleLyricsMode
-                     ? "В Simple Lyrics Mode слова не светятся."
-                     : "Свечение — мягкий ореол вокруг спетых слов.")
+                     ? String(localized: "В Simple Lyrics Mode слова не светятся.")
+                     : String(localized: "Свечение — мягкий ореол вокруг спетых слов."))
             }
 
-            ResetSection(title: "Вернуть эффекты по умолчанию") { settings.resetEffects() }
+            ResetSection(title: String(localized: "Вернуть эффекты по умолчанию")) { settings.resetEffects() }
         }
     }
 }
@@ -211,29 +211,29 @@ private struct BackgroundSettings: View {
         @Bindable var settings = settings
         Form {
             Section {
-                Toggle("Обложка на фоне", isOn: $settings.dynamicBackground)
+                Toggle(String(localized: "Обложка на фоне"), isOn: $settings.dynamicBackground)
             } footer: {
                 if settings.powerSaving || performance.constrained {
-                    Text("Сейчас включена экономия батареи, поэтому фон не двигается.")
+                    Text(String(localized: "Сейчас включена экономия батареи, поэтому фон не двигается."))
                 } else {
-                    Text("Размытая обложка трека, которая медленно плавает за текстом.")
+                    Text(String(localized: "Размытая обложка трека, которая медленно плавает за текстом."))
                 }
             }
 
             if settings.dynamicBackground {
-                Section("Обложка") {
-                    SliderRow(title: "Скорость движения", value: $settings.backgroundSpeed, range: 0.25...3)
-                    SliderRow(title: "Размытие", value: $settings.backgroundBlur, range: 0.3...3)
+                Section(String(localized: "Обложка")) {
+                    SliderRow(title: String(localized: "Скорость движения"), value: $settings.backgroundSpeed, range: 0.25...3)
+                    SliderRow(title: String(localized: "Размытие"), value: $settings.backgroundBlur, range: 0.3...3)
                 }
             }
 
             Section {
-                SliderRow(title: "Затемнение", value: $settings.backgroundDim, range: 0...0.7, step: 0.02)
+                SliderRow(title: String(localized: "Затемнение"), value: $settings.backgroundDim, range: 0...0.7, step: 0.02)
             } footer: {
-                Text("Чем темнее фон, тем лучше читается белый текст на светлых обложках.")
+                Text(String(localized: "Чем темнее фон, тем лучше читается белый текст на светлых обложках."))
             }
 
-            ResetSection(title: "Вернуть фон по умолчанию") { settings.resetBackground() }
+            ResetSection(title: String(localized: "Вернуть фон по умолчанию")) { settings.resetBackground() }
         }
     }
 }
@@ -245,31 +245,31 @@ private struct LanguageSettings: View {
         @Bindable var settings = settings
         Form {
             Section {
-                Toggle("Романизация", isOn: $settings.showRomanization)
+                Toggle(String(localized: "Романизация"), isOn: $settings.showRomanization)
             } footer: {
-                Text("Латиница вместо японского, китайского, корейского, кириллицы и греческого. Делается прямо на телефоне.")
+                Text(String(localized: "Латиница вместо японского, китайского, корейского, кириллицы и греческого. Делается прямо на телефоне."))
             }
 
             Section {
-                Toggle("Перевод под строками", isOn: $settings.translateLyrics)
+                Toggle(String(localized: "Переводить текст"), isOn: $settings.translateLyrics)
                 if settings.translateLyrics {
-                    Picker("Язык перевода", selection: $settings.translationLanguage) {
+                    Picker(String(localized: "Язык перевода"), selection: $settings.translationLanguage) {
                         ForEach(LyricsTranslation.languages, id: \.id) { language in
                             Text(language.name).tag(language.id)
                         }
                     }
-                    Picker("Показывать", selection: $settings.translationReplaces) {
-                        Text("Под строкой").tag(false)
-                        Text("Вместо строки").tag(true)
+                    Picker(String(localized: "Показывать"), selection: $settings.translationReplaces) {
+                        Text(String(localized: "Под строкой")).tag(false)
+                        Text(String(localized: "Вместо строки")).tag(true)
                     }
                     if !settings.translationReplaces {
-                        SliderRow(title: "Размер перевода", value: $settings.translationScale, range: 0.6...1.6)
+                        SliderRow(title: String(localized: "Размер перевода"), value: $settings.translationScale, range: 0.6...1.6)
                     }
                 }
             } footer: {
                 Text(settings.translateLyrics && settings.translationReplaces
-                     ? "Перевод заменяет оригинал, а слова подсвечиваются по ритму исходной строки: время каждой строки делится между новыми словами по их длине. Перевод Apple на устройстве (iOS 18 и новее)."
-                     : "Перевод Apple на устройстве (iOS 18 и новее). Строки, которые уже на выбранном языке, не переводятся. При первом использовании iOS предложит скачать языковую модель.")
+                     ? String(localized: "Перевод заменяет оригинал, а слова подсвечиваются по ритму исходной строки: время каждой строки делится между новыми словами по их длине. Перевод Apple на устройстве (iOS 18 и новее).")
+                     : String(localized: "Перевод Apple на устройстве (iOS 18 и новее). Строки, которые уже на выбранном языке, не переводятся. При первом использовании iOS предложит скачать языковую модель."))
             }
         }
     }
@@ -277,23 +277,49 @@ private struct LanguageSettings: View {
 
 private struct InterfaceSettings: View {
     @Environment(AppSettings.self) private var settings
+    /// The language the app runs in now, to tell when a restart is needed.
+    @State private var launchLanguage = Bundle.main.preferredLocalizations.first ?? "en"
+
+    private var pendingRestart: Bool {
+        switch settings.appLanguage {
+        case "en", "ru": return settings.appLanguage != launchLanguage
+        default:
+            let system = Bundle.preferredLocalizations(from: Bundle.main.localizations,
+                                                       forPreferences: Locale.preferredLanguages).first ?? "en"
+            return system != launchLanguage
+        }
+    }
 
     var body: some View {
         @Bindable var settings = settings
         Form {
             Section {
-                Toggle("Прятать кнопки во время песни", isOn: $settings.autoHideControls)
-                if settings.autoHideControls {
-                    SliderRow(title: "Через", value: $settings.autoHideDelay, range: 2...12, step: 1,
-                              format: { "\(Int($0)) с" })
+                Picker(String(localized: "Язык"), selection: $settings.appLanguage) {
+                    Text(String(localized: "Как на телефоне")).tag("system")
+                    Text(verbatim: "English").tag("en")
+                    Text(verbatim: "Русский").tag("ru")
                 }
+            } header: {
+                Text(String(localized: "Язык приложения"))
             } footer: {
-                Text("Как в Apple Music: кнопки исчезают, пока играет песня. Касание внизу экрана возвращает их.")
+                if pendingRestart {
+                    Text(String(localized: "Язык сменится после перезапуска приложения: закройте его в переключателе приложений и откройте снова."))
+                }
             }
 
             Section {
-                Toggle("Полоска громкости", isOn: $settings.showVolumeSlider)
-                Toggle("Не гасить экран", isOn: $settings.keepScreenOn)
+                Toggle(String(localized: "Прятать кнопки во время песни"), isOn: $settings.autoHideControls)
+                if settings.autoHideControls {
+                    SliderRow(title: String(localized: "Через"), value: $settings.autoHideDelay, range: 2...12, step: 1,
+                              format: { String(localized: "\(Int($0)) с") })
+                }
+            } footer: {
+                Text(String(localized: "Как в Apple Music: кнопки исчезают, пока играет песня. Касание внизу экрана возвращает их."))
+            }
+
+            Section {
+                Toggle(String(localized: "Полоска громкости"), isOn: $settings.showVolumeSlider)
+                Toggle(String(localized: "Не гасить экран"), isOn: $settings.keepScreenOn)
             }
         }
     }
@@ -306,18 +332,18 @@ private struct LandscapeSettings: View {
         @Bindable var settings = settings
         Form {
             Section {
-                Toggle("Только текст", isOn: $settings.landscapeLyricsOnly)
+                Toggle(String(localized: "Только текст"), isOn: $settings.landscapeLyricsOnly)
             } footer: {
-                Text("Прячет весь интерфейс: текст занимает весь экран, а кнопки появляются по касанию на несколько секунд.")
+                Text(String(localized: "Прячет весь интерфейс: текст занимает весь экран, а кнопки появляются по касанию на несколько секунд."))
             }
 
             Section {
-                Toggle("Обложка", isOn: $settings.landscapeArtwork)
-                Toggle("Название и исполнитель", isOn: $settings.landscapeTitle)
+                Toggle(String(localized: "Обложка"), isOn: $settings.landscapeArtwork)
+                Toggle(String(localized: "Название и исполнитель"), isOn: $settings.landscapeTitle)
             } header: {
-                Text("Слева от текста")
+                Text(String(localized: "Слева от текста"))
             } footer: {
-                Text("Если выключить и то и другое, текст сдвинется к центру, когда кнопки спрячутся.")
+                Text(String(localized: "Если выключить и то и другое, текст сдвинется к центру, когда кнопки спрячутся."))
             }
             .disabled(settings.landscapeLyricsOnly)
         }
@@ -331,18 +357,18 @@ private struct PictureInPictureSettings: View {
         @Bindable var settings = settings
         Form {
             Section {
-                Toggle("Открывать при сворачивании", isOn: $settings.autoPictureInPicture)
+                Toggle(String(localized: "Открывать при сворачивании"), isOn: $settings.autoPictureInPicture)
             } footer: {
-                Text("Текст поверх других приложений. Вручную окно открывается из меню «•••» в плеере.")
+                Text(String(localized: "Текст поверх других приложений. Вручную окно открывается из меню «•••» в плеере."))
             }
 
             Section {
-                Toggle("Анимированный фон", isOn: $settings.pipAnimatedBackground)
-                Toggle("Название песни", isOn: $settings.pipShowTitle)
+                Toggle(String(localized: "Анимированный фон"), isOn: $settings.pipAnimatedBackground)
+                Toggle(String(localized: "Название песни"), isOn: $settings.pipShowTitle)
             } header: {
-                Text("Окно")
+                Text(String(localized: "Окно"))
             } footer: {
-                Text("Анимированный фон — плавающая обложка, как в приложении. На слабых устройствах выключите его; в режиме экономии он и так неподвижен.")
+                Text(String(localized: "Анимированный фон — плавающая обложка, как в приложении. На слабых устройствах выключите его; в режиме экономии он и так неподвижен."))
             }
         }
     }
@@ -355,22 +381,22 @@ private struct GestureSettings: View {
         @Bindable var settings = settings
         Form {
             Section {
-                Toggle("Жесты", isOn: $settings.gesturesEnabled)
+                Toggle(String(localized: "Жесты"), isOn: $settings.gesturesEnabled)
             } footer: {
-                Text("Свайпы и щипок работают на iOS 18 и новее.")
+                Text(String(localized: "Свайпы и щипок работают на iOS 18 и новее."))
             }
 
             Section {
-                row("hand.draw", "Свайп влево / вправо по тексту", "следующий / предыдущий трек")
-                row("arrow.up.left.and.arrow.down.right", "Щипок двумя пальцами", "размер текста")
-                row("hand.tap", "Долгое нажатие на строку", "перемотать, скопировать, поделиться")
-                row("hand.point.up.left", "Касание строки", "перемотать к ней")
-                row("chevron.up", "Свайп вверх внизу экрана", "показать кнопки")
-                row("chevron.down", "Свайп вниз по заголовку", "спрятать кнопки")
+                row("hand.draw", String(localized: "Свайп влево / вправо по тексту"), String(localized: "следующий / предыдущий трек"))
+                row("arrow.up.left.and.arrow.down.right", String(localized: "Щипок двумя пальцами"), String(localized: "размер текста"))
+                row("hand.tap", String(localized: "Долгое нажатие на строку"), String(localized: "перемотать, скопировать, поделиться"))
+                row("hand.point.up.left", String(localized: "Касание строки"), String(localized: "перемотать к ней"))
+                row("chevron.up", String(localized: "Свайп вверх внизу экрана"), String(localized: "показать кнопки"))
+                row("chevron.down", String(localized: "Свайп вниз по заголовку"), String(localized: "спрятать кнопки"))
             } header: {
-                Text("Что умеют")
+                Text(String(localized: "Что умеют"))
             } footer: {
-                Text("На iPad с клавиатурой: пробел — пауза, ⌘← / ⌘→ — треки.")
+                Text(String(localized: "На iPad с клавиатурой: пробел — пауза, ⌘← / ⌘→ — треки."))
             }
         }
     }
@@ -395,19 +421,19 @@ private struct SyncSettings: View {
         Form {
             Section {
                 VStack(alignment: .leading) {
-                    Text("Сдвиг текста: \(Int(settings.timingOffsetMs)) мс")
+                    Text(String(localized: "Сдвиг текста: \(Int(settings.timingOffsetMs)) мс"))
                     Slider(value: $settings.timingOffsetMs, in: -1500...1500, step: 50)
                 }
-                Button("Сбросить сдвиг") { settings.timingOffsetMs = 0 }
+                Button(String(localized: "Сбросить сдвиг")) { settings.timingOffsetMs = 0 }
                     .disabled(settings.timingOffsetMs == 0)
             } footer: {
-                Text("Положительный сдвиг показывает слова раньше.")
+                Text(String(localized: "Положительный сдвиг показывает слова раньше."))
             }
 
             Section {
-                Toggle("Учитывать задержку наушников", isOn: $settings.compensateOutputLatency)
+                Toggle(String(localized: "Учитывать задержку наушников"), isOn: $settings.compensateOutputLatency)
             } footer: {
-                Text("Когда Spotify играет на этом iPhone, задержка Bluetooth-наушников вычитается автоматически.")
+                Text(String(localized: "Когда Spotify играет на этом iPhone, задержка Bluetooth-наушников вычитается автоматически."))
             }
         }
     }
@@ -421,17 +447,17 @@ private struct PerformanceSettings: View {
         @Bindable var settings = settings
         Form {
             Section {
-                Toggle("Экономия батареи", isOn: $settings.powerSaving)
+                Toggle(String(localized: "Экономия батареи"), isOn: $settings.powerSaving)
             } footer: {
-                Text("30 кадров в секунду, без размытия строк, неподвижный фон в приложении и в PiP.")
+                Text(String(localized: "30 кадров в секунду, без размытия строк, неподвижный фон в приложении и в PiP."))
             }
 
             Section {
-                LabeledContent("Сейчас", value: settings.powerSaving
-                               ? "Экономия включена"
-                               : (performance.constrained ? "Экономия (авто)" : "Полная плавность"))
+                LabeledContent(String(localized: "Сейчас"), value: settings.powerSaving
+                               ? String(localized: "Экономия включена")
+                               : (performance.constrained ? String(localized: "Экономия (авто)") : String(localized: "Полная плавность")))
             } footer: {
-                Text("Экономия включается сама в режиме энергосбережения iOS и когда телефон сильно нагревается.")
+                Text(String(localized: "Экономия включается сама в режиме энергосбережения iOS и когда телефон сильно нагревается."))
             }
         }
     }
@@ -449,7 +475,7 @@ private struct SourceSettings: View {
         Form {
             Section {
                 if settings.hasBundledSpicyKey {
-                    Label("Ключ Spicy Lyrics встроен в приложение", systemImage: "checkmark.seal.fill")
+                    Label(String(localized: "Ключ Spicy Lyrics встроен в приложение"), systemImage: "checkmark.seal.fill")
                 } else {
                     TextField("sl_pk_…", text: $settings.spicyLyricsKey)
                         .textInputAutocapitalization(.never)
@@ -457,24 +483,24 @@ private struct SourceSettings: View {
                         .font(.body.monospaced())
                     if !settings.spicyLyricsKey.isEmpty && settings.validSpicyKey == nil {
                         Text(settings.spicyLyricsKey.hasPrefix("sl_sk_")
-                             ? "Это секретный ключ. Нужен клиентский ключ sl_pk_…"
-                             : "Ключ должен начинаться с sl_pk_")
+                             ? String(localized: "Это секретный ключ. Нужен клиентский ключ sl_pk_…")
+                             : String(localized: "Ключ должен начинаться с sl_pk_"))
                             .font(.footnote)
                             .foregroundStyle(.red)
                     }
-                    Link("Получить ключ Spicy Lyrics", destination: URL(string: "https://developers.spicylyrics.org")!)
+                    Link(String(localized: "Получить ключ Spicy Lyrics"), destination: URL(string: "https://developers.spicylyrics.org")!)
                 }
-                Toggle("Запасной источник LRCLIB", isOn: $settings.useLRCLibFallback)
+                Toggle(String(localized: "Запасной источник LRCLIB"), isOn: $settings.useLRCLibFallback)
             } header: {
                 Text("Spicy Lyrics")
             } footer: {
-                Text("С клиентским ключом используется публичный API /v1/lyrics. Без ключа приложение пробует токен Spotify, как расширение для Spicetify.")
+                Text(String(localized: "С клиентским ключом используется публичный API /v1/lyrics. Без ключа приложение пробует токен Spotify, как расширение для Spicetify."))
             }
 
             Section {
-                Button("Свои тексты (TTML)") { showOwnLyrics = true }
-                Button("Перезагрузить текст") { player.loadLyrics(force: true) }
-                Button(cacheCleared ? "Кэш очищен" : "Очистить кэш текстов") {
+                Button(String(localized: "Свои тексты (TTML)")) { showOwnLyrics = true }
+                Button(String(localized: "Перезагрузить текст")) { player.loadLyrics(force: true) }
+                Button(cacheCleared ? String(localized: "Кэш очищен") : String(localized: "Очистить кэш текстов")) {
                     player.clearLyricsCache()
                     cacheCleared = true
                 }
@@ -497,18 +523,18 @@ private struct SpotifySettings: View {
             Section {
                 LabeledContent("Client ID", value: settings.hasValidClientID
                                ? "…\(String(settings.spotifyClientID.suffix(4)))"
-                               : "Не настроен")
+                               : String(localized: "Не настроен"))
                 NavigationLink {
                     SpotifySetupGuideView()
                 } label: {
-                    Label("Сменить Client ID", systemImage: "key.horizontal")
+                    Label(String(localized: "Сменить Client ID"), systemImage: "key.horizontal")
                 }
             } footer: {
-                Text("Приложение работает только через ваше собственное приложение Spotify. Друзей можно добавить в него через Settings → User Management в developer.spotify.com (до 5 человек).")
+                Text(String(localized: "Приложение работает только через ваше собственное приложение Spotify. Друзей можно добавить в него через Settings → User Management в developer.spotify.com (до 5 человек)."))
             }
 
             Section {
-                Button("Выйти из Spotify", role: .destructive) { auth.logOut() }
+                Button(String(localized: "Выйти из Spotify"), role: .destructive) { auth.logOut() }
             }
         }
     }
@@ -518,15 +544,15 @@ private struct AboutSettings: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Версия", value: AppVersion.display)
+                LabeledContent(String(localized: "Версия"), value: AppVersion.display)
             }
             Section {
-                Link("Spicy Lyrics (оригинал)", destination: URL(string: "https://github.com/Spikerko/spicy-lyrics")!)
+                Link(String(localized: "Spicy Lyrics (оригинал)"), destination: URL(string: "https://github.com/Spikerko/spicy-lyrics")!)
                 Link("Spicy Lyrics Mobile (Android)", destination: URL(string: "https://github.com/spicylyrics/mobile")!)
-                Link("Этот проект на GitHub", destination: URL(string: "https://github.com/Sppqq/spicy-lyrics-ios")!)
+                Link(String(localized: "Этот проект на GitHub"), destination: URL(string: "https://github.com/Sppqq/spicy-lyrics-ios")!)
                 Link("LRCLIB", destination: URL(string: "https://lrclib.net")!)
             } footer: {
-                Text("Неофициальный iOS-порт. Распространяется по лицензии AGPL-3.0, как и оригинал. Не связан со Spotify AB.")
+                Text(String(localized: "Неофициальный iOS-порт. Распространяется по лицензии AGPL-3.0, как и оригинал. Не связан со Spotify AB."))
             }
         }
     }

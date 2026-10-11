@@ -3,10 +3,16 @@ import SwiftUI
 /// Pick what plays next without leaving the app: the queue, recent history and search.
 struct TrackPickerView: View {
     enum Tab: String, CaseIterable, Identifiable {
-        case queue = "Очередь"
-        case recent = "Недавние"
-        case search = "Поиск"
+        case queue, recent, search
         var id: Self { self }
+
+        var title: String {
+            switch self {
+            case .queue: return String(localized: "Очередь")
+            case .recent: return String(localized: "Недавние")
+            case .search: return String(localized: "Поиск")
+            }
+        }
     }
 
     @Environment(PlayerModel.self) private var player
@@ -29,8 +35,8 @@ struct TrackPickerView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Picker("Раздел", selection: $tab) {
-                    ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
+                Picker(String(localized: "Раздел"), selection: $tab) {
+                    ForEach(Tab.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
@@ -49,7 +55,7 @@ struct TrackPickerView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Готово") { dismiss() }
+                    Button(String(localized: "Готово")) { dismiss() }
                 }
                 if tab != .search {
                     ToolbarItem(placement: .topBarLeading) {
@@ -107,7 +113,7 @@ struct TrackPickerView: View {
         } else {
             List {
                 if tab == .queue, let track = player.track {
-                    Section("Сейчас играет") {
+                    Section(String(localized: "Сейчас играет")) {
                         TrackRow(title: track.title, subtitle: track.artistLine, artwork: track.artworkURL,
                                  duration: track.duration, highlighted: true)
                     }
@@ -126,7 +132,7 @@ struct TrackPickerView: View {
                                 Button {
                                     player.addToQueue(track)
                                 } label: {
-                                    Label("В очередь", systemImage: "text.badge.plus")
+                                    Label(String(localized: "В очередь"), systemImage: "text.badge.plus")
                                 }
                                 .tint(.green)
                             }
@@ -139,7 +145,7 @@ struct TrackPickerView: View {
                     } label: {
                         HStack {
                             Spacer()
-                            if loading { ProgressView() } else { Text("Показать ещё") }
+                            if loading { ProgressView() } else { Text(String(localized: "Показать ещё")) }
                             Spacer()
                         }
                     }
@@ -162,9 +168,9 @@ struct TrackPickerView: View {
 
     private var sectionTitle: String {
         switch tab {
-        case .queue: return "Далее"
-        case .recent: return "Недавно играли"
-        case .search: return "Треки"
+        case .queue: return String(localized: "Далее")
+        case .recent: return String(localized: "Недавно играли")
+        case .search: return String(localized: "Треки")
         }
     }
 
@@ -178,16 +184,16 @@ struct TrackPickerView: View {
 
     private var emptyText: String {
         switch tab {
-        case .queue: return "Очередь пуста"
-        case .recent: return "История пуста"
-        case .search: return query.isEmpty ? "Найдите трек по названию или исполнителю" : "Ничего не найдено"
+        case .queue: return String(localized: "Очередь пуста")
+        case .recent: return String(localized: "История пуста")
+        case .search: return query.isEmpty ? String(localized: "Найдите трек по названию или исполнителю") : String(localized: "Ничего не найдено")
         }
     }
 
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("Трек, исполнитель, альбом", text: $query)
+            TextField(String(localized: "Трек, исполнитель, альбом"), text: $query)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
@@ -208,10 +214,10 @@ struct TrackPickerView: View {
     private var reloginPrompt: some View {
         VStack(spacing: 14) {
             Image(systemName: "clock.badge.exclamationmark").font(.system(size: 40))
-            Text("Для истории прослушивания нужно заново войти в Spotify и разрешить доступ к недавним трекам.")
+            Text(String(localized: "Для истории прослушивания нужно заново войти в Spotify и разрешить доступ к недавним трекам."))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
-            Button("Войти заново") {
+            Button(String(localized: "Войти заново")) {
                 Task {
                     do {
                         try await auth.logIn()
@@ -243,20 +249,20 @@ struct TrackPickerView: View {
         Button {
             choose(track, at: index)
         } label: {
-            Label(tab == .queue ? "Перейти к треку" : "Слушать", systemImage: "play.fill")
+            Label(tab == .queue ? String(localized: "Перейти к треку") : String(localized: "Слушать"), systemImage: "play.fill")
         }
         if tab != .queue {
             Button {
                 player.addToQueue(track)
             } label: {
-                Label("Добавить в очередь", systemImage: "text.badge.plus")
+                Label(String(localized: "Добавить в очередь"), systemImage: "text.badge.plus")
             }
         }
         if let url = Self.spotifyURL(track.uri) {
             Button {
                 UIApplication.shared.open(url)
             } label: {
-                Label("Открыть в Spotify", systemImage: "arrow.up.forward.app")
+                Label(String(localized: "Открыть в Spotify"), systemImage: "arrow.up.forward.app")
             }
         }
     }

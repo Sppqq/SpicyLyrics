@@ -13,9 +13,9 @@ enum TTMLParser {
 
         var errorDescription: String? {
             switch self {
-            case .notXML: return "Файл не похож на TTML: это не XML."
-            case .notTTML: return "В файле нет TTML (<tt>…</tt>)."
-            case .noLyrics: return "В TTML не нашлось строк с текстом."
+            case .notXML: return String(localized: "Файл не похож на TTML: это не XML.")
+            case .notTTML: return String(localized: "В файле нет TTML (<tt>…</tt>).")
+            case .noLyrics: return String(localized: "В TTML не нашлось строк с текстом.")
             }
         }
     }

@@ -22,11 +22,11 @@ struct OwnLyricsView: View {
                 currentTrackSection
                 librarySection
             }
-            .navigationTitle("Свои тексты (TTML)")
+            .navigationTitle(String(localized: "Свои тексты (TTML)"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Готово") { dismiss() }
+                    Button(String(localized: "Готово")) { dismiss() }
                 }
             }
             .fileImporter(isPresented: $importing, allowedContentTypes: Self.types) { result in
@@ -48,29 +48,29 @@ struct OwnLyricsView: View {
                     Text(track.artistLine).font(.subheadline).foregroundStyle(.secondary)
                 }
 
-                Picker("Режим", selection: $modeRaw) {
-                    Text("В библиотеку").tag(PlayerModel.TTMLMode.library.rawValue)
-                    Text("Только сейчас").tag(PlayerModel.TTMLMode.temporary.rawValue)
+                Picker(String(localized: "Режим"), selection: $modeRaw) {
+                    Text(String(localized: "В библиотеку")).tag(PlayerModel.TTMLMode.library.rawValue)
+                    Text(String(localized: "Только сейчас")).tag(PlayerModel.TTMLMode.temporary.rawValue)
                 }
                 .pickerStyle(.segmented)
 
                 Button {
                     importing = true
                 } label: {
-                    Label("Выбрать файл .ttml", systemImage: "doc.badge.plus")
+                    Label(String(localized: "Выбрать файл .ttml"), systemImage: "doc.badge.plus")
                 }
                 Button {
                     apply(UIPasteboard.general.string)
                 } label: {
-                    Label("Вставить TTML из буфера", systemImage: "doc.on.clipboard")
+                    Label(String(localized: "Вставить TTML из буфера"), systemImage: "doc.on.clipboard")
                 }
 
                 if player.localLyrics.contains(track.id) || player.hasTemporaryLyrics {
                     Button(role: .destructive) {
                         player.removeOwnLyrics(trackID: track.id)
-                        message = ("Свой текст убран, вернулся текст из сети.", false)
+                        message = (String(localized: "Свой текст убран, вернулся текст из сети."), false)
                     } label: {
-                        Label("Убрать свой текст для этого трека", systemImage: "trash")
+                        Label(String(localized: "Убрать свой текст для этого трека"), systemImage: "trash")
                     }
                 }
 
@@ -80,15 +80,15 @@ struct OwnLyricsView: View {
                         .foregroundStyle(message.isError ? .red : .green)
                 }
             } else {
-                Text("Включите трек в Spotify, чтобы привязать к нему свой текст.")
+                Text(String(localized: "Включите трек в Spotify, чтобы привязать к нему свой текст."))
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text("Текущий трек")
+            Text(String(localized: "Текущий трек"))
         } footer: {
             Text(mode == .library
-                 ? "Текст сохранится в библиотеке и будет показываться для этого трека вместо текстов из сети."
-                 : "Текст покажется только сейчас, до закрытия приложения.")
+                 ? String(localized: "Текст сохранится в библиотеке и будет показываться для этого трека вместо текстов из сети.")
+                 : String(localized: "Текст покажется только сейчас, до закрытия приложения."))
         }
     }
 
@@ -97,7 +97,7 @@ struct OwnLyricsView: View {
     private var librarySection: some View {
         Section {
             if player.localLyrics.entries.isEmpty {
-                Text("Пока пусто")
+                Text(String(localized: "Пока пусто"))
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(player.localLyrics.entries) { entry in
@@ -114,9 +114,9 @@ struct OwnLyricsView: View {
                 }
             }
         } header: {
-            Text("Библиотека")
+            Text(String(localized: "Библиотека"))
         } footer: {
-            Text("Смахните влево, чтобы удалить.")
+            Text(String(localized: "Смахните влево, чтобы удалить."))
         }
     }
 
@@ -129,18 +129,18 @@ struct OwnLyricsView: View {
             let data = try Data(contentsOf: url)
             apply(String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self))
         } catch {
-            message = ("Не удалось прочитать файл: \(error.localizedDescription)", true)
+            message = (String(localized: "Не удалось прочитать файл: \(error.localizedDescription)"), true)
         }
     }
 
     private func apply(_ text: String?) {
         guard let text, !text.isEmpty else {
-            message = ("В буфере обмена нет текста.", true)
+            message = (String(localized: "В буфере обмена нет текста."), true)
             return
         }
         do {
             try player.applyTTML(text, mode: mode)
-            message = (mode == .library ? "Сохранено в библиотеку и показано." : "Показано до закрытия приложения.", false)
+            message = (mode == .library ? String(localized: "Сохранено в библиотеку и показано.") : String(localized: "Показано до закрытия приложения."), false)
         } catch {
             message = (error.localizedDescription, true)
         }

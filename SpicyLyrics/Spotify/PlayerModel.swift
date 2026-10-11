@@ -150,7 +150,7 @@ final class PlayerModel {
                 isPlaying = false
             }
             lastSample = nil
-            statusMessage = "Сейчас ничего не играет в Spotify"
+            statusMessage = String(localized: "Сейчас ничего не играет в Spotify")
             return
         }
         statusMessage = nil
@@ -402,11 +402,11 @@ final class PlayerModel {
         case .track:
             loadLyrics(force: false)
         case .episode:
-            lyricsState = .unavailable("Для подкастов тексты недоступны")
+            lyricsState = .unavailable(String(localized: "Для подкастов тексты недоступны"))
         case .ad:
-            lyricsState = .unavailable("Реклама")
+            lyricsState = .unavailable(String(localized: "Реклама"))
         case .unknown:
-            lyricsState = .unavailable("Не удалось распознать трек")
+            lyricsState = .unavailable(String(localized: "Не удалось распознать трек"))
         case .none:
             lyricsState = .idle
         }
@@ -463,7 +463,7 @@ final class PlayerModel {
 
     enum TTMLError: LocalizedError {
         case noTrack
-        var errorDescription: String? { "Сейчас не играет трек Spotify, к которому можно привязать текст." }
+        var errorDescription: String? { String(localized: "Сейчас не играет трек Spotify, к которому можно привязать текст.") }
     }
 
     var hasTemporaryLyrics: Bool { track.map { temporaryLyrics[$0.id] != nil } ?? false }

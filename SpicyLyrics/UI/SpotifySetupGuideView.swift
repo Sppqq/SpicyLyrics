@@ -19,25 +19,25 @@ struct SpotifySetupGuideView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Свой доступ к Spotify")
+                    Text(String(localized: "Свой доступ к Spotify"))
                         .font(.largeTitle.bold())
-                    Text("Приложению нужен ваш собственный Client ID: так Spotify разрешает ему видеть, что у вас играет. Это бесплатно и занимает около 5 минут.")
+                    Text(String(localized: "Приложению нужен ваш собственный Client ID: так Spotify разрешает ему видеть, что у вас играет. Это бесплатно и занимает около 5 минут."))
                         .foregroundStyle(.white.opacity(0.75))
                 }
 
                 requirementCard
 
-                step(1, "Откройте Spotify for Developers") {
-                    Text("Войдите тем же аккаунтом, что и в приложении Spotify. При первом входе примите условия (Accept the terms) и подтвердите e-mail, если попросят.")
-                    actionButton("Открыть developer.spotify.com", systemImage: "safari") {
+                step(1, String(localized: "Откройте Spotify for Developers")) {
+                    Text(String(localized: "Войдите тем же аккаунтом, что и в приложении Spotify. При первом входе примите условия (Accept the terms) и подтвердите e-mail, если попросят."))
+                    actionButton(String(localized: "Открыть developer.spotify.com"), systemImage: "safari") {
                         openURL(Self.dashboard)
                     }
-                    Text("Удобнее делать с компьютера, но и с телефона получится.")
+                    Text(String(localized: "Удобнее делать с компьютера, но и с телефона получится."))
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.55))
                 }
 
-                step(2, "Создайте приложение") {
+                step(2, String(localized: "Создайте приложение")) {
                     Text("Нажмите **Create app** и заполните форму:")
                     bullet("**App name** — любое, например «Spicy Lyrics».")
                     bullet("**App description** — любое, например «Тексты песен».")
@@ -48,21 +48,21 @@ struct SpotifySetupGuideView: View {
                     bullet("Поставьте галочку согласия с условиями и нажмите **Save**.")
                 }
 
-                step(3, "Добавьте себя в пользователи") {
+                step(3, String(localized: "Добавьте себя в пользователи")) {
                     Text("В приложении откройте **Settings** → вкладка **User Management** → **Add new user**. Имя любое, e-mail — тот, к которому привязан ваш аккаунт Spotify, затем **Add user**.")
-                    Text("Так же можно добавить ещё до четырёх друзей, и они войдут с вашим Client ID.")
+                    Text(String(localized: "Так же можно добавить ещё до четырёх друзей, и они войдут с вашим Client ID."))
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.55))
                 }
 
-                step(4, "Скопируйте Client ID") {
+                step(4, String(localized: "Скопируйте Client ID")) {
                     Text("Вкладка **Basic Information** → поле **Client ID** (32 символа, буквы и цифры) → скопируйте.")
-                    Label("Client secret не нужен. Никому его не отправляйте.", systemImage: "exclamationmark.shield")
+                    Label(String(localized: "Client secret не нужен. Никому его не отправляйте."), systemImage: "exclamationmark.shield")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.orange)
                 }
 
-                step(5, "Вставьте Client ID и войдите") {
+                step(5, String(localized: "Вставьте Client ID и войдите")) {
                     clientIDField
                     if let error {
                         Text(error)
@@ -74,7 +74,7 @@ struct SpotifySetupGuideView: View {
                     } label: {
                         HStack {
                             if busy { ProgressView().tint(.black) }
-                            Text("Сохранить и войти")
+                            Text(String(localized: "Сохранить и войти"))
                                 .font(.headline)
                         }
                         .frame(maxWidth: .infinity)
@@ -105,10 +105,10 @@ struct SpotifySetupGuideView: View {
 
     private var requirementCard: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("Что понадобится", systemImage: "checklist")
+            Label(String(localized: "Что понадобится"), systemImage: "checklist")
                 .font(.headline)
             Text("• Аккаунт **Spotify Premium**: с 2026 года Spotify запускает приложения разработчиков только у владельцев с Premium.")
-            Text("• 5 минут и браузер.")
+            Text(String(localized: "• 5 минут и браузер."))
         }
         .font(.callout)
         .padding(14)
@@ -126,7 +126,7 @@ struct SpotifySetupGuideView: View {
                 UIPasteboard.general.string = SpotifyAuth.redirectURI
                 copied = true
             } label: {
-                Label(copied ? "Скопировано" : "Скопировать", systemImage: copied ? "checkmark" : "doc.on.doc")
+                Label(copied ? String(localized: "Скопировано") : String(localized: "Скопировать"), systemImage: copied ? "checkmark" : "doc.on.doc")
                     .font(.footnote.weight(.semibold))
             }
         }
@@ -146,7 +146,7 @@ struct SpotifySetupGuideView: View {
                         draft = text.trimmingCharacters(in: .whitespacesAndNewlines)
                     }
                 } label: {
-                    Label("Вставить", systemImage: "doc.on.clipboard")
+                    Label(String(localized: "Вставить"), systemImage: "doc.on.clipboard")
                         .font(.footnote.weight(.semibold))
                 }
             }
@@ -154,7 +154,7 @@ struct SpotifySetupGuideView: View {
             .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             if !draft.isEmpty && !AppSettings.isValidClientID(draft) {
-                Text("Client ID — это 32 символа из цифр и букв a–f. Проверьте, что скопирован именно Client ID, а не Client secret.")
+                Text(String(localized: "Client ID — это 32 символа из цифр и букв a–f. Проверьте, что скопирован именно Client ID, а не Client secret."))
                     .font(.footnote)
                     .foregroundStyle(.orange)
             }
@@ -163,16 +163,16 @@ struct SpotifySetupGuideView: View {
 
     private var troubleshooting: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Если не получается")
+            Text(String(localized: "Если не получается"))
                 .font(.headline)
             problem("«INVALID_CLIENT: Invalid redirect URI»",
-                    "Redirect URI в приложении Spotify должен быть ровно spicylyrics-ios://callback — без пробелов и без слэша в конце. После правки нажмите Save.")
+                    String(localized: "Redirect URI в приложении Spotify должен быть ровно spicylyrics-ios://callback — без пробелов и без слэша в конце. После правки нажмите Save."))
             problem("«INVALID_CLIENT: Invalid client»",
-                    "Client ID скопирован не полностью или с ошибкой. Скопируйте его ещё раз со вкладки Basic Information.")
-            problem("Вход прошёл, но Spotify отвечает ошибкой 403",
-                    "Добавьте свой e-mail в User Management (шаг 3) и проверьте, что у владельца приложения есть Premium.")
-            problem("«Закончился лимит запросов»",
-                    "Spotify ограничивает число запросов на аккаунт разработчика. Подождите несколько минут.")
+                    String(localized: "Client ID скопирован не полностью или с ошибкой. Скопируйте его ещё раз со вкладки Basic Information."))
+            problem(String(localized: "Вход прошёл, но Spotify отвечает ошибкой 403"),
+                    String(localized: "Добавьте свой e-mail в User Management (шаг 3) и проверьте, что у владельца приложения есть Premium."))
+            problem(String(localized: "«Закончился лимит запросов»"),
+                    String(localized: "Spotify ограничивает число запросов на аккаунт разработчика. Подождите несколько минут."))
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)

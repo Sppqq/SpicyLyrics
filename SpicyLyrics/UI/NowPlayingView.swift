@@ -98,7 +98,7 @@ struct NowPlayingView: View {
                 SpotifySetupGuideView()
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
-                            Button("Закрыть") { showSetupGuide = false }
+                            Button(String(localized: "Закрыть")) { showSetupGuide = false }
                         }
                     }
             }
@@ -123,7 +123,7 @@ struct NowPlayingView: View {
         .modifier(LyricsTranslation(player: player, settings: settings))
         .task { pip.configure(player: player, settings: settings, performance: performance) }
         .onChange(of: settings.autoPictureInPicture) { _, enabled in pip.setAutomaticStart(enabled) }
-        .alert("Картинка в картинке", isPresented: Binding(
+        .alert(String(localized: "Картинка в картинке"), isPresented: Binding(
             get: { pip.lastError != nil && !pip.isActive },
             set: { _ in }
         )) {
@@ -198,11 +198,11 @@ struct NowPlayingView: View {
     /// Hardware keyboard (iPad): space plays/pauses, ⌘← / ⌘→ change tracks.
     private var keyboardShortcuts: some View {
         ZStack {
-            Button("Пауза / воспроизведение") { player.togglePlay() }
+            Button(String(localized: "Пауза / воспроизведение")) { player.togglePlay() }
                 .keyboardShortcut(.space, modifiers: [])
-            Button("Следующий трек") { player.next() }
+            Button(String(localized: "Следующий трек")) { player.next() }
                 .keyboardShortcut(.rightArrow, modifiers: .command)
-            Button("Предыдущий трек") { player.previous() }
+            Button(String(localized: "Предыдущий трек")) { player.previous() }
                 .keyboardShortcut(.leftArrow, modifiers: .command)
         }
         .opacity(0)
@@ -258,7 +258,7 @@ struct NowPlayingView: View {
             .contentShape(Rectangle())
             .onTapGesture { showChrome() }
             .verticalSwipe(.up) { showChrome() }
-            .accessibilityLabel("Показать элементы управления")
+            .accessibilityLabel(String(localized: "Показать элементы управления"))
             .accessibilityAddTraits(.isButton)
     }
 
@@ -372,7 +372,7 @@ struct NowPlayingView: View {
                 }
         )
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Выбрать трек. Смахните влево или вправо, чтобы переключить трек.")
+        .accessibilityHint(String(localized: "Выбрать трек. Смахните влево или вправо, чтобы переключить трек."))
     }
 
     private var titleBlock: some View {
@@ -411,30 +411,38 @@ struct NowPlayingView: View {
             Button {
                 showPicker = true
             } label: {
-                Label("Выбрать трек", systemImage: "music.note.list")
+                Label(String(localized: "Выбрать трек"), systemImage: "music.note.list")
             }
             if let url = spotifyURL {
                 Button {
                     UIApplication.shared.open(url)
                 } label: {
-                    Label("Открыть в Spotify", systemImage: "arrow.up.forward.app")
+                    Label(String(localized: "Открыть в Spotify"), systemImage: "arrow.up.forward.app")
                 }
             }
             Button {
                 player.loadLyrics(force: true)
             } label: {
-                Label("Перезагрузить текст", systemImage: "arrow.clockwise")
+                Label(String(localized: "Перезагрузить текст"), systemImage: "arrow.clockwise")
             }
             Button {
                 showOwnLyrics = true
             } label: {
-                Label("Свой текст (TTML)", systemImage: "doc.text")
+                Label(String(localized: "Свой текст (TTML)"), systemImage: "doc.text")
+            }
+            if #available(iOS 18.0, *) {
+                Button {
+                    settings.translateLyrics.toggle()
+                } label: {
+                    Label(settings.translateLyrics ? String(localized: "Выключить перевод") : String(localized: "Включить перевод"),
+                          systemImage: "character.bubble")
+                }
             }
             if LyricsPictureInPicture.isSupported {
                 Button {
                     pip.isActive ? pip.stop() : pip.start()
                 } label: {
-                    Label(pip.isActive ? "Закрыть окно с текстом" : "Текст поверх приложений",
+                    Label(pip.isActive ? String(localized: "Закрыть окно с текстом") : String(localized: "Текст поверх приложений"),
                           systemImage: "pip.enter")
                 }
             }
@@ -442,7 +450,7 @@ struct NowPlayingView: View {
             Button {
                 showSettings = true
             } label: {
-                Label("Настройки", systemImage: "gearshape")
+                Label(String(localized: "Настройки"), systemImage: "gearshape")
             }
         } label: {
             Image(systemName: "ellipsis")
@@ -475,8 +483,8 @@ struct NowPlayingView: View {
         switch player.content {
         case .track(let track): return track.title
         case .episode(let title, _, _): return title
-        case .ad: return "Реклама"
-        case .unknown: return "Неизвестный трек"
+        case .ad: return String(localized: "Реклама")
+        case .unknown: return String(localized: "Неизвестный трек")
         case .none: return "Spicy Lyrics"
         }
     }
@@ -485,7 +493,7 @@ struct NowPlayingView: View {
         switch player.content {
         case .track(let track): return track.artistLine
         case .episode(_, let show, _): return show
-        default: return player.statusMessage ?? "Ожидание Spotify…"
+        default: return player.statusMessage ?? String(localized: "Ожидание Spotify…")
         }
     }
 
@@ -497,7 +505,7 @@ struct NowPlayingView: View {
             .opacity(player.isResyncing ? 0.3 : 1)
             .overlay(alignment: .top) {
                 if player.isResyncing {
-                    Label("Синхронизация со Spotify…", systemImage: "arrow.triangle.2.circlepath")
+                    Label(String(localized: "Синхронизация со Spotify…"), systemImage: "arrow.triangle.2.circlepath")
                         .font(.footnote.weight(.semibold))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
@@ -532,11 +540,11 @@ struct NowPlayingView: View {
                 .padding(.top, topInset)
                 .frame(maxHeight: .infinity, alignment: .top)
         case .notFound:
-            message(icon: "text.badge.xmark", title: "Текст не найден",
-                    detail: "Для этого трека пока нет текста ни в Spicy Lyrics, ни в LRCLIB.",
+            message(icon: "text.badge.xmark", title: String(localized: "Текст не найден"),
+                    detail: String(localized: "Для этого трека пока нет текста ни в Spicy Lyrics, ни в LRCLIB."),
                     retry: true)
         case .failed(let reason):
-            message(icon: "wifi.exclamationmark", title: "Не удалось загрузить текст", detail: reason, retry: true)
+            message(icon: "wifi.exclamationmark", title: String(localized: "Не удалось загрузить текст"), detail: reason, retry: true)
         case .unavailable(let reason):
             message(icon: "music.note", title: reason, detail: nil, retry: false)
         case .idle:
@@ -548,14 +556,14 @@ struct NowPlayingView: View {
         VStack(spacing: 16) {
             Image(systemName: "music.quarternote.3")
                 .font(.system(size: 44))
-            Text(player.statusMessage ?? "Включите музыку в Spotify")
+            Text(player.statusMessage ?? String(localized: "Включите музыку в Spotify"))
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
             if player.accessProblem != nil {
                 Button {
                     showSetupGuide = true
                 } label: {
-                    Label("Подключить свой Client ID", systemImage: "key.horizontal")
+                    Label(String(localized: "Подключить свой Client ID"), systemImage: "key.horizontal")
                         .font(.headline)
                         .padding(.horizontal, 18)
                         .padding(.vertical, 10)
@@ -566,7 +574,7 @@ struct NowPlayingView: View {
                 Button {
                     if let url = URL(string: "spotify:") { UIApplication.shared.open(url) }
                 } label: {
-                    Label("Открыть Spotify", systemImage: "arrow.up.forward.app")
+                    Label(String(localized: "Открыть Spotify"), systemImage: "arrow.up.forward.app")
                         .font(.headline)
                         .padding(.horizontal, 18)
                         .padding(.vertical, 10)
@@ -593,7 +601,7 @@ struct NowPlayingView: View {
                     .multilineTextAlignment(.center)
             }
             if retry {
-                Button("Повторить") { player.loadLyrics(force: true) }
+                Button(String(localized: "Повторить")) { player.loadLyrics(force: true) }
                     .buttonStyle(.bordered)
             }
         }

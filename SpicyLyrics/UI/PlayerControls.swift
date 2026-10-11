@@ -60,7 +60,7 @@ struct PlaybackBar: View {
                     .frame(width: 34, height: 30)
                     .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
-            .accessibilityLabel("Скрыть элементы управления")
+            .accessibilityLabel(String(localized: "Скрыть элементы управления"))
             Spacer()
             AirPlayButton()
                 .frame(width: 34, height: 30)
@@ -74,7 +74,7 @@ struct PlaybackBar: View {
                     .foregroundStyle(.white.opacity(0.6))
                     .frame(width: 34, height: 30)
             }
-            .accessibilityLabel("Выбрать трек")
+            .accessibilityLabel(String(localized: "Выбрать трек"))
         }
         .padding(.horizontal, 26)
     }

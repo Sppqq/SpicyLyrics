@@ -76,7 +76,7 @@ final class LyricsPictureInPicture: NSObject {
     func start() {
         lastError = nil
         guard let controller else {
-            lastError = "Картинка в картинке не поддерживается на этом устройстве."
+            lastError = String(localized: "Картинка в картинке не поддерживается на этом устройстве.")
             return
         }
         renderFrame()
@@ -89,7 +89,7 @@ final class LyricsPictureInPicture: NSObject {
                 if controller.isPictureInPicturePossible {
                     controller.startPictureInPicture()
                 } else {
-                    self.lastError = "Окно «картинка в картинке» сейчас недоступно. Попробуйте ещё раз."
+                    self.lastError = String(localized: "Окно «картинка в картинке» сейчас недоступно. Попробуйте ещё раз.")
                 }
             }
         }
@@ -166,7 +166,7 @@ extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
     func pictureInPictureController(_ controller: AVPictureInPictureController,
                                     failedToStartPictureInPictureWithError error: Error) {
         isActive = false
-        lastError = "Не удалось открыть окно: \(error.localizedDescription)"
+        lastError = String(localized: "Не удалось открыть окно: \(error.localizedDescription)")
     }
 
     func pictureInPictureController(_ controller: AVPictureInPictureController,
@@ -273,7 +273,7 @@ struct PiPSnapshot: @unchecked Sendable {
                     Neighbor(id: "static:\($0.offset + 1)", text: $0.element.plainText, offset: $0.offset + 1)
                 }
                 lineID = "static:0"
-                message = "Текст без синхронизации"
+                message = String(localized: "Текст без синхронизации")
                 return
             }
             let time = player.position()
@@ -343,13 +343,13 @@ struct PiPSnapshot: @unchecked Sendable {
                 current = [(text, 1)]
             }
         case .loading:
-            message = "Загрузка текста…"
+            message = String(localized: "Загрузка текста…")
         case .notFound:
-            message = "Текст не найден"
+            message = String(localized: "Текст не найден")
         case .failed, .unavailable:
-            message = "Текст недоступен"
+            message = String(localized: "Текст недоступен")
         case .idle:
-            message = player.statusMessage ?? "Включите музыку в Spotify"
+            message = player.statusMessage ?? String(localized: "Включите музыку в Spotify")
         }
     }
 }

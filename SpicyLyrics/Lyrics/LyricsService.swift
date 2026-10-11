@@ -101,8 +101,8 @@ final class LyricsService {
         var errorDescription: String? {
             switch self {
             case .http(let code, let message): return "HTTP \(code)" + (message.map { ": \($0)" } ?? "")
-            case .unauthorized: return "сервер не принял авторизацию (добавьте ключ sl_pk_ в настройках)"
-            case .malformed: return "непонятный ответ сервера"
+            case .unauthorized: return String(localized: "сервер не принял авторизацию (добавьте ключ sl_pk_ в настройках)")
+            case .malformed: return String(localized: "непонятный ответ сервера")
             }
         }
     }
@@ -123,7 +123,7 @@ final class LyricsService {
             case .missing: return nil
             case .queued(let wait):
                 // The server accepted the request and is fetching the lyrics; poll again.
-                guard attempt < 3 else { throw SpicyError.http(503, "в очереди") }
+                guard attempt < 3 else { throw SpicyError.http(503, String(localized: "в очереди")) }
                 try await Task.sleep(for: .seconds(min(max(wait, 2), 10)))
             }
         }

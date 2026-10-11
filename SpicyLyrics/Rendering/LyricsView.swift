@@ -186,7 +186,7 @@ struct LyricsView: View {
             }
             withAnimation(.easeOut(duration: 0.25)) { showResetSize = false }
         } label: {
-            Label("Сбросить размер", systemImage: "arrow.uturn.backward")
+            Label(String(localized: "Сбросить размер"), systemImage: "arrow.uturn.backward")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 16)
@@ -207,21 +207,21 @@ extension LyricsView {
                 Button {
                     player.seek(to: max(0, line.start - settings.timingOffsetMs / 1000))
                 } label: {
-                    Label("Перемотать сюда", systemImage: "play.circle")
+                    Label(String(localized: "Перемотать сюда"), systemImage: "play.circle")
                 }
             }
             Button {
                 UIPasteboard.general.string = line.plainText
             } label: {
-                Label("Скопировать строку", systemImage: "doc.on.doc")
+                Label(String(localized: "Скопировать строку"), systemImage: "doc.on.doc")
             }
             Button {
                 UIPasteboard.general.string = shown.lines.filter { !$0.isInterlude }.map(\.plainText).joined(separator: "\n")
             } label: {
-                Label("Скопировать весь текст", systemImage: "doc.on.doc.fill")
+                Label(String(localized: "Скопировать весь текст"), systemImage: "doc.on.doc.fill")
             }
             ShareLink(item: line.plainText) {
-                Label("Поделиться строкой", systemImage: "square.and.arrow.up")
+                Label(String(localized: "Поделиться строкой"), systemImage: "square.and.arrow.up")
             }
         }
     }

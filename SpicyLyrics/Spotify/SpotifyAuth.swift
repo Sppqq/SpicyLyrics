@@ -23,11 +23,11 @@ enum SpotifyAuthError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingClientID: return "Укажите Client ID приложения Spotify в настройках."
-        case .cancelled: return "Вход отменён."
-        case .badCallback(let reason): return "Spotify вернул ошибку: \(reason)"
-        case .tokenEndpoint(let code, let body): return "Не удалось получить токен (HTTP \(code)): \(body)"
-        case .notLoggedIn: return "Нужно войти в Spotify."
+        case .missingClientID: return String(localized: "Укажите Client ID приложения Spotify в настройках.")
+        case .cancelled: return String(localized: "Вход отменён.")
+        case .badCallback(let reason): return String(localized: "Spotify вернул ошибку: \(reason)")
+        case .tokenEndpoint(let code, let body): return String(localized: "Не удалось получить токен (HTTP \(code)): \(body)")
+        case .notLoggedIn: return String(localized: "Нужно войти в Spotify.")
         }
     }
 }
@@ -97,7 +97,7 @@ final class SpotifyAuth: NSObject, ObservableObject {
         }
         guard items.first(where: { $0.name == "state" })?.value == state,
               let code = items.first(where: { $0.name == "code" })?.value
-        else { throw SpotifyAuthError.badCallback("неверный ответ авторизации") }
+        else { throw SpotifyAuthError.badCallback(String(localized: "неверный ответ авторизации")) }
 
         let newTokens = try await requestToken(form: [
             "grant_type": "authorization_code",
@@ -224,7 +224,7 @@ final class SpotifyAuth: NSObject, ObservableObject {
             session.prefersEphemeralWebBrowserSession = false
             self.session = session
             if !session.start() {
-                continuation.resume(throwing: SpotifyAuthError.badCallback("не удалось открыть окно входа"))
+                continuation.resume(throwing: SpotifyAuthError.badCallback(String(localized: "не удалось открыть окно входа")))
             }
         }
     }

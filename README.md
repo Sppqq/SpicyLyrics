@@ -33,6 +33,7 @@ These features work, but still need testing and refinement.
 | iPad | Side-by-side layout in both orientations, larger lyrics, pointer hover, keyboard shortcuts (space, ⌘← / ⌘→) |
 | Floating lyrics (Picture in Picture) | The current line, word by word, in a PiP window over any app; starts from *•••* or when leaving the app; play/pause and ±15 s from the window |
 | Romanization and translation | On-device: Japanese (with kanji readings), Chinese pinyin, Korean, Cyrillic, Greek; translation under each line with Apple Translation (iOS 18+) |
+| Interface language | English and Russian; follows the phone's language (English otherwise), or pick one in *Settings → Interface* |
 | Display modes | Spicy Lyrics' Simple Lyrics Mode, centred lyrics, SF Pro / Rounded / New York |
 
 ## Spotify Connection

@@ -46,6 +46,9 @@ targets:
       path: SpicyLyrics/Info.plist
       properties:
         CFBundleDisplayName: Spicy Lyrics
+        CFBundleLocalizations:
+          - en
+          - ru
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         SpicyLyricsChannel: $(SPICY_CHANNEL)
