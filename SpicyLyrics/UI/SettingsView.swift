@@ -485,6 +485,7 @@ private struct SyncSettings: View {
                 Toggle(String(localized: "Точное время из приложения Spotify"), isOn: $settings.useAppRemote)
                 if settings.useAppRemote {
                     LabeledContent(String(localized: "Состояние"), value: appRemote.statusText)
+                    Toggle(String(localized: "Будить Spotify самому"), isOn: $settings.autoWakeSpotify)
                     if let error = appRemote.lastError, appRemote.status != .connected {
                         Text(error)
                             .font(.footnote.monospaced())
@@ -526,7 +527,7 @@ private struct SyncSettings: View {
                 } header: {
                     Text(String(localized: "Если не подключается"))
                 } footer: {
-                    Text(String(localized: "1. Spotify должен играть на этом iPhone. 2. В developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте этот Bundle ID (AltStore меняет его при установке) и Redirect URI. 3. Нажмите «Открыть Spotify и подключиться». Если состояние «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify."))
+                    Text(String(localized: "1. Spotify должен играть на этом iPhone. 2. В developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте этот Bundle ID (AltStore меняет его при установке) и Redirect URI. 3. Нажмите «Открыть Spotify и подключиться» (или включите «Будить Spotify самому»: если Spotify дважды откажет, приложение один раз откроет его и вернётся). Если состояние «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify."))
                 }
             }
 

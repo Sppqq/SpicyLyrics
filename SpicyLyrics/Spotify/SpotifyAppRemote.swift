@@ -42,6 +42,10 @@ final class SpotifyAppRemote: NSObject {
     /// Token handed back by Spotify after "wake Spotify", used for the next connection.
     @ObservationIgnored private var wakeToken: String?
     @ObservationIgnored private var coverURI: String?
+    /// Failed attempts in a row: retries back off from 8 s to a minute.
+    @ObservationIgnored private var failures = 0
+    /// Spotify was already woken automatically this launch (only ever once).
+    @ObservationIgnored private var autoWoke = false
 
     static let scope = "app-remote-control"
 
@@ -106,6 +110,7 @@ final class SpotifyAppRemote: NSObject {
         guard let parameters = remote?.authorizationParameters(from: url) else { return }
         if let token = parameters[SPTAppRemoteAccessTokenKey] {
             wakeToken = token
+            failures = 0
             SyncLog.shared.add("remote", "Spotify handed back a token")
             status = .off
             Task { await connect() }
@@ -202,6 +207,7 @@ final class SpotifyAppRemote: NSObject {
         connectTimeout?.cancel()
         connectTimeout = nil
         status = .connected
+        failures = 0
         lastError = nil
         SyncLog.shared.add("remote", "connected")
         player?.setRemoteConnected(true)
@@ -230,7 +236,15 @@ final class SpotifyAppRemote: NSObject {
         SyncLog.shared.add("remote", "no connection: \(message)")
         guard wanted else { return }
         status = .unavailable
-        scheduleRetry(after: 8)
+        failures += 1
+        // Spotify refuses apps it was not woken by: after two refusals, wake it once (if allowed).
+        if failures == 2, settings.autoWakeSpotify, !autoWoke, UIApplication.shared.applicationState == .active {
+            autoWoke = true
+            SyncLog.shared.add("remote", "refused twice, waking Spotify")
+            wakeSpotify()
+            return
+        }
+        scheduleRetry(after: min(60, 8 * pow(2, Double(min(failures, 4) - 1))))
     }
 
     /// The SDK's errors say little on their own; the domain, code and the underlying error tell

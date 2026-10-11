@@ -271,7 +271,7 @@ struct NowPlayingView: View {
         let column = min(size.width * 0.4, 420)
         let blockWidth = column - 40
         // The artwork gets whatever height the title and controls leave free.
-        let reserved = (chromeVisible ? landscapeControlsHeight + 18 : 0) + (showTitle || chromeVisible ? 62 : 0) + 24
+        let reserved = (chromeVisible ? landscapeControlsHeight + 18 : 0) + (showTitle ? 62 : 0) + 24
         let artworkSide = min(blockWidth, size.height * 0.62, size.height - reserved)
         let showArtwork = settings.landscapeArtwork && !lyricsOnly && artworkSide >= 72
         let infoWidth = showArtwork ? artworkSide : min(blockWidth, 320)
@@ -291,14 +291,9 @@ struct NowPlayingView: View {
                         .transition(.opacity.combined(with: .scale(scale: 0.9)))
                 }
 
-                if showTitle || chromeVisible {
-                    HStack(alignment: .center, spacing: 10) {
-                        if showTitle { titleBlock }
-                        Spacer(minLength: 0)
-                        moreMenu
-                            .opacity(chromeVisible ? 1 : 0)
-                    }
-                    .frame(width: infoWidth)
+                if showTitle {
+                    titleBlock
+                        .frame(width: infoWidth)
                 }
 
                 if chromeVisible {
@@ -314,6 +309,14 @@ struct NowPlayingView: View {
             .contentShape(Rectangle())
             // Empty space in the column toggles the controls (the buttons keep their own taps).
             .onTapGesture { toggleChrome() }
+            // "•••" in the column's corner, out of the title's way.
+            .overlay(alignment: .topTrailing) {
+                if chromeVisible && !lyricsOnly {
+                    moreMenu
+                        .padding(.top, 4)
+                        .transition(.opacity)
+                }
+            }
             .padding(.leading, 12)
             .opacity(columnEmpty ? 0 : 1)
 
@@ -379,13 +382,10 @@ struct NowPlayingView: View {
 
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(title)
-                .font(.system(size: 17, weight: .semibold))
-                .lineLimit(1)
-            Text(subtitle)
-                .font(.system(size: 17))
+            // Too long to fit: rides sideways, like in Apple Music.
+            MarqueeText(text: title, font: .system(size: 17, weight: .semibold), active: chromeVisible || isLandscape)
+            MarqueeText(text: subtitle, font: .system(size: 17), active: chromeVisible || isLandscape)
                 .foregroundStyle(.white.opacity(0.6))
-                .lineLimit(1)
         }
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, alignment: .leading)

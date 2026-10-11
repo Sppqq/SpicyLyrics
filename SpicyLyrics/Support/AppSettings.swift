@@ -111,6 +111,8 @@ final class AppSettings {
     /// Frame counter over the lyrics / in the PiP window.
     var showLyricsFPS: Bool { didSet { defaults.set(showLyricsFPS, forKey: Keys.showLyricsFPS) } }
     var pipShowFPS: Bool { didSet { defaults.set(pipShowFPS, forKey: Keys.pipShowFPS) } }
+    /// Open Spotify once by itself when it keeps refusing the SDK connection.
+    var autoWakeSpotify: Bool { didSet { defaults.set(autoWakeSpotify, forKey: Keys.autoWakeSpotify) } }
 
     /// Keys baked in at build time from `Config/Secrets.xcconfig` or CI secrets (may be empty).
     /// When present they are fixed: the app ignores anything typed in settings.
@@ -162,6 +164,7 @@ final class AppSettings {
             Keys.lyricsFrameRate: 60.0,
             Keys.showLyricsFPS: false,
             Keys.pipShowFPS: false,
+            Keys.autoWakeSpotify: false,
         ])
         spotifyClientID = defaults.string(forKey: Keys.clientID) ?? ""
         spicyLyricsKey = defaults.string(forKey: Keys.spicyKey) ?? ""
@@ -218,6 +221,7 @@ final class AppSettings {
         lyricsFrameRate = defaults.double(forKey: Keys.lyricsFrameRate)
         showLyricsFPS = defaults.bool(forKey: Keys.showLyricsFPS)
         pipShowFPS = defaults.bool(forKey: Keys.pipShowFPS)
+        autoWakeSpotify = defaults.bool(forKey: Keys.autoWakeSpotify)
     }
 
     /// The Client ID to sign in with: always the user's own.
@@ -347,6 +351,7 @@ final class AppSettings {
         static let lyricsFrameRate = "lyricsFrameRate"
         static let showLyricsFPS = "showLyricsFPS"
         static let pipShowFPS = "pipShowFPS"
+        static let autoWakeSpotify = "autoWakeSpotify"
     }
 }
 

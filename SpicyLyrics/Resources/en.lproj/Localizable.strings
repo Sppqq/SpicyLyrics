@@ -327,7 +327,7 @@
 "Кадры" = "Frames";
 "Меньше кадров — меньше нагрев. На паузе текст рисуется 15 раз в секунду, в режиме экономии — не больше 30. Счётчик показывает реальные кадры / цель. Частота PiP настраивается в «Картинке в картинке»." = "Fewer frames, less heat. While paused the lyrics draw 15 times a second, with battery saver at most 30. The counter shows actual frames / target. The PiP frame rate is set under Picture in Picture.";
 "Если не подключается" = "If It Won't Connect";
-"1. Spotify должен играть на этом iPhone. 2. В developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте этот Bundle ID (AltStore меняет его при установке) и Redirect URI. 3. Нажмите «Открыть Spotify и подключиться». Если состояние «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify." = "1. Spotify has to be playing on this iPhone. 2. In developer.spotify.com → your app → Settings, tick “iOS” and add this Bundle ID (AltStore changes it when installing) and the Redirect URI. 3. Tap “Open Spotify and Connect”. If the state says “Sign In Again”, sign in again: the old login had no access to the Spotify app.";
+"1. Spotify должен играть на этом iPhone. 2. В developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте этот Bundle ID (AltStore меняет его при установке) и Redirect URI. 3. Нажмите «Открыть Spotify и подключиться» (или включите «Будить Spotify самому»: если Spotify дважды откажет, приложение один раз откроет его и вернётся). Если состояние «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify." = "1. Spotify has to be playing on this iPhone. 2. In developer.spotify.com → your app → Settings, tick “iOS” and add this Bundle ID (AltStore changes it when installing) and the Redirect URI. 3. Tap “Open Spotify and Connect” (or turn on “Wake Spotify Automatically”: after two refusals the app opens Spotify once and comes back). If the state says “Sign In Again”, sign in again: the old login had no access to the Spotify app.";
 "Скопировано" = "Copied";
 "Нет Client ID" = "No Client ID";
 "Не удалось открыть Spotify. Он установлен?" = "Couldn't open Spotify. Is it installed?";
@@ -336,3 +336,4 @@
 "SDK: подключение" = "SDK: connecting";
 "SDK: нет связи" = "SDK: no link";
 "Включить SDK" = "Turn On SDK";
+"Будить Spotify самому" = "Wake Spotify Automatically";
