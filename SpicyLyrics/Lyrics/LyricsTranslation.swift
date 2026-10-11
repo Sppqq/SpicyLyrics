@@ -114,6 +114,7 @@ private struct TranslationDriver: ViewModifier {
             player.setTranslations(result, revision: revision)
         } catch {
             // An unsupported language pair or a declined download: show the lyrics untranslated.
+            SyncLog.shared.add("translate", "failed: \(error.localizedDescription)")
         }
     }
 }

@@ -568,6 +568,7 @@ final class PlayerModel {
             do {
                 try await api.addToQueue(track.uri)
             } catch {
+                SyncLog.shared.add("control", "add to queue failed: \(error.localizedDescription)")
                 transientError = error.localizedDescription
             }
         }
@@ -593,6 +594,7 @@ final class PlayerModel {
                 try await action()
                 try? await Task.sleep(for: .milliseconds(400))
             } catch {
+                SyncLog.shared.add("control", "failed: \(error.localizedDescription)")
                 transientError = error.localizedDescription
             }
             holdUntil = 0
@@ -630,6 +632,7 @@ final class PlayerModel {
         }
         lyricsTask?.cancel()
         lyricsState = .loading
+        SyncLog.shared.add("lyrics", "loading \"\(track.title.prefix(30))\" \(track.id)\(force ? " (no cache)" : "")")
         lyricsTask = Task { [weak self] in
             guard let self else { return }
             let result = await self.lyrics.lyrics(for: track, ignoreCache: force)
@@ -637,11 +640,16 @@ final class PlayerModel {
             self.lyricsTask = nil
             switch result {
             case .found(let document):
+                SyncLog.shared.add("lyrics", "found: \(document.sourceName), \(document.kind.rawValue), \(document.lines.count) lines")
                 self.show(document)
             case .notFound:
+                SyncLog.shared.add("lyrics", "not found")
                 self.lyricsState = .notFound
             case .failed(let reason):
-                if reason != "cancelled" { self.lyricsState = .failed(reason) }
+                if reason != "cancelled" {
+                    SyncLog.shared.add("lyrics", "failed: \(reason)")
+                    self.lyricsState = .failed(reason)
+                }
             }
         }
     }

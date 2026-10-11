@@ -285,7 +285,8 @@
 "Отправить файл журнала" = "Share Log File";
 "Скопировать журнал" = "Copy Log";
 "Очистить" = "Clear";
-"Если текст отстаёт или пауза не совпадает: дождитесь ошибки, затем отправьте файл журнала. В нём только тайминги, названия треков и настройки синхронизации, без ключей и токенов." = "If the lyrics lag or play/pause doesn't match: wait for it to happen, then share the log file. It only holds timings, track names and sync settings, no keys or tokens.";
+"Когда что-то пошло не так (текст отстаёт, пауза не совпадает, ошибка): отправьте файл журнала. В нём тайминги, ошибки, названия треков и настройки, без ключей и токенов." = "When something goes wrong (lyrics lag, play/pause doesn't match, an error), share the log file. It holds timings, errors, track names and settings, no keys or tokens.";
+"Журнал" = "Log";
 "Последние записи" = "Latest Entries";
 "Обновить" = "Refresh";
 "Размер текста" = "Text Size";

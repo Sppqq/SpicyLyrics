@@ -158,6 +158,7 @@ final class SpotifyAuth: NSObject, ObservableObject {
             store(fresh)
             return fresh.accessToken
         } catch SpotifyAuthError.tokenEndpoint(let status, let body) where status == 400 || status == 401 {
+            SyncLog.shared.add("auth", "token refresh rejected (\(status)), signing out")
             // The refresh token was revoked (or the Client ID changed): start over.
             logOut()
             throw SpotifyAuthError.tokenEndpoint(status, body)

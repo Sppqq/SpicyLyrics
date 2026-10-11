@@ -270,6 +270,7 @@ final class SpotifyAPI {
         guard !(200..<300).contains(status) else { return }
         let error = (try? JSONDecoder().decode(ErrorPayload.self, from: data))?.error
         let message = error?.message ?? ""
+        SyncLog.log("api", "HTTP \(status) \(error?.reason ?? "") \(message)")
         switch status {
         case 403 where message.lowercased().contains("premium") || error?.reason == "PREMIUM_REQUIRED":
             throw SpotifyAPIError.premiumRequired

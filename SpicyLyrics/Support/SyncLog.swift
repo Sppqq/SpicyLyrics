@@ -3,8 +3,9 @@ import Observation
 import QuartzCore
 import UIKit
 
-/// A rolling log of everything that moves the lyrics clock: Web API polls, App Remote events and
-/// queries, every correction and why. Settings → Sync log shows it and shares it as a file.
+/// A rolling log of everything that moves the lyrics clock (Web API polls, App Remote events and
+/// queries, every correction and why) and of every error: requests, lyrics, translation, Picture
+/// in Picture, sign-in. Settings → Log shows it and shares it as a file.
 @MainActor
 @Observable
 final class SyncLog {
@@ -26,11 +27,17 @@ final class SyncLog {
     @ObservationIgnored private var nextID = 0
     private static let limit = 4000
 
-    func add(_ source: String, _ message: String) {
+    func add(_ source: String, _ message: String, at date: Date = Date()) {
         guard enabled else { return }
-        entries.append(Entry(id: nextID, date: Date(), media: CACurrentMediaTime(), source: source, message: message))
+        entries.append(Entry(id: nextID, date: date, media: CACurrentMediaTime(), source: source, message: message))
         nextID += 1
         if entries.count > Self.limit { entries.removeFirst(entries.count - Self.limit) }
+    }
+
+    /// From any thread.
+    nonisolated static func log(_ source: String, _ message: String) {
+        let date = Date()
+        Task { @MainActor in shared.add(source, message, at: date) }
     }
 
     /// A clock reading that was compared with (and maybe applied to) the lyrics clock.

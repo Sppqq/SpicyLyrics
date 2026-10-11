@@ -40,7 +40,7 @@ struct SettingsView: View {
                              value: settings.powerSaving ? String(localized: "Экономия") : (performance.constrained ? String(localized: "Авто-экономия") : nil)) {
                         PerformanceSettings()
                     }
-                    category(String(localized: "Журнал синхронизации"), "list.bullet.rectangle.fill", .gray,
+                    category(String(localized: "Журнал"), "list.bullet.rectangle.fill", .gray,
                              value: settings.syncLogEnabled ? nil : String(localized: "Выкл.")) { SyncLogView() }
                     category(String(localized: "Источники текстов"), "doc.text.fill", .brown) { SourceSettings() }
                     category("Spotify", "music.note", Color(red: 0.12, green: 0.84, blue: 0.38),
@@ -496,8 +496,8 @@ private struct SyncSettings: View {
                 SliderRow(title: String(localized: "Сверка с приложением Spotify"), value: $settings.remoteQueryInterval,
                           range: 0.5...5, step: 0.5, format: { String(format: "%.1f", $0) + " " + String(localized: "с") })
                 Toggle(String(localized: "Индикатор синхронизации"), isOn: $settings.showSyncIndicator)
-                NavigationLink(String(localized: "Журнал синхронизации")) {
-                    SyncLogView().navigationTitle(String(localized: "Журнал синхронизации"))
+                NavigationLink(String(localized: "Журнал")) {
+                    SyncLogView().navigationTitle(String(localized: "Журнал"))
                 }
             } header: {
                 Text(String(localized: "Как часто сверять время"))

@@ -89,6 +89,7 @@ final class LyricsPictureInPicture: NSObject {
                 if controller.isPictureInPicturePossible {
                     controller.startPictureInPicture()
                 } else {
+                    SyncLog.log("pip", "not possible right now")
                     self.lastError = String(localized: "Окно «картинка в картинке» сейчас недоступно. Попробуйте ещё раз.")
                 }
             }
@@ -155,12 +156,14 @@ final class LyricsPictureInPicture: NSObject {
 
 extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
     func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
+        SyncLog.log("pip", "started")
         isActive = true
         scheduleFrames(fps: 30)
         renderFrame()
     }
 
     func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
+        SyncLog.log("pip", "stopped")
         isActive = false
         scheduleFrames(fps: idleFramesPerSecond)
     }
@@ -168,6 +171,7 @@ extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
     func pictureInPictureController(_ controller: AVPictureInPictureController,
                                     failedToStartPictureInPictureWithError error: Error) {
         isActive = false
+        SyncLog.log("pip", "failed to start: \(error.localizedDescription)")
         lastError = String(localized: "Не удалось открыть окно: \(error.localizedDescription)")
     }
 

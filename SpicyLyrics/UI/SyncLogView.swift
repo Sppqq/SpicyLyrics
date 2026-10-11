@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Settings → Sync log: every poll, App Remote event and clock correction, to share when the
-/// lyrics drift.
+/// Settings → Log: every poll, App Remote event and clock correction, and every error, to share
+/// when something goes wrong.
 struct SyncLogView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(PlayerModel.self) private var player
@@ -35,7 +35,7 @@ struct SyncLogView: View {
                     Label(String(localized: "Очистить"), systemImage: "trash")
                 }
             } footer: {
-                Text(String(localized: "Если текст отстаёт или пауза не совпадает: дождитесь ошибки, затем отправьте файл журнала. В нём только тайминги, названия треков и настройки синхронизации, без ключей и токенов."))
+                Text(String(localized: "Когда что-то пошло не так (текст отстаёт, пауза не совпадает, ошибка): отправьте файл журнала. В нём тайминги, ошибки, названия треков и настройки, без ключей и токенов."))
             }
 
             Section(String(localized: "Последние записи")) {
