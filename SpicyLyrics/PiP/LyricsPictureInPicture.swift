@@ -228,7 +228,6 @@ struct PiPStyle: Equatable {
     var translationScale: CGFloat = 1
     /// Lyric size multiplier for the window.
     var textScale: CGFloat = 1
-    var showCredits = true
 
     /// Same as the app's `LyricsTypography.opacity`.
     func opacity(_ value: Double) -> CGFloat {
@@ -282,7 +281,6 @@ struct PiPSnapshot: @unchecked Sendable {
             style.inactiveBrightness = settings.inactiveBrightness
             style.blur = settings.blurInactiveLines && settings.pipBlurLines && !reduced ? settings.blurStrength : 0
             style.textScale = CGFloat(settings.pipTextScale)
-            style.showCredits = settings.pipShowCredits
             backgroundDim = CGFloat(settings.pipBackgroundDim)
             style.lineSpacing = CGFloat(settings.lineSpacingScale)
             style.translationScale = CGFloat(settings.translationScale)
@@ -565,7 +563,7 @@ final class PiPFrameRenderer {
                        runs: runs, fontSize: CTFontGetSize(font), anchor: alignment, isBackground: line.isBackground)
         }
         lastLyricEnd = lyrics.kind == .static ? 0 : lyrics.lines.map(\.end).max() ?? 0
-        credits = style.showCredits ? creditsLayout(lyrics, width: column - cqw * 5, design: style.design) : nil
+        credits = creditsLayout(lyrics, width: column - cqw * 5, design: style.design)
     }
 
     /// The block after the last line, as in the app (`LyricsCreditsView`).

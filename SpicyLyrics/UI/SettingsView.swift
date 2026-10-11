@@ -384,7 +384,6 @@ private struct PictureInPictureSettings: View {
                 }
                 Toggle(String(localized: "Размытие соседних строк"), isOn: $settings.pipBlurLines)
                 Toggle(String(localized: "Перевод в окне"), isOn: $settings.pipShowTranslation)
-                Toggle(String(localized: "Титры в конце песни"), isOn: $settings.pipShowCredits)
             } header: {
                 Text(String(localized: "Текст в окне"))
             } footer: {
@@ -397,7 +396,6 @@ private struct PictureInPictureSettings: View {
                 settings.pipFrameRate = 30
                 settings.pipBlurLines = true
                 settings.pipShowTranslation = true
-                settings.pipShowCredits = true
             }
         }
     }

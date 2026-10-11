@@ -36,7 +36,6 @@ final class AppSettings {
     var pipTextScale: Double { didSet { defaults.set(pipTextScale, forKey: Keys.pipTextScale) } }
     var pipBackgroundDim: Double { didSet { defaults.set(pipBackgroundDim, forKey: Keys.pipBackgroundDim) } }
     var pipFrameRate: Double { didSet { defaults.set(pipFrameRate, forKey: Keys.pipFrameRate) } }
-    var pipShowCredits: Bool { didSet { defaults.set(pipShowCredits, forKey: Keys.pipShowCredits) } }
     var pipShowTranslation: Bool { didSet { defaults.set(pipShowTranslation, forKey: Keys.pipShowTranslation) } }
     var pipBlurLines: Bool { didSet { defaults.set(pipBlurLines, forKey: Keys.pipBlurLines) } }
     /// Translate the lyrics on the device and show the translation under each line.
@@ -159,7 +158,6 @@ final class AppSettings {
         pipTextScale = defaults.object(forKey: Keys.pipTextScale) as? Double ?? 1
         pipBackgroundDim = defaults.object(forKey: Keys.pipBackgroundDim) as? Double ?? 0.42
         pipFrameRate = defaults.object(forKey: Keys.pipFrameRate) as? Double ?? 30
-        pipShowCredits = defaults.object(forKey: Keys.pipShowCredits) as? Bool ?? true
         pipShowTranslation = defaults.object(forKey: Keys.pipShowTranslation) as? Bool ?? true
         pipBlurLines = defaults.object(forKey: Keys.pipBlurLines) as? Bool ?? true
         simpleLyricsMode = defaults.bool(forKey: Keys.simpleMode)
@@ -274,7 +272,6 @@ final class AppSettings {
         static let pipTextScale = "pipTextScale"
         static let pipBackgroundDim = "pipBackgroundDim"
         static let pipFrameRate = "pipFrameRate"
-        static let pipShowCredits = "pipShowCredits"
         static let pipShowTranslation = "pipShowTranslation"
         static let pipBlurLines = "pipBlurLines"
         static let simpleMode = "simpleLyricsMode"

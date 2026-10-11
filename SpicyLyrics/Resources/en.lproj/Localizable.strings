@@ -294,7 +294,6 @@
 "Частота кадров" = "Frame Rate";
 "Размытие соседних строк" = "Blur Other Lines";
 "Перевод в окне" = "Translation in the Window";
-"Титры в конце песни" = "Credits at the End";
 "Текст в окне" = "Lyrics in the Window";
 "Меньше кадров — меньше нагрузка и нагрев. Размытие строк работает, только если оно включено и в «Эффектах»." = "Fewer frames mean less load and heat. Line blur only works if it is also on in Effects.";
 "Сбросить вид окна" = "Reset Window Look";
