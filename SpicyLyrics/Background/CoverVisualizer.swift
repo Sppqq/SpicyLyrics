@@ -259,7 +259,7 @@ struct CoverPalette {
         // Dark orange and dark yellow read as brown: their shadows lean towards crimson instead.
         let warm = leadHue > 0.02 && leadHue < 0.17
         let deepHue = warm ? fract(leadHue - 0.07) : leadHue
-        return CoverPalette(deep: rgb(h: deepHue, s: 0.85, v: 0.16),
+        return CoverPalette(deep: rgb(h: deepHue, s: 0.9, v: 0.22),
                             vivid: lift(lead, saturation: 0.72, value: 0.95, maxValue: 1),
                             accent: lift(accent, saturation: 0.62, value: 1, maxValue: 1))
     }

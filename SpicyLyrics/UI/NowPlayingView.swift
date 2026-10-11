@@ -69,8 +69,8 @@ struct NowPlayingView: View {
                 // Experimental: a visualizer where the lyrics were hidden.
                 ZStack {
                     if showVisualizer {
-                        // Half the background's darkening: the nebula should glow, the lines still read.
-                        CoverVisualizerView(player: player, reduced: reduced, dim: settings.backgroundDim * 0.5,
+                        // Less than half the background's darkening: the nebula should glow, the lines still read.
+                        CoverVisualizerView(player: player, reduced: reduced, dim: settings.backgroundDim * 0.4,
                                             randomColors: settings.nebulaColors == NebulaColors.random.rawValue)
                             .allowsHitTesting(false)
                             .transition(.opacity)
