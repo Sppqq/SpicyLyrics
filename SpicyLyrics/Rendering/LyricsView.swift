@@ -30,6 +30,7 @@ struct LyricsView: View {
     /// "Reset size" pill after a pinch; each pinch restarts its countdown.
     @State private var showResetSize = false
     @State private var resetSizeTick = 0
+    @State private var frameCounter = FrameRateCounter()
 
     init(lyrics: PreparedLyrics, player: PlayerModel, settings: AppSettings,
          topInset: CGFloat = 0, bottomInset: CGFloat = 0, horizontalPadding: CGFloat = 24,
@@ -66,25 +67,32 @@ struct LyricsView: View {
             glowScale: settings.glowStrength,
             inactiveBrightness: settings.inactiveBrightness,
             lineSpacingScale: CGFloat(settings.lineSpacingScale),
-            translationScale: CGFloat(settings.translationScale)
+            translationScale: CGFloat(settings.translationScale),
+            translationBrightness: settings.translationBrightness,
+            weight: (LyricsWeight(rawValue: settings.lyricsWeight) ?? .bold).fontWeight
         )
     }
 
     /// Spicy Lyrics centres the active line in the visible lyrics, 30 px above the middle
-    /// (`ScrollTo(..., "Center")` with a 30 px padding).
+    /// (`ScrollTo(..., "Center")` with a 30 px padding). The setting moves it up or down.
     private func anchor(height: CGFloat) -> UnitPoint {
-        let visibleCentre = (topInset + height - bottomInset) / 2
-        return UnitPoint(x: 0.5, y: clamp((visibleCentre - 30) / max(height, 1), 0.1, 0.9))
+        let visible = max(height - topInset - bottomInset, 1)
+        let spot = topInset + visible * CGFloat(clamp(settings.activeLinePosition, 0.2, 0.8))
+        return UnitPoint(x: 0.5, y: clamp((spot - 30) / max(height, 1), 0.1, 0.9))
     }
 
-    /// The virtualizer's glide: a critically damped 1 Hz spring (`SMOOTH_SCROLL_FREQUENCY/DAMPING`).
-    private static let scrollAnimation = Animation.spring(response: 1, dampingFraction: 1)
+    /// The virtualizer's glide: a critically damped 1 Hz spring (`SMOOTH_SCROLL_FREQUENCY/DAMPING`),
+    /// quicker or slower with the setting.
+    private var scrollAnimation: Animation {
+        .spring(response: 1 / clamp(settings.scrollSpeed, 0.25, 4), dampingFraction: 1)
+    }
     /// `USER_SCROLL_COOLDOWN` in ScrollToActiveLine.ts.
     private static let userScrollCooldown: TimeInterval = 0.75
 
     private var frameInterval: Double {
         if !player.isPlaying { return 1.0 / 15 }
-        return reduced ? 1.0 / 30 : 1.0 / 60
+        let target = max(15, settings.lyricsFrameRate)
+        return 1 / (reduced ? min(30, target) : target)
     }
 
     var body: some View {
@@ -95,6 +103,7 @@ struct LyricsView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     TimelineView(.animation(minimumInterval: frameInterval)) { _ in
                         let now = CACurrentMediaTime()
+                        let _ = settings.showLyricsFPS ? frameCounter.tick(now) : ()
                         let _ = animator.step(position: player.position(at: now), now: now,
                                               blurEnabled: settings.blurInactiveLines && !userScrolling && !reduced)
                         let focus = animator.focusIndex
@@ -117,8 +126,10 @@ struct LyricsView: View {
                                     .contextMenu { lineMenu(line) }
                                     .id(line.id)
                             }
-                            LyricsCreditsView(lyrics: shown, lyricSize: typography.fontSize)
-                                .padding(.top, typography.fontSize * 0.45)
+                            if settings.showCredits {
+                                LyricsCreditsView(lyrics: shown, lyricSize: typography.fontSize)
+                                    .padding(.top, typography.fontSize * 0.45)
+                            }
                         }
                         .padding(.horizontal, horizontalPadding)
                         .padding(.vertical, geometry.size.height * 0.6)
@@ -126,14 +137,14 @@ struct LyricsView: View {
                         .onTapGesture { onBackgroundTap() }
                         .onChange(of: focus) { _, newFocus in
                             guard shown.kind != .static, !userScrolling, Date() >= resumeAutoScrollAt else { return }
-                            withAnimation(Self.scrollAnimation) {
+                            withAnimation(scrollAnimation) {
                                 proxy.scrollTo(newFocus, anchor: anchor)
                             }
                         }
                         // The visible area changes when the controls show or hide: re-centre.
                         .onChange(of: anchor.y) { _, _ in
                             guard shown.kind != .static, !userScrolling else { return }
-                            withAnimation(Self.scrollAnimation) {
+                            withAnimation(scrollAnimation) {
                                 proxy.scrollTo(animator.focusIndex, anchor: anchor)
                             }
                         }
@@ -164,6 +175,13 @@ struct LyricsView: View {
                     if settings.fontSize != AppSettings.defaultFontSize {
                         resetSizeTick += 1
                         withAnimation(.easeOut(duration: 0.2)) { showResetSize = true }
+                    }
+                }
+                .overlay(alignment: .topLeading) {
+                    if settings.showLyricsFPS {
+                        FPSBadge(counter: frameCounter, target: player.isPlaying ? 1 / frameInterval : 15)
+                            .padding(.top, topInset + 6)
+                            .padding(.leading, horizontalPadding)
                     }
                 }
                 .overlay(alignment: .bottom) {

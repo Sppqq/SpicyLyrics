@@ -148,6 +148,11 @@ private struct TextLookSettings: View {
                         Text(font.title).tag(font.rawValue)
                     }
                 }
+                Picker(String(localized: "Насыщенность шрифта"), selection: $settings.lyricsWeight) {
+                    ForEach(LyricsWeight.allCases) { weight in
+                        Text(weight.title).tag(weight.rawValue)
+                    }
+                }
                 SliderRow(title: String(localized: "Размер"), value: $settings.fontSize,
                           range: Double(AppSettings.fontRange.lowerBound)...Double(AppSettings.fontRange.upperBound),
                           step: 1, format: { "\(Int($0)) pt" })
@@ -160,8 +165,30 @@ private struct TextLookSettings: View {
                 SliderRow(title: String(localized: "Между строками"), value: $settings.lineSpacingScale, range: 0...4, step: 0.25)
             }
 
+            Section {
+                SliderRow(title: String(localized: "Положение активной строки"), value: $settings.activeLinePosition,
+                          range: 0.2...0.8, step: 0.05, format: Self.positionLabel)
+                SliderRow(title: String(localized: "Скорость прокрутки"), value: $settings.scrollSpeed, range: 0.5...3, step: 0.25)
+            } header: {
+                Text(String(localized: "Прокрутка"))
+            } footer: {
+                Text(String(localized: "Где держится строка, которую поют, и как быстро текст доезжает до следующей."))
+            }
+
+            Section {
+                Toggle(String(localized: "Авторы в конце текста"), isOn: $settings.showCredits)
+            } footer: {
+                Text(String(localized: "Авторы песни, источник текста и кто его синхронизировал — после последней строки, в приложении и в PiP."))
+            }
+
             ResetSection(title: String(localized: "Вернуть как было")) { settings.resetLyricsLook() }
         }
+    }
+
+    private static func positionLabel(_ value: Double) -> String {
+        if abs(value - 0.5) < 0.01 { return String(localized: "По центру") }
+        return value < 0.5 ? String(localized: "Выше на \(Int(((0.5 - value) * 100).rounded()))%")
+                           : String(localized: "Ниже на \(Int(((value - 0.5) * 100).rounded()))%")
     }
 }
 
@@ -226,6 +253,7 @@ private struct BackgroundSettings: View {
                 Section(String(localized: "Обложка")) {
                     SliderRow(title: String(localized: "Скорость движения"), value: $settings.backgroundSpeed, range: 0.25...3)
                     SliderRow(title: String(localized: "Размытие"), value: $settings.backgroundBlur, range: 0.3...3)
+                    SliderRow(title: String(localized: "Насыщенность цвета"), value: $settings.backgroundSaturation, range: 0...2)
                 }
             }
 
@@ -266,6 +294,7 @@ private struct LanguageSettings: View {
                     }
                     if !settings.translationReplaces {
                         SliderRow(title: String(localized: "Размер перевода"), value: $settings.translationScale, range: 0.6...1.6)
+                        SliderRow(title: String(localized: "Яркость перевода"), value: $settings.translationBrightness, range: 0.5...1.6)
                     }
                 }
             } footer: {
@@ -384,6 +413,7 @@ private struct PictureInPictureSettings: View {
                 }
                 Toggle(String(localized: "Размытие соседних строк"), isOn: $settings.pipBlurLines)
                 Toggle(String(localized: "Перевод в окне"), isOn: $settings.pipShowTranslation)
+                Toggle(String(localized: "Показывать FPS"), isOn: $settings.pipShowFPS)
             } header: {
                 Text(String(localized: "Текст в окне"))
             } footer: {
@@ -396,6 +426,7 @@ private struct PictureInPictureSettings: View {
                 settings.pipFrameRate = 30
                 settings.pipBlurLines = true
                 settings.pipShowTranslation = true
+                settings.pipShowFPS = false
             }
         }
     }
@@ -445,15 +476,7 @@ private struct SyncSettings: View {
     @Environment(SpotifyAppRemote.self) private var appRemote
     @EnvironmentObject private var auth: SpotifyAuth
 
-    private var remoteStatus: String {
-        switch appRemote.status {
-        case .off: return String(localized: "Выключено")
-        case .needsLogin: return String(localized: "Нужно войти заново")
-        case .connecting: return String(localized: "Подключение…")
-        case .connected: return String(localized: "Подключено")
-        case .unavailable: return String(localized: "Spotify не отвечает")
-        }
-    }
+    @State private var bundleCopied = false
 
     var body: some View {
         @Bindable var settings = settings
@@ -461,7 +484,13 @@ private struct SyncSettings: View {
             Section {
                 Toggle(String(localized: "Точное время из приложения Spotify"), isOn: $settings.useAppRemote)
                 if settings.useAppRemote {
-                    LabeledContent(String(localized: "Состояние"), value: remoteStatus)
+                    LabeledContent(String(localized: "Состояние"), value: appRemote.statusText)
+                    if let error = appRemote.lastError, appRemote.status != .connected {
+                        Text(error)
+                            .font(.footnote.monospaced())
+                            .foregroundStyle(.orange)
+                            .textSelection(.enabled)
+                    }
                     if appRemote.status == .needsLogin {
                         Button(String(localized: "Войти заново")) {
                             Task {
@@ -469,12 +498,36 @@ private struct SyncSettings: View {
                                 appRemote.refresh()
                             }
                         }
-                    } else if appRemote.status == .unavailable {
+                    } else if appRemote.status == .unavailable || appRemote.status == .connecting {
                         Button(String(localized: "Открыть Spotify и подключиться")) { appRemote.wakeSpotify() }
                     }
                 }
             } footer: {
                 Text(String(localized: "Когда Spotify играет на этом iPhone, позиция берётся прямо из его приложения, без задержек интернета. Иначе время берётся из Spotify Web API."))
+            }
+
+            if settings.useAppRemote {
+                Section {
+                    Button {
+                        UIPasteboard.general.string = Bundle.main.bundleIdentifier
+                        bundleCopied = true
+                    } label: {
+                        LabeledContent("Bundle ID") {
+                            Text(bundleCopied ? String(localized: "Скопировано") : (Bundle.main.bundleIdentifier ?? "—"))
+                                .font(.footnote.monospaced())
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+                    LabeledContent("Redirect URI") {
+                        Text(SpotifyAuth.redirectURI).font(.footnote.monospaced())
+                    }
+                } header: {
+                    Text(String(localized: "Если не подключается"))
+                } footer: {
+                    Text(String(localized: "1. Spotify должен играть на этом iPhone. 2. В developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте этот Bundle ID (AltStore меняет его при установке) и Redirect URI. 3. Нажмите «Открыть Spotify и подключиться». Если состояние «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify."))
+                }
             }
 
             Section {
@@ -523,6 +576,24 @@ private struct PerformanceSettings: View {
                 Toggle(String(localized: "Экономия батареи"), isOn: $settings.powerSaving)
             } footer: {
                 Text(String(localized: "30 кадров в секунду, без размытия строк, неподвижный фон в приложении и в PiP."))
+            }
+
+            Section {
+                Picker(String(localized: "Частота кадров текста"), selection: $settings.lyricsFrameRate) {
+                    Text("24").tag(24.0)
+                    Text("30").tag(30.0)
+                    Text("45").tag(45.0)
+                    Text("60").tag(60.0)
+                    if UIScreen.main.maximumFramesPerSecond > 60 {
+                        Text("120").tag(120.0)
+                    }
+                }
+                Toggle(String(localized: "Показывать FPS в плеере"), isOn: $settings.showLyricsFPS)
+                Toggle(String(localized: "Показывать FPS в PiP"), isOn: $settings.pipShowFPS)
+            } header: {
+                Text(String(localized: "Кадры"))
+            } footer: {
+                Text(String(localized: "Меньше кадров — меньше нагрев. На паузе текст рисуется 15 раз в секунду, в режиме экономии — не больше 30. Счётчик показывает реальные кадры / цель. Частота PiP настраивается в «Картинке в картинке»."))
             }
 
             Section {

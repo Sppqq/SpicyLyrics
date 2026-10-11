@@ -19,11 +19,13 @@ struct DynamicBackground: View {
     var speed: Double = 1
     /// × the default cover blur.
     var blur: Double = 1
+    /// × the default cover saturation.
+    var saturation: Double = 1
 
     var body: some View {
         ZStack {
             Color(red: 0.07, green: 0.07, blue: 0.08)
-            CoverBlobs(image: image, imageID: imageID, animated: animated, speed: speed, blur: blur)
+            CoverBlobs(image: image, imageID: imageID, animated: animated, speed: speed, blur: blur, saturation: saturation)
             Color.black.opacity(dim)
         }
         .ignoresSafeArea()
@@ -37,13 +39,14 @@ private struct CoverBlobs: UIViewRepresentable {
     let animated: Bool
     let speed: Double
     let blur: Double
+    let saturation: Double
 
     func makeUIView(context: Context) -> CoverBlobsView { CoverBlobsView() }
 
     func updateUIView(_ view: CoverBlobsView, context: Context) {
         view.setAnimated(animated)
         view.setSpeed(speed)
-        view.setImage(image, id: image == nil ? "" : imageID, blur: blur)
+        view.setImage(image, id: image == nil ? "" : imageID, blur: blur, saturation: saturation)
     }
 }
 
@@ -149,9 +152,9 @@ final class CoverBlobsView: UIView {
         container.speed = Float(value)
     }
 
-    func setImage(_ image: UIImage?, id: String, blur: Double = 1) {
-        // The blur is part of the key: changing it re-renders the cover.
-        let key = image == nil ? "" : "\(id)|\(blur)"
+    func setImage(_ image: UIImage?, id: String, blur: Double = 1, saturation: Double = 1) {
+        // Blur and saturation are part of the key: changing them re-renders the cover.
+        let key = image == nil ? "" : "\(id)|\(blur)|\(saturation)"
         guard key != currentID else { return }
         currentID = key
         processing?.cancel()
@@ -161,7 +164,7 @@ final class CoverBlobsView: UIView {
         }
         let id = key
         processing = Task.detached(priority: .utility) { [weak self] in
-            let rendered = CoverBlobsView.render(image, blur: blur)
+            let rendered = CoverBlobsView.render(image, blur: blur, saturation: saturation)
             guard !Task.isCancelled else { return }
             await MainActor.run { [weak self] in
                 guard let self, self.currentID == id else { return }
@@ -184,13 +187,14 @@ final class CoverBlobsView: UIView {
 
     /// Small, saturated, pre-blurred copies: one opaque, one fading out radially for the blobs.
     /// Scaled up to fill the screen, a tiny image looks exactly like a heavy blur.
-    nonisolated static func render(_ image: UIImage, blur: Double = 1) -> (base: CGImage, blob: CGImage)? {
+    nonisolated static func render(_ image: UIImage, blur: Double = 1, saturation: Double = 1) -> (base: CGImage, blob: CGImage)? {
         let blur = clamp(blur, 0.3, 3)
+        let saturation = clamp(saturation, 0, 2)
         guard let cgImage = image.downscaled(to: CGFloat(96 / blur)).cgImage else { return nil }
         let input = CIImage(cgImage: cgImage)
         let extent = input.extent
         let colored = input.applyingFilter("CIColorControls", parameters: [
-            kCIInputSaturationKey: 1.7,
+            kCIInputSaturationKey: 1.7 * saturation,
             kCIInputBrightnessKey: -0.03,
             kCIInputContrastKey: 1.05,
         ])

@@ -26,6 +26,8 @@ final class SpotifyAppRemote: NSObject {
     }
 
     private(set) var status: Status = .off
+    /// Why the last attempt failed, as Spotify put it (shown in settings and on the sync badge).
+    private(set) var lastError: String?
 
     @ObservationIgnored private let auth: SpotifyAuth
     @ObservationIgnored private let settings: AppSettings
@@ -35,6 +37,8 @@ final class SpotifyAppRemote: NSObject {
     @ObservationIgnored private var wanted = false
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     @ObservationIgnored private var queryTask: Task<Void, Never>?
+    /// Gives up on a connection attempt Spotify never answers.
+    @ObservationIgnored private var connectTimeout: Task<Void, Never>?
     /// Token handed back by Spotify after "wake Spotify", used for the next connection.
     @ObservationIgnored private var wakeToken: String?
     @ObservationIgnored private var coverURI: String?
@@ -51,7 +55,9 @@ final class SpotifyAppRemote: NSObject {
         self.player = player
         player.onRemoteStale = { [weak self] in self?.reconnect() }
         wanted = true
-        if remote?.isConnected != true { Task { await connect() } }
+        // Called on every scene change; a second `connect()` mid-attempt cancels the first.
+        guard remote?.isConnected != true, status != .connecting else { return }
+        Task { await connect() }
     }
 
     func stop() {
@@ -60,6 +66,8 @@ final class SpotifyAppRemote: NSObject {
         retryTask = nil
         queryTask?.cancel()
         queryTask = nil
+        connectTimeout?.cancel()
+        connectTimeout = nil
         if remote?.isConnected == true { remote?.disconnect() }
         player?.setRemoteConnected(false)
         status = .off
@@ -78,10 +86,17 @@ final class SpotifyAppRemote: NSObject {
 
     /// Opens Spotify so it starts (and resumes playback), then comes back with a token.
     func wakeSpotify() {
-        guard let remote = makeRemote() else { return }
+        guard let remote = makeRemote() else {
+            lastError = String(localized: "Нет Client ID")
+            return
+        }
+        SyncLog.shared.add("remote", "waking Spotify")
         remote.authorizeAndPlayURI("") { [weak self] success in
             Task { @MainActor in
-                if !success { self?.status = .unavailable }
+                guard !success else { return }
+                self?.status = .unavailable
+                self?.lastError = String(localized: "Не удалось открыть Spotify. Он установлен?")
+                SyncLog.shared.add("remote", "could not open Spotify")
             }
         }
     }
@@ -91,7 +106,13 @@ final class SpotifyAppRemote: NSObject {
         guard let parameters = remote?.authorizationParameters(from: url) else { return }
         if let token = parameters[SPTAppRemoteAccessTokenKey] {
             wakeToken = token
+            SyncLog.shared.add("remote", "Spotify handed back a token")
+            status = .off
             Task { await connect() }
+        } else if let message = parameters[SPTAppRemoteErrorDescriptionKey] {
+            lastError = message
+            status = .unavailable
+            SyncLog.shared.add("remote", "Spotify refused: \(message)")
         }
     }
 
@@ -118,6 +139,7 @@ final class SpotifyAppRemote: NSObject {
             return
         }
         guard auth.hasScope(Self.scope) || wakeToken != nil else {
+            if status != .needsLogin { SyncLog.shared.add("remote", "the login lacks \(Self.scope): sign in again") }
             status = .needsLogin
             return
         }
@@ -126,11 +148,14 @@ final class SpotifyAppRemote: NSObject {
             token = wakeToken
             self.wakeToken = nil
         } else {
-            guard let fresh = try? await auth.accessToken() else {
+            do {
+                token = try await auth.accessToken()
+            } catch {
+                lastError = error.localizedDescription
+                SyncLog.shared.add("remote", "no token: \(error.localizedDescription)")
                 scheduleRetry(after: 10)
                 return
             }
-            token = fresh
         }
         guard wanted, let remote = makeRemote() else { return }
         if remote.isConnected { return }
@@ -138,6 +163,13 @@ final class SpotifyAppRemote: NSObject {
         status = .connecting
         SyncLog.shared.add("remote", "connecting")
         remote.connect()
+        connectTimeout?.cancel()
+        connectTimeout = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(15))
+            guard !Task.isCancelled, let self, self.status == .connecting else { return }
+            self.remote?.disconnect()
+            self.didDrop(nil, reason: String(localized: "Spotify не ответил за 15 секунд"))
+        }
     }
 
     /// The connection looks alive but Spotify stopped answering truthfully: start over.
@@ -167,7 +199,10 @@ final class SpotifyAppRemote: NSObject {
             remote?.disconnect()
             return
         }
+        connectTimeout?.cancel()
+        connectTimeout = nil
         status = .connected
+        lastError = nil
         SyncLog.shared.add("remote", "connected")
         player?.setRemoteConnected(true)
         remote.playerAPI?.delegate = self
@@ -184,14 +219,29 @@ final class SpotifyAppRemote: NSObject {
         }
     }
 
-    private func didDrop(_ error: Error?) {
+    private func didDrop(_ error: Error?, reason: String? = nil) {
         queryTask?.cancel()
         queryTask = nil
+        connectTimeout?.cancel()
+        connectTimeout = nil
         player?.setRemoteConnected(false)
-        SyncLog.shared.add("remote", "no connection: \(error?.localizedDescription ?? "disconnected")")
+        let message = reason ?? error.map(Self.describe) ?? "disconnected"
+        lastError = message
+        SyncLog.shared.add("remote", "no connection: \(message)")
         guard wanted else { return }
         status = .unavailable
         scheduleRetry(after: 8)
+    }
+
+    /// The SDK's errors say little on their own; the domain, code and the underlying error tell
+    /// "Spotify is not running" from "this app is not allowed".
+    private static func describe(_ error: Error) -> String {
+        let ns = error as NSError
+        var text = "\(ns.localizedDescription) [\(ns.domain) \(ns.code)]"
+        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError {
+            text += " ← \(underlying.localizedDescription) [\(underlying.domain) \(underlying.code)]"
+        }
+        return text
     }
 
     private func query() {
@@ -277,6 +327,19 @@ extension SpotifyAppRemote: SPTAppRemotePlayerStateDelegate {
         Task { @MainActor in
             self.player?.applyRemote(sample)
             self.fetchCover(track, uri: sample.uri)
+        }
+    }
+}
+
+extension SpotifyAppRemote {
+    /// The connection state in words, for settings and the sync badge.
+    var statusText: String {
+        switch status {
+        case .off: return String(localized: "Выключено")
+        case .needsLogin: return String(localized: "Нужно войти заново")
+        case .connecting: return String(localized: "Подключение…")
+        case .connected: return String(localized: "Подключено")
+        case .unavailable: return String(localized: "Spotify не отвечает")
         }
     }
 }

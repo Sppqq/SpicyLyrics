@@ -303,3 +303,36 @@
 "Индикатор синхронизации" = "Sync Indicator";
 "Как часто сверять время" = "How Often to Check the Time";
 "Индикатор над текстом показывает, откуда пришло время (App Remote или Web API), насколько часы расходились и как давно была сверка. Частый опрос Web API тратит общий лимит запросов вашего Client ID." = "The badge over the lyrics shows where the time came from (App Remote or Web API), how far the clock was off and how long ago it was checked. Frequent Web API polling uses up your Client ID's shared request quota.";
+
+/* Customization, FPS, SDK diagnostics */
+"Полужирный" = "Semibold";
+"Жирный" = "Bold";
+"Плотный" = "Heavy";
+"Сверхжирный" = "Black";
+"Насыщенность шрифта" = "Font Weight";
+"Положение активной строки" = "Active Line Position";
+"Скорость прокрутки" = "Scroll Speed";
+"Прокрутка" = "Scrolling";
+"Где держится строка, которую поют, и как быстро текст доезжает до следующей." = "Where the line being sung stays, and how fast the lyrics glide to the next one.";
+"Авторы в конце текста" = "Credits After the Lyrics";
+"Авторы песни, источник текста и кто его синхронизировал — после последней строки, в приложении и в PiP." = "Songwriters, the lyrics source and who synced them, after the last line, in the app and in PiP.";
+"Выше на %lld%%" = "%lld%% higher";
+"Ниже на %lld%%" = "%lld%% lower";
+"Яркость перевода" = "Translation Brightness";
+"Насыщенность цвета" = "Color Saturation";
+"Показывать FPS" = "Show FPS";
+"Частота кадров текста" = "Lyrics Frame Rate";
+"Показывать FPS в плеере" = "Show FPS in Player";
+"Показывать FPS в PiP" = "Show FPS in PiP";
+"Кадры" = "Frames";
+"Меньше кадров — меньше нагрев. На паузе текст рисуется 15 раз в секунду, в режиме экономии — не больше 30. Счётчик показывает реальные кадры / цель. Частота PiP настраивается в «Картинке в картинке»." = "Fewer frames, less heat. While paused the lyrics draw 15 times a second, with battery saver at most 30. The counter shows actual frames / target. The PiP frame rate is set under Picture in Picture.";
+"Если не подключается" = "If It Won't Connect";
+"1. Spotify должен играть на этом iPhone. 2. В developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте этот Bundle ID (AltStore меняет его при установке) и Redirect URI. 3. Нажмите «Открыть Spotify и подключиться». Если состояние «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify." = "1. Spotify has to be playing on this iPhone. 2. In developer.spotify.com → your app → Settings, tick “iOS” and add this Bundle ID (AltStore changes it when installing) and the Redirect URI. 3. Tap “Open Spotify and Connect”. If the state says “Sign In Again”, sign in again: the old login had no access to the Spotify app.";
+"Скопировано" = "Copied";
+"Нет Client ID" = "No Client ID";
+"Не удалось открыть Spotify. Он установлен?" = "Couldn't open Spotify. Is it installed?";
+"Spotify не ответил за 15 секунд" = "Spotify didn't answer within 15 seconds";
+"SDK: войти заново" = "SDK: sign in again";
+"SDK: подключение" = "SDK: connecting";
+"SDK: нет связи" = "SDK: no link";
+"Включить SDK" = "Turn On SDK";

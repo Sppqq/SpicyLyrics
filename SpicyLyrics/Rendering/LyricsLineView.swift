@@ -18,6 +18,8 @@ struct LyricsTypography: Equatable {
     var inactiveBrightness: Double = 1
     var lineSpacingScale: CGFloat = 1
     var translationScale: CGFloat = 1
+    var translationBrightness: Double = 1
+    var weight: Font.Weight = .bold
 
     private var design: Font.Design {
         switch font {
@@ -27,13 +29,13 @@ struct LyricsTypography: Equatable {
         }
     }
 
-    var leadFont: Font { .system(size: fontSize, weight: .bold, design: design) }
+    var leadFont: Font { .system(size: fontSize, weight: weight, design: design) }
     /// Width of the lit → unlit fade, as a fraction of a glyph.
     var fillFade: Double { simple ? 0.5 : 0.2 }
     var leadAlpha: GradientAlpha { simple ? GradientAlpha(lit: 1, unlit: 0.3) : .lead }
     /// `.line.bg-line { --font-size: calc(var(--DefaultLyricsSize) * 0.75) }`
     var backgroundFontSize: CGFloat { fontSize * 0.75 }
-    var backgroundFont: Font { .system(size: backgroundFontSize, weight: .bold, design: design) }
+    var backgroundFont: Font { .system(size: backgroundFontSize, weight: weight, design: design) }
     /// `.word::after { margin-right: 0.32ch }` (a "0" in the bold face is ~0.6em wide).
     func wordGap(_ size: CGFloat) -> CGFloat { size * 0.6 * 0.32 }
     /// `.line { margin: 1cqw 0 }`, collapsing between neighbours.
@@ -56,6 +58,7 @@ struct LyricsTypography: Equatable {
             && lhs.blurScale == rhs.blurScale && lhs.glowScale == rhs.glowScale
             && lhs.inactiveBrightness == rhs.inactiveBrightness && lhs.lineSpacingScale == rhs.lineSpacingScale
             && lhs.translationScale == rhs.translationScale
+            && lhs.translationBrightness == rhs.translationBrightness && lhs.weight == rhs.weight
     }
 
     /// Scales how far a line's opacity sits below fully lit, so the active line stays at 1
@@ -151,7 +154,7 @@ struct LyricLineView: View, Equatable {
                     // A backing vocal's translation is as much smaller as the vocal itself.
                     .font(.system(size: (line.isBackground ? typography.backgroundFontSize : typography.fontSize)
                                   * 0.55 * typography.translationScale, weight: .semibold))
-                    .foregroundStyle(.white.opacity(line.isBackground ? 0.45 : 0.6))
+                    .foregroundStyle(.white.opacity(min(1, (line.isBackground ? 0.45 : 0.6) * typography.translationBrightness)))
                     .multilineTextAlignment(textAlignment)
                     .fixedSize(horizontal: false, vertical: true)
             }

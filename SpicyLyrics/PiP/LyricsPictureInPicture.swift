@@ -35,6 +35,7 @@ final class LyricsPictureInPicture: NSObject {
     @ObservationIgnored private var animatorKey: (revision: Int, simple: Bool)?
     @ObservationIgnored private weak var performance: PerformanceMonitor?
     @ObservationIgnored private var framesPerSecond: Double = 0
+    @ObservationIgnored private let frameCounter = FrameRateCounter()
 
     static var isSupported: Bool { AVPictureInPictureController.isPictureInPictureSupported() }
 
@@ -132,10 +133,14 @@ final class LyricsPictureInPicture: NSObject {
                 lyricsAnimator = nil
                 animatorKey = nil
             }
-            return PiPSnapshot(player: player, settings: settings, animator: lyricsAnimator, reduced: reduced)
+            let fpsText = settings?.pipShowFPS == true
+                ? "\(Int(frameCounter.fps().rounded())) / \(Int(framesPerSecond.rounded())) fps" : nil
+            return PiPSnapshot(player: player, settings: settings, animator: lyricsAnimator, reduced: reduced,
+                               fpsText: fpsText)
         }
         guard let sample = renderer.sampleBuffer(for: snapshot) else { return }
         output.enqueue(sample)
+        frameCounter.tick()
 
         // Full rate only while something moves: playing, or a line still sliding into place.
         if isActive {
@@ -228,6 +233,8 @@ struct PiPStyle: Equatable {
     var translationScale: CGFloat = 1
     /// Lyric size multiplier for the window.
     var textScale: CGFloat = 1
+    var weight: UIFont.Weight = .bold
+    var showCredits = true
 
     /// Same as the app's `LyricsTypography.opacity`.
     func opacity(_ value: Double) -> CGFloat {
@@ -259,9 +266,13 @@ struct PiPSnapshot: @unchecked Sendable {
     var style = PiPStyle()
     /// How much the cover behind the lyrics is darkened.
     var backgroundDim: CGFloat = 0.42
+    var backgroundSaturation: Double = 1
+    /// "30 fps" in the corner, when the counter is on.
+    var fpsText: String?
 
     @MainActor
-    init(player: PlayerModel, settings: AppSettings?, animator: LyricsAnimator?, reduced: Bool = false) {
+    init(player: PlayerModel, settings: AppSettings?, animator: LyricsAnimator?, reduced: Bool = false, fpsText: String? = nil) {
+        self.fpsText = fpsText
         animatedBackground = (settings?.pipAnimatedBackground ?? true) && !reduced
         showTitle = settings?.pipShowTitle ?? true
         title = player.track?.title ?? "Spicy Lyrics"
@@ -284,6 +295,9 @@ struct PiPSnapshot: @unchecked Sendable {
             backgroundDim = CGFloat(settings.pipBackgroundDim)
             style.lineSpacing = CGFloat(settings.lineSpacingScale)
             style.translationScale = CGFloat(settings.translationScale)
+            style.weight = (LyricsWeight(rawValue: settings.lyricsWeight) ?? .bold).uiWeight
+            style.showCredits = settings.showCredits
+            backgroundSaturation = settings.backgroundSaturation
         }
 
         switch player.lyricsState {
@@ -457,8 +471,26 @@ final class PiPFrameRenderer {
     }
 
     private var clipBottom: CGFloat = 0
+    private var fpsLayout: (text: String, layout: PiPTextLayout)?
 
     private func draw(_ snapshot: PiPSnapshot, in rect: CGRect, now: CFTimeInterval, context: CGContext) {
+        drawContent(snapshot, in: rect, now: now, context: context)
+        guard let text = snapshot.fpsText else { return }
+        if fpsLayout?.text != text {
+            fpsLayout = (text, PiPTextLayout(blocks: [PiPTextBlock(runs: [text], font: ctFont(20, .semibold, .monospaced),
+                                                                   singleLine: true)], width: 200))
+        }
+        if let layout = fpsLayout?.layout, let mask = layout.sharp.first {
+            let box = CGRect(x: rect.width - layout.size.width - 26, y: 10,
+                             width: layout.size.width + 16, height: layout.size.height + 8)
+            context.setFillColor(red: 0, green: 0, blue: 0, alpha: 0.45)
+            context.addPath(CGPath(roundedRect: box, cornerWidth: box.height / 2, cornerHeight: box.height / 2, transform: nil))
+            context.fillPath()
+            context.fill(mask: mask, in: layout.firstRect.offsetBy(dx: box.minX + 8, dy: box.minY + 4), white: 0.9)
+        }
+    }
+
+    private func drawContent(_ snapshot: PiPSnapshot, in rect: CGRect, now: CFTimeInterval, context: CGContext) {
         let inset = Self.inset
         clipBottom = rect.height - (snapshot.showTitle ? 62 : 10)
 
@@ -502,8 +534,8 @@ final class PiPFrameRenderer {
         let cqw = column / 100
         let hasDuets = lyrics.lines.contains(where: \.oppositeAligned)
         let size = leadSize
-        let lead = ctFont(size, .bold, style.design)
-        let background = ctFont(size * 0.75, .bold, style.design)
+        let lead = ctFont(size, style.weight, style.design)
+        let background = ctFont(size * 0.75, style.weight, style.design)
         let still = ctFont(size * 5 / 7, .medium, style.design)
 
         rows = lyrics.lines.map { line -> Row? in
@@ -563,7 +595,7 @@ final class PiPFrameRenderer {
                        runs: runs, fontSize: CTFontGetSize(font), anchor: alignment, isBackground: line.isBackground)
         }
         lastLyricEnd = lyrics.kind == .static ? 0 : lyrics.lines.map(\.end).max() ?? 0
-        credits = creditsLayout(lyrics, width: column - cqw * 5, design: style.design)
+        credits = style.showCredits ? creditsLayout(lyrics, width: column - cqw * 5, design: style.design) : nil
     }
 
     /// The block after the last line, as in the app (`LyricsCreditsView`).
@@ -928,9 +960,10 @@ final class PiPFrameRenderer {
                                  space: Self.sRGB, bitmapInfo: Self.bitmapInfo)
         }
         guard let backdrop, let source = backdrop.data else { return }
-        if let artwork = snapshot.artwork, coverImages?.id != snapshot.artworkID,
-           let rendered = CoverBlobsView.render(artwork) {
-            coverImages = (snapshot.artworkID, rendered.base, rendered.blob)
+        let coverID = "\(snapshot.artworkID)|\(snapshot.backgroundSaturation)"
+        if let artwork = snapshot.artwork, coverImages?.id != coverID,
+           let rendered = CoverBlobsView.render(artwork, saturation: snapshot.backgroundSaturation) {
+            coverImages = (coverID, rendered.base, rendered.blob)
             backdropKey = nil
         }
         let hasArtwork = snapshot.artwork != nil && coverImages != nil

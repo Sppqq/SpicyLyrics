@@ -45,7 +45,8 @@ struct NowPlayingView: View {
                     animated: settings.dynamicBackground && !reduced,
                     dim: settings.backgroundDim,
                     speed: settings.backgroundSpeed,
-                    blur: settings.backgroundBlur
+                    blur: settings.backgroundBlur,
+                    saturation: settings.backgroundSaturation
                 )
 
                 if landscape {

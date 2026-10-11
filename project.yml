@@ -80,6 +80,8 @@ targets:
         LSApplicationQueriesSchemes:
           - spotify
         ITSAppUsesNonExemptEncryption: false
+        # Lets the lyrics run at 120 fps on ProMotion iPhones when the user picks it.
+        CADisableMinimumFrameDurationOnPhone: true
         # Picture in Picture lyrics keep running while the app is in the background.
         UIBackgroundModes:
           - audio

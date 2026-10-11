@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 /// User preferences, persisted in UserDefaults. The Spicy Lyrics key lives here too: it is a
 /// public client key (`sl_pk_…`), not a secret.
@@ -93,6 +94,23 @@ final class AppSettings {
     var backgroundBlur: Double { didSet { defaults.set(backgroundBlur, forKey: Keys.backgroundBlur) } }
     /// Seconds before the controls hide while a song plays.
     var autoHideDelay: Double { didSet { defaults.set(autoHideDelay, forKey: Keys.autoHideDelay) } }
+    /// `LyricsWeight.rawValue`.
+    var lyricsWeight: String { didSet { defaults.set(lyricsWeight, forKey: Keys.lyricsWeight) } }
+    /// Writers, provider and community credits after the last line (app and PiP).
+    var showCredits: Bool { didSet { defaults.set(showCredits, forKey: Keys.showCredits) } }
+    /// Where the line being sung sits in the visible lyrics: 0.5 is the middle (the original).
+    var activeLinePosition: Double { didSet { defaults.set(activeLinePosition, forKey: Keys.activeLinePosition) } }
+    /// × the speed of the glide to the next line.
+    var scrollSpeed: Double { didSet { defaults.set(scrollSpeed, forKey: Keys.scrollSpeed) } }
+    /// × the brightness of the translation under a line.
+    var translationBrightness: Double { didSet { defaults.set(translationBrightness, forKey: Keys.translationBrightness) } }
+    /// × the saturation of the cover behind the lyrics (app and PiP).
+    var backgroundSaturation: Double { didSet { defaults.set(backgroundSaturation, forKey: Keys.backgroundSaturation) } }
+    /// Lyrics frame rate while a song plays (battery saver caps it at 30).
+    var lyricsFrameRate: Double { didSet { defaults.set(lyricsFrameRate, forKey: Keys.lyricsFrameRate) } }
+    /// Frame counter over the lyrics / in the PiP window.
+    var showLyricsFPS: Bool { didSet { defaults.set(showLyricsFPS, forKey: Keys.showLyricsFPS) } }
+    var pipShowFPS: Bool { didSet { defaults.set(pipShowFPS, forKey: Keys.pipShowFPS) } }
 
     /// Keys baked in at build time from `Config/Secrets.xcconfig` or CI secrets (may be empty).
     /// When present they are fixed: the app ignores anything typed in settings.
@@ -135,6 +153,15 @@ final class AppSettings {
             Keys.backgroundSpeed: 1.0,
             Keys.backgroundBlur: 1.0,
             Keys.autoHideDelay: 4.0,
+            Keys.lyricsWeight: LyricsWeight.bold.rawValue,
+            Keys.showCredits: true,
+            Keys.activeLinePosition: 0.5,
+            Keys.scrollSpeed: 1.0,
+            Keys.translationBrightness: 1.0,
+            Keys.backgroundSaturation: 1.0,
+            Keys.lyricsFrameRate: 60.0,
+            Keys.showLyricsFPS: false,
+            Keys.pipShowFPS: false,
         ])
         spotifyClientID = defaults.string(forKey: Keys.clientID) ?? ""
         spicyLyricsKey = defaults.string(forKey: Keys.spicyKey) ?? ""
@@ -182,6 +209,15 @@ final class AppSettings {
         backgroundSpeed = defaults.double(forKey: Keys.backgroundSpeed)
         backgroundBlur = defaults.double(forKey: Keys.backgroundBlur)
         autoHideDelay = defaults.double(forKey: Keys.autoHideDelay)
+        lyricsWeight = defaults.string(forKey: Keys.lyricsWeight) ?? LyricsWeight.bold.rawValue
+        showCredits = defaults.bool(forKey: Keys.showCredits)
+        activeLinePosition = defaults.double(forKey: Keys.activeLinePosition)
+        scrollSpeed = defaults.double(forKey: Keys.scrollSpeed)
+        translationBrightness = defaults.double(forKey: Keys.translationBrightness)
+        backgroundSaturation = defaults.double(forKey: Keys.backgroundSaturation)
+        lyricsFrameRate = defaults.double(forKey: Keys.lyricsFrameRate)
+        showLyricsFPS = defaults.bool(forKey: Keys.showLyricsFPS)
+        pipShowFPS = defaults.bool(forKey: Keys.pipShowFPS)
     }
 
     /// The Client ID to sign in with: always the user's own.
@@ -232,6 +268,11 @@ final class AppSettings {
         centerLyrics = false
         lineSpacingScale = 1
         translationScale = 1
+        lyricsWeight = LyricsWeight.bold.rawValue
+        showCredits = true
+        activeLinePosition = 0.5
+        scrollSpeed = 1
+        translationBrightness = 1
     }
 
     func resetEffects() {
@@ -247,6 +288,7 @@ final class AppSettings {
         backgroundDim = Self.defaultBackgroundDim
         backgroundSpeed = 1
         backgroundBlur = 1
+        backgroundSaturation = 1
     }
 
     private enum Keys {
@@ -296,6 +338,15 @@ final class AppSettings {
         static let backgroundSpeed = "backgroundSpeed"
         static let backgroundBlur = "backgroundBlur"
         static let autoHideDelay = "autoHideDelay"
+        static let lyricsWeight = "lyricsWeight"
+        static let showCredits = "showCredits"
+        static let activeLinePosition = "activeLinePosition"
+        static let scrollSpeed = "scrollSpeed"
+        static let translationBrightness = "translationBrightness"
+        static let backgroundSaturation = "backgroundSaturation"
+        static let lyricsFrameRate = "lyricsFrameRate"
+        static let showLyricsFPS = "showLyricsFPS"
+        static let pipShowFPS = "pipShowFPS"
     }
 }
 
@@ -310,6 +361,40 @@ enum LyricsFont: String, CaseIterable, Identifiable {
         case .standard: return "SF Pro"
         case .rounded: return "SF Pro Rounded"
         case .serif: return "New York"
+        }
+    }
+}
+
+/// Thickness of the lyrics (the original is bold).
+enum LyricsWeight: String, CaseIterable, Identifiable {
+    case semibold, bold, heavy, black
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .semibold: return String(localized: "Полужирный")
+        case .bold: return String(localized: "Жирный")
+        case .heavy: return String(localized: "Плотный")
+        case .black: return String(localized: "Сверхжирный")
+        }
+    }
+
+    var uiWeight: UIFont.Weight {
+        switch self {
+        case .semibold: return .semibold
+        case .bold: return .bold
+        case .heavy: return .heavy
+        case .black: return .black
+        }
+    }
+
+    var fontWeight: Font.Weight {
+        switch self {
+        case .semibold: return .semibold
+        case .bold: return .bold
+        case .heavy: return .heavy
+        case .black: return .black
         }
     }
 }

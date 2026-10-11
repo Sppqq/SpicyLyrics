@@ -87,11 +87,58 @@ struct SyncLogView: View {
     }
 }
 
-/// A small badge over the lyrics: where the time last came from and how far off the clock was.
+/// A small badge over the lyrics: where the time last came from, how far off the clock was and,
+/// while the Spotify app (SDK) is not keeping time, why. Tap it for the SDK's state and a fix.
 struct SyncIndicator: View {
     @Environment(PlayerModel.self) private var player
+    @Environment(AppSettings.self) private var settings
+    @Environment(SpotifyAppRemote.self) private var appRemote
+    @EnvironmentObject private var auth: SpotifyAuth
 
     var body: some View {
+        Menu {
+            Section {
+                Text("SDK (App Remote): \(settings.useAppRemote ? appRemote.statusText : String(localized: "Выключено"))")
+                if let error = appRemote.lastError, appRemote.status != .connected {
+                    Text(error)
+                }
+            }
+            if settings.useAppRemote {
+                switch appRemote.status {
+                case .needsLogin:
+                    Button(String(localized: "Войти заново"), systemImage: "person.crop.circle.badge.checkmark") {
+                        Task {
+                            try? await auth.logIn()
+                            appRemote.refresh()
+                        }
+                    }
+                case .unavailable, .connecting:
+                    Button(String(localized: "Открыть Spotify и подключиться"), systemImage: "arrow.up.forward.app") {
+                        appRemote.wakeSpotify()
+                    }
+                case .off, .connected:
+                    EmptyView()
+                }
+            } else {
+                Button(String(localized: "Включить SDK"), systemImage: "bolt.horizontal") { settings.useAppRemote = true }
+            }
+        } label: {
+            badge
+        }
+    }
+
+    private var sdkNote: String? {
+        guard settings.useAppRemote else { return "SDK off" }
+        switch appRemote.status {
+        case .connected: return nil
+        case .needsLogin: return String(localized: "SDK: войти заново")
+        case .connecting: return String(localized: "SDK: подключение")
+        case .unavailable: return String(localized: "SDK: нет связи")
+        case .off: return "SDK off"
+        }
+    }
+
+    private var badge: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { context in
             let sync = SyncLog.shared.lastSync
             HStack(spacing: 6) {
@@ -103,6 +150,9 @@ struct SyncIndicator: View {
                 } else {
                     Text(player.remoteConnected ? "App Remote" : "Web API")
                 }
+                if let sdkNote {
+                    Text("· " + sdkNote).foregroundStyle(.orange)
+                }
             }
             .font(.caption2.monospaced())
             .foregroundStyle(.white.opacity(0.85))
@@ -110,6 +160,5 @@ struct SyncIndicator: View {
             .padding(.vertical, 4)
             .background(.black.opacity(0.35), in: Capsule())
         }
-        .allowsHitTesting(false)
     }
 }
