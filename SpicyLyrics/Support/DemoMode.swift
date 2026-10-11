@@ -7,7 +7,8 @@ import Foundation
 ///     -demoTrack <Spotify track ID> -demoTitle <title> -demoArtist <artist>
 ///     -demoArtwork <cover URL> -demoStart <seconds> -demoDuration <seconds>
 ///
-/// `-demoLandscape YES` turns the screen sideways, `-demoSettings YES` opens Settings. App
+/// `-demoLandscape YES` turns the screen sideways, `-demoSettings YES` opens Settings,
+/// `-demoPiP YES` opens the floating window. App
 /// settings can be set the same way (`-simpleLyricsMode YES`): launch arguments override
 /// UserDefaults.
 struct DemoTrack {

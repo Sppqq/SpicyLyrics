@@ -35,9 +35,11 @@ struct NowPlayingView: View {
             let landscape = (size.width > size.height && size.width > 560) || size.width >= 700
             ZStack {
                 // The PiP layer has to be in the window; it sits behind everything.
-                PictureInPictureHost(pip: pip)
-                    .frame(width: 80, height: 40)
-                    .allowsHitTesting(false)
+                if !pip.previewing {
+                    PictureInPictureHost(pip: pip)
+                        .frame(width: 80, height: 40)
+                        .allowsHitTesting(false)
+                }
 
                 DynamicBackground(
                     image: settings.dynamicBackground ? player.backgroundArtwork : nil,
@@ -68,6 +70,10 @@ struct NowPlayingView: View {
                         .transition(.scale(scale: 0.6).combined(with: .opacity))
                         .allowsHitTesting(false)
                 }
+
+                #if DEBUG
+                if pip.previewing { DemoPiPScene(pip: pip) }
+                #endif
             }
         }
         .sensoryFeedback(.impact(weight: .light), trigger: skipCount)
@@ -132,6 +138,15 @@ struct NowPlayingView: View {
                 scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
             }
             if defaults.bool(forKey: "demoSettings") { showSettings = true }
+            if defaults.bool(forKey: "demoPiP") {
+                // Once the lyrics are on screen, as the "•••" menu would.
+                try? await Task.sleep(for: .seconds(3))
+                if LyricsPictureInPicture.isSupported {
+                    pip.start()
+                } else {
+                    pip.startPreview()
+                }
+            }
         }
         #endif
         .onChange(of: settings.autoPictureInPicture) { _, enabled in pip.setAutomaticStart(enabled) }

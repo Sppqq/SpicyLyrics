@@ -101,6 +101,18 @@ final class LyricsPictureInPicture: NSObject {
         controller?.stopPictureInPicture()
     }
 
+    /// Frames at the window's rate without a PiP window, shown in the app instead (Debug only:
+    /// the README's recording, made in the Simulator, which has no Picture in Picture).
+    private(set) var previewing = false
+
+    #if DEBUG
+    func startPreview() {
+        previewing = true
+        renderFrame()
+        scheduleFrames(fps: MainActor.assumeIsolated { settings?.pipFrameRate ?? 30 })
+    }
+    #endif
+
     // MARK: Frames
 
     private func scheduleFrames(fps: Double) {
@@ -143,7 +155,7 @@ final class LyricsPictureInPicture: NSObject {
         frameCounter.tick()
 
         // Full rate only while something moves: playing, or a line still sliding into place.
-        if isActive {
+        if isActive || previewing {
             let moving = snapshot.isPlaying || renderer.isAnimating
             let fps = MainActor.assumeIsolated { settings?.pipFrameRate ?? 30 }
             scheduleFrames(fps: moving ? (reduced ? min(20, fps) : fps) : 5)
