@@ -148,8 +148,10 @@ struct LyricLineView: View, Equatable {
             content
             if let translation, !translation.isEmpty {
                 Text(translation)
-                    .font(.system(size: typography.fontSize * 0.55 * typography.translationScale, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.6))
+                    // A backing vocal's translation is as much smaller as the vocal itself.
+                    .font(.system(size: (line.isBackground ? typography.backgroundFontSize : typography.fontSize)
+                                  * 0.55 * typography.translationScale, weight: .semibold))
+                    .foregroundStyle(.white.opacity(line.isBackground ? 0.45 : 0.6))
                     .multilineTextAlignment(textAlignment)
                     .fixedSize(horizontal: false, vertical: true)
             }

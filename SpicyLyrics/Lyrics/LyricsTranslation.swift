@@ -53,8 +53,8 @@ private struct TranslationDriver: ViewModifier {
     private func pendingTexts() -> [String] {
         guard settings.translateLyrics, case .loaded(let lyrics) = player.lyricsState else { return [] }
         let texts = Set(lyrics.lines
-            // Replacing translates the backing vocals too, so the whole song is in one language.
-            .filter { !$0.isInterlude && (settings.translationReplaces || !$0.isBackground) }
+            // Backing vocals are lines of their own and get translated too.
+            .filter { !$0.isInterlude }
             .map(\.sourceText)
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
         let code = targetCode

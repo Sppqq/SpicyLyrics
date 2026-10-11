@@ -99,7 +99,6 @@ struct LyricsView: View {
                             ForEach(shown.lines) { line in
                                 LyricLineView(line: line, visual: visuals[line.id], typography: typography,
                                               translation: settings.translateLyrics && !settings.translationReplaces
-                                                  && !line.isBackground
                                                   ? player.translations[line.sourceText] : nil)
                                     .equatable()
                                     .contentShape(Rectangle())
