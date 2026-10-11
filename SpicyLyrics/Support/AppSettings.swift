@@ -24,6 +24,21 @@ final class AppSettings {
     var compensateOutputLatency: Bool { didSet { defaults.set(compensateOutputLatency, forKey: Keys.outputLatency) } }
     /// Read the position from the Spotify app on this phone (App Remote) when it is reachable.
     var useAppRemote: Bool { didSet { defaults.set(useAppRemote, forKey: Keys.appRemote) } }
+    /// Seconds between Web API polls while playing (when App Remote is not keeping time).
+    var webPollInterval: Double { didSet { defaults.set(webPollInterval, forKey: Keys.webPollInterval) } }
+    /// Seconds between App Remote position queries.
+    var remoteQueryInterval: Double { didSet { defaults.set(remoteQueryInterval, forKey: Keys.remoteQueryInterval) } }
+    /// Keep the sync log (Settings → Sync log).
+    var syncLogEnabled: Bool { didSet { defaults.set(syncLogEnabled, forKey: Keys.syncLog) } }
+    /// Small badge over the lyrics: where the time came from and how far off it was.
+    var showSyncIndicator: Bool { didSet { defaults.set(showSyncIndicator, forKey: Keys.syncIndicator) } }
+    // Picture in Picture look.
+    var pipTextScale: Double { didSet { defaults.set(pipTextScale, forKey: Keys.pipTextScale) } }
+    var pipBackgroundDim: Double { didSet { defaults.set(pipBackgroundDim, forKey: Keys.pipBackgroundDim) } }
+    var pipFrameRate: Double { didSet { defaults.set(pipFrameRate, forKey: Keys.pipFrameRate) } }
+    var pipShowCredits: Bool { didSet { defaults.set(pipShowCredits, forKey: Keys.pipShowCredits) } }
+    var pipShowTranslation: Bool { didSet { defaults.set(pipShowTranslation, forKey: Keys.pipShowTranslation) } }
+    var pipBlurLines: Bool { didSet { defaults.set(pipBlurLines, forKey: Keys.pipBlurLines) } }
     /// Translate the lyrics on the device and show the translation under each line.
     var translateLyrics: Bool { didSet { defaults.set(translateLyrics, forKey: Keys.translate) } }
     var translationLanguage: String { didSet { defaults.set(translationLanguage, forKey: Keys.translationLanguage) } }
@@ -137,6 +152,16 @@ final class AppSettings {
         gesturesEnabled = defaults.bool(forKey: Keys.gestures)
         compensateOutputLatency = defaults.bool(forKey: Keys.outputLatency)
         useAppRemote = defaults.object(forKey: Keys.appRemote) as? Bool ?? true
+        webPollInterval = defaults.object(forKey: Keys.webPollInterval) as? Double ?? 2
+        remoteQueryInterval = defaults.object(forKey: Keys.remoteQueryInterval) as? Double ?? 1.5
+        syncLogEnabled = defaults.object(forKey: Keys.syncLog) as? Bool ?? true
+        showSyncIndicator = defaults.object(forKey: Keys.syncIndicator) as? Bool ?? false
+        pipTextScale = defaults.object(forKey: Keys.pipTextScale) as? Double ?? 1
+        pipBackgroundDim = defaults.object(forKey: Keys.pipBackgroundDim) as? Double ?? 0.42
+        pipFrameRate = defaults.object(forKey: Keys.pipFrameRate) as? Double ?? 30
+        pipShowCredits = defaults.object(forKey: Keys.pipShowCredits) as? Bool ?? true
+        pipShowTranslation = defaults.object(forKey: Keys.pipShowTranslation) as? Bool ?? true
+        pipBlurLines = defaults.object(forKey: Keys.pipBlurLines) as? Bool ?? true
         simpleLyricsMode = defaults.bool(forKey: Keys.simpleMode)
         autoPictureInPicture = defaults.bool(forKey: Keys.autoPiP)
         pipAnimatedBackground = defaults.bool(forKey: Keys.pipAnimatedBackground)
@@ -242,6 +267,16 @@ final class AppSettings {
         static let gestures = "gesturesEnabled"
         static let outputLatency = "compensateOutputLatency"
         static let appRemote = "useAppRemote"
+        static let webPollInterval = "webPollInterval"
+        static let remoteQueryInterval = "remoteQueryInterval"
+        static let syncLog = "syncLogEnabled"
+        static let syncIndicator = "showSyncIndicator"
+        static let pipTextScale = "pipTextScale"
+        static let pipBackgroundDim = "pipBackgroundDim"
+        static let pipFrameRate = "pipFrameRate"
+        static let pipShowCredits = "pipShowCredits"
+        static let pipShowTranslation = "pipShowTranslation"
+        static let pipBlurLines = "pipBlurLines"
         static let simpleMode = "simpleLyricsMode"
         static let autoPiP = "autoPictureInPicture"
         static let pipAnimatedBackground = "pipAnimatedBackground"

@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import QuartzCore
 import SpotifyiOS
+import UIKit
 
 /// Reads the playback position straight from the Spotify app on this phone (App Remote).
 ///
@@ -36,10 +37,9 @@ final class SpotifyAppRemote: NSObject {
     @ObservationIgnored private var queryTask: Task<Void, Never>?
     /// Token handed back by Spotify after "wake Spotify", used for the next connection.
     @ObservationIgnored private var wakeToken: String?
+    @ObservationIgnored private var coverURI: String?
 
     static let scope = "app-remote-control"
-    /// Between events, ask the Spotify app for its position this often.
-    private static let queryInterval: Double = 1.5
 
     init(auth: SpotifyAuth, settings: AppSettings) {
         self.auth = auth
@@ -60,6 +60,7 @@ final class SpotifyAppRemote: NSObject {
         queryTask?.cancel()
         queryTask = nil
         if remote?.isConnected == true { remote?.disconnect() }
+        player?.setRemoteConnected(false)
         status = .off
     }
 
@@ -134,6 +135,7 @@ final class SpotifyAppRemote: NSObject {
         if remote.isConnected { return }
         remote.connectionParameters.accessToken = token
         status = .connecting
+        SyncLog.shared.add("remote", "connecting")
         remote.connect()
     }
 
@@ -153,22 +155,27 @@ final class SpotifyAppRemote: NSObject {
             return
         }
         status = .connected
+        SyncLog.shared.add("remote", "connected")
+        player?.setRemoteConnected(true)
         remote.playerAPI?.delegate = self
         remote.playerAPI?.subscribe(toPlayerState: { _, _ in })
         query()
         queryTask?.cancel()
         queryTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(Self.queryInterval))
+                let interval = self?.settings.remoteQueryInterval ?? 1.5
+                try? await Task.sleep(for: .seconds(interval))
                 guard !Task.isCancelled else { return }
                 self?.query()
             }
         }
     }
 
-    private func didDrop() {
+    private func didDrop(_ error: Error?) {
         queryTask?.cancel()
         queryTask = nil
+        player?.setRemoteConnected(false)
+        SyncLog.shared.add("remote", "no connection: \(error?.localizedDescription ?? "disconnected")")
         guard wanted else { return }
         status = .unavailable
         scheduleRetry(after: 8)
@@ -185,9 +192,25 @@ final class SpotifyAppRemote: NSObject {
         }
     }
 
+    /// The cover straight from the Spotify app (works offline), once per track.
+    private func fetchCover(_ track: SPTAppRemoteTrack, uri: String) {
+        guard coverURI != uri, let imageAPI = remote?.imageAPI else { return }
+        coverURI = uri
+        imageAPI.fetchImage(forItem: track, with: CGSize(width: 640, height: 640)) { [weak self] result, _ in
+            guard let image = result as? UIImage else { return }
+            Task { @MainActor in self?.player?.setRemoteArtwork(image, uri: uri) }
+        }
+    }
+
     /// One reading of the Spotify app's player.
     struct Sample: Sendable {
         var uri: String
+        var name: String
+        var artist: String
+        var album: String
+        var duration: Double
+        /// A song (not a podcast episode or an ad).
+        var isTrack: Bool
         /// Seconds, valid at `measuredAt`.
         var position: Double
         var paused: Bool
@@ -197,10 +220,23 @@ final class SpotifyAppRemote: NSObject {
 
         init(_ state: SPTAppRemotePlayerState, at time: CFTimeInterval, event: Bool) {
             uri = state.track.uri
+            name = state.track.name
+            artist = state.track.artist.name
+            album = state.track.album.name
+            duration = Double(state.track.duration) / 1000
+            isTrack = !state.track.isEpisode && !state.track.isPodcast && !state.track.isAdvertisement
+                && uri.hasPrefix("spotify:track:")
             position = Double(state.playbackPosition) / 1000
             paused = state.isPaused
             measuredAt = time
             self.event = event
+        }
+
+        /// What App Remote knows of the song, enough for lyrics (the cover comes separately).
+        var trackInfo: TrackInfo? {
+            guard isTrack, let id = uri.split(separator: ":").last.map(String.init) else { return nil }
+            return TrackInfo(id: id, uri: uri, title: name, artists: artist.isEmpty ? [] : [artist], album: album,
+                             duration: duration, artworkURL: nil, isLocal: false)
         }
     }
 }
@@ -211,17 +247,23 @@ extension SpotifyAppRemote: SPTAppRemoteDelegate {
     }
 
     nonisolated func appRemote(_ appRemote: SPTAppRemote, didFailConnectionAttemptWithError error: Error?) {
-        Task { @MainActor in self.didDrop() }
+        let message = error
+        Task { @MainActor in self.didDrop(message) }
     }
 
     nonisolated func appRemote(_ appRemote: SPTAppRemote, didDisconnectWithError error: Error?) {
-        Task { @MainActor in self.didDrop() }
+        let message = error
+        Task { @MainActor in self.didDrop(message) }
     }
 }
 
 extension SpotifyAppRemote: SPTAppRemotePlayerStateDelegate {
     nonisolated func playerStateDidChange(_ playerState: SPTAppRemotePlayerState) {
         let sample = Sample(playerState, at: CACurrentMediaTime(), event: true)
-        Task { @MainActor in self.player?.applyRemote(sample) }
+        nonisolated(unsafe) let track = playerState.track
+        Task { @MainActor in
+            self.player?.applyRemote(sample)
+            self.fetchCover(track, uri: sample.uri)
+        }
     }
 }

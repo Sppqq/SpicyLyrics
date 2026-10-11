@@ -13,6 +13,7 @@ struct SpicyLyricsApp: App {
     init() {
         AudioRoute.prepare()
         let settings = AppSettings()
+        SyncLog.shared.enabled = settings.syncLogEnabled
         let auth = SpotifyAuth(settings: settings)
         let api = SpotifyAPI(auth: auth)
         let localLyrics = LocalLyricsStore()
@@ -59,6 +60,7 @@ struct RootView: View {
         .onChange(of: settings.keepScreenOn) { _, _ in updateActivity(scenePhase) }
         .onChange(of: pip.isActive) { _, _ in updateActivity(scenePhase) }
         .onChange(of: settings.useAppRemote) { _, _ in appRemote.refresh() }
+        .onChange(of: settings.syncLogEnabled) { _, enabled in SyncLog.shared.enabled = enabled }
         .onOpenURL { url in appRemote.handle(url) }
     }
 

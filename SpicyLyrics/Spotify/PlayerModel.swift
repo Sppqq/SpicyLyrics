@@ -75,8 +75,10 @@ final class PlayerModel {
     /// Quick follow-up polls left after the clock was set from a single report: one answer is
     /// only as exact as half its round trip, a few more narrow it down.
     @ObservationIgnored private var refineSamples = 0
-    /// App Remote keeps the clock until then (each of its readings extends it).
-    @ObservationIgnored private var remoteUntil: CFTimeInterval = 0
+    /// App Remote is connected: it keeps the clock, play / pause and the track.
+    private(set) var remoteConnected = false
+    /// The track App Remote last reported.
+    @ObservationIgnored private var remoteURI: String?
     /// Its queried positions stopped moving while playing: only trust its events.
     @ObservationIgnored private var remoteQueriesFrozen = false
     @ObservationIgnored private var lastRemoteQuery: (position: Double, at: CFTimeInterval)?
@@ -154,8 +156,11 @@ final class PlayerModel {
         slewSpan = max(Self.slewDuration, abs(slew) * 2)
     }
 
-    private func apply(_ snapshot: PlaybackSnapshot?) {
+    private func apply(_ snapshot: PlaybackSnapshot?, roundTrip: Double) {
+        let log = SyncLog.shared
         guard let snapshot else {
+            log.add("web", "204 nothing playing (rtt \(roundTrip.signedMs))")
+            if remoteAuthority { return }
             // No active device. Keep the last track on screen, just stop the clock.
             if isPlaying {
                 setClock(rawPosition(at: CACurrentMediaTime()))
@@ -173,12 +178,34 @@ final class PlayerModel {
         outputLatency = AudioRoute.outputLatency
 
         let now = CACurrentMediaTime()
-        let trackChanged = content != snapshot.content
+        let sameItem = Self.sameItem(content, snapshot.content)
+        let trackChanged = !sameItem
+        let summary = "\(snapshot.isPlaying ? "playing" : "paused") \(snapshot.progress.s3)s "
+            + "\(Self.shortID(snapshot.content)) on \(snapshot.deviceType ?? "?") \"\(snapshot.deviceName ?? "")\" "
+            + "rtt \(roundTrip.signedMs) stamp \(snapshot.stateChangedAt.map { String(format: "%.3f", $0) } ?? "-")"
+
+        // Same song, new details (cover, a name filled in): update without reloading lyrics.
+        if sameItem, content != snapshot.content {
+            content = snapshot.content
+            loadArtwork()
+        }
+
+        // The Spotify app on this phone knows better, and the cloud copy goes stale whenever the
+        // phone is offline: while App Remote is connected the Web API only fills in details.
+        if remoteAuthority {
+            if trackChanged, case .track(let info) = snapshot.content, info.uri == remoteURI {
+                log.add("web", "\(summary) → track details for the App Remote track")
+                content = snapshot.content
+                onContentChanged()
+            } else {
+                log.add("web", "\(summary) → ignored (App Remote keeps the clock)")
+            }
+            return
+        }
+
         // Right after a control action, polls may still describe the old state.
-        if now < holdUntil && !trackChanged { return }
-        // The Spotify app on this phone tells the time far better: leave the clock to it.
-        if now < remoteUntil && !trackChanged {
-            lastSample = nil
+        if now < holdUntil && !trackChanged {
+            log.add("web", "\(summary) → ignored (right after a control)")
             return
         }
 
@@ -210,43 +237,58 @@ final class PlayerModel {
         // Part of the previous correction not blended in yet: the clock is already heading there.
         let unapplied = isPlaying ? slew * (1 - min(1, max(0, now - anchorTime) / slewSpan)) : 0
         let target = predicted + unapplied
+        let drift = (stampEstimate ?? measured) - target
+        var decision: String
 
         if trackChanged || stateChanged || !snapshot.isPlaying || isResyncing {
             // Play, pause, a new song or the first report after the background: Spotify's
             // position is exact at these moments.
             setClock(measured, at: now)
             refineSamples = snapshot.isPlaying && !frozenReports ? Self.refineCount : 0
+            decision = "set \(measured.s3) (\(trackChanged ? "new track" : stateChanged ? "play/pause" : isResyncing ? "resync" : "paused"))"
         } else if frozenReports {
             // Keep our own clock; the frozen value only says where the last change happened.
+            decision = "frozen device, kept clock"
             if stampChanged, let stampEstimate {
                 setClock(stampEstimate, at: now) // a seek elsewhere
+                decision = "frozen device, seek → set \(stampEstimate.s3)"
             } else if let stampEstimate, stampEstimate - target > Self.catchUpThreshold {
                 // Opened mid-song, the first report was the stale frozen value: catch up.
                 if stampEstimate - target > Self.resyncThreshold {
                     setClock(stampEstimate, at: now)
+                    decision = "frozen device, far behind → set \(stampEstimate.s3)"
                 } else {
                     blend(to: stampEstimate, predicted: predicted, now: now)
+                    decision = "frozen device, catch up → blend"
                 }
             }
         } else {
             // Spotify's position can only be late (a stale or cached answer), never early. So a
             // report ahead of us means we are behind; one behind us is old news, unless it is far
             // behind twice in a row (a seek back on another device).
-            let drift = measured - target
             let refining = refineSamples > 0
             refineSamples = max(0, refineSamples - 1)
+            decision = "kept clock"
             if drift > Self.resyncThreshold {
                 setClock(measured, at: now)
+                decision = "far behind → set"
             } else if drift > (refining ? Self.refineThreshold : Self.catchUpThreshold) {
                 blend(to: measured, predicted: predicted, now: now)
                 behindStreak = 0
+                decision = refining ? "refine → blend" : "behind → blend"
             } else if drift < -Self.seekBackThreshold {
                 behindStreak += 1
-                if behindStreak >= 2 { setClock(measured, at: now) }
+                decision = "report far behind (\(behindStreak))"
+                if behindStreak >= 2 {
+                    setClock(measured, at: now)
+                    decision = "seek back elsewhere → set"
+                }
             } else {
                 behindStreak = 0
             }
         }
+        log.add("web", "\(summary) drift \(drift.signedMs) → \(decision)")
+        log.synced("Web API", drift: drift)
 
         if stateChanged { isPlaying = snapshot.isPlaying }
         if trackChanged {
@@ -255,48 +297,143 @@ final class PlayerModel {
         }
     }
 
+    /// App Remote is connected and allowed to keep the clock.
+    private var remoteAuthority: Bool { remoteConnected && settings.useAppRemote }
+
+    func setRemoteConnected(_ connected: Bool) {
+        guard remoteConnected != connected else { return }
+        remoteConnected = connected
+        remoteQueriesFrozen = false
+        lastRemoteQuery = nil
+        // Back to the Web API: take its next answer as it is.
+        if !connected, content != nil { isResyncing = true }
+    }
+
+    /// Same song (or episode / ad), whatever details differ.
+    private static func sameItem(_ a: PlaybackSnapshot.Content?, _ b: PlaybackSnapshot.Content) -> Bool {
+        switch (a, b) {
+        case (.track(let x), .track(let y)): return x.uri == y.uri
+        case (.episode(let x, let xs, _), .episode(let y, let ys, _)): return x == y && xs == ys
+        case (.ad, .ad), (.unknown, .unknown): return true
+        default: return false
+        }
+    }
+
+    private static func shortID(_ content: PlaybackSnapshot.Content) -> String {
+        switch content {
+        case .track(let info): return "track:\(info.id.prefix(8)) \"\(info.title.prefix(24))\""
+        case .episode(let title, _, _): return "episode \"\(title.prefix(24))\""
+        case .ad: return "ad"
+        case .unknown: return "unknown"
+        }
+    }
+
     /// A reading from the Spotify app on this phone (App Remote): exact to a few milliseconds.
     func applyRemote(_ sample: SpotifyAppRemote.Sample) {
+        let log = SyncLog.shared
         let now = CACurrentMediaTime()
-        guard let track, track.uri == sample.uri else {
-            // Spotify moved on before the Web API noticed: ask it now (once per track).
-            if lastRemoteMismatch != sample.uri {
-                lastRemoteMismatch = sample.uri
-                refreshNow()
+        let kind = sample.event ? "event" : "query"
+        let summary = "\(kind) \(sample.paused ? "paused" : "playing") \(sample.position.s3)s "
+            + "\(sample.uri.split(separator: ":").last.map { String($0.prefix(8)) } ?? "?") \"\(sample.name.prefix(24))\""
+            + " age \(max(0, now - sample.measuredAt).signedMs)"
+        remoteURI = sample.uri
+        let measured = sample.position + (sample.paused ? 0 : max(0, now - sample.measuredAt))
+
+        if track?.uri != sample.uri {
+            guard sample.isTrack, let info = sample.trackInfo else {
+                // A podcast or an ad: the Web API describes those.
+                log.add("remote", "\(summary) → not a song, asking the Web API")
+                if lastRemoteMismatch != sample.uri {
+                    lastRemoteMismatch = sample.uri
+                    refreshNow()
+                }
+                return
             }
+            // A new song, straight from the phone (works offline); the Web API adds the cover.
+            log.add("remote", "\(summary) → new track, set \(measured.s3)")
+            content = .track(info)
+            onContentChanged()
+            setClock(measured, at: now)
+            isPlaying = !sample.paused
+            lastRemoteQuery = nil
+            remoteQueriesFrozen = false
+            fetchTrackDetails(info)
             return
         }
         lastRemoteMismatch = nil
-        if now < holdUntil { return }
-
-        if !sample.event {
-            // A queried position that does not advance while playing is a cached one.
-            if !sample.paused, let last = lastRemoteQuery, sample.measuredAt - last.at > 0.8 {
-                remoteQueriesFrozen = sample.position - last.position < (sample.measuredAt - last.at) * 0.5
-            }
-            lastRemoteQuery = (sample.position, sample.measuredAt)
-            if remoteQueriesFrozen { return }
-        }
-        remoteUntil = now + 4
-
-        let measured = sample.position + (sample.paused ? 0 : max(0, now - sample.measuredAt))
-        if sample.paused == isPlaying {
-            setClock(measured, at: now)
-            isPlaying = !sample.paused
+        // Events are the truth even right after our own play / pause; queries may lag behind it.
+        if now < holdUntil, !sample.event {
+            log.add("remote", "\(summary) → ignored (right after a control)")
             return
         }
-        guard !sample.paused else {
-            setClock(measured, at: now)
-            return
-        }
+
         let predicted = rawPosition(at: now)
-        let unapplied = slew * (1 - min(1, max(0, now - anchorTime) / slewSpan))
+        let unapplied = isPlaying ? slew * (1 - min(1, max(0, now - anchorTime) / slewSpan)) : 0
         let drift = measured - (predicted + unapplied)
-        if abs(drift) > Self.resyncThreshold || (sample.event && abs(drift) > 0.02) {
-            setClock(measured, at: now)
-        } else if abs(drift) > 0.03 {
-            blend(to: measured, predicted: predicted, now: now)
+
+        if sample.event {
+            // Pushed on play, pause, seek or skip: exact, and the only source of play / pause.
+            var decision = "kept clock"
+            if sample.paused == isPlaying {
+                isPlaying = !sample.paused
+                setClock(measured, at: now)
+                decision = sample.paused ? "paused → set" : "resumed → set"
+            } else if sample.paused || abs(drift) > 0.02 {
+                setClock(measured, at: now)
+                decision = "set"
+            }
+            log.add("remote", "\(summary) drift \(drift.signedMs) → \(decision)")
+            log.synced("App Remote", drift: drift)
+            return
         }
+
+        // Queries between events: Spotify may answer with the position of its last event, so
+        // they only ever move the clock forward, and stop counting once they stop moving.
+        guard isPlaying, !sample.paused else {
+            log.add("remote", "\(summary) → ignored (not playing)")
+            return
+        }
+        if let last = lastRemoteQuery, sample.measuredAt - last.at > 0.8 {
+            let frozen = sample.position - last.position < (sample.measuredAt - last.at) * 0.5
+            if frozen != remoteQueriesFrozen {
+                log.add("remote", frozen ? "queries stopped moving: using events only" : "queries move again")
+            }
+            remoteQueriesFrozen = frozen
+        }
+        lastRemoteQuery = (sample.position, sample.measuredAt)
+        guard !remoteQueriesFrozen else {
+            log.add("remote", "\(summary) drift \(drift.signedMs) → ignored (cached answer)")
+            return
+        }
+        var decision = "kept clock"
+        if drift > Self.resyncThreshold {
+            setClock(measured, at: now)
+            decision = "far behind → set"
+        } else if drift > Self.refineThreshold {
+            blend(to: measured, predicted: predicted, now: now)
+            decision = "behind → blend"
+        }
+        log.add("remote", "\(summary) drift \(drift.signedMs) → \(decision)")
+        log.synced("App Remote", drift: drift)
+    }
+
+    /// Cover and full details of a song App Remote announced (needs the internet).
+    private func fetchTrackDetails(_ info: TrackInfo) {
+        Task { [weak self, api] in
+            guard let full = try? await api.track(id: info.id) else { return }
+            guard let self, self.track?.uri == info.uri else { return }
+            SyncLog.shared.add("web", "details for \"\(full.title.prefix(24))\"")
+            self.content = .track(full)
+            self.loadArtwork()
+        }
+    }
+
+    /// The cover App Remote sent, until (or instead of) the Web API's.
+    func setRemoteArtwork(_ image: UIImage, uri: String) {
+        guard track?.uri == uri, lastArtworkURL == nil else { return }
+        artwork = image
+        backgroundArtwork = image.downscaled(to: 160)
+        artworkID = "remote:" + uri
     }
 
     // MARK: Polling
@@ -324,11 +461,14 @@ final class PlayerModel {
         let now = CACurrentMediaTime()
         if now < backoffUntil { return backoffUntil - now }
         do {
-            apply(try await api.playbackState())
+            let sentAt = CACurrentMediaTime()
+            let snapshot = try await api.playbackState()
+            apply(snapshot, roundTrip: CACurrentMediaTime() - sentAt)
             accessProblem = nil
             isResyncing = false
             return nextPollInterval()
         } catch SpotifyAPIError.rateLimited(let retryAfter) {
+            SyncLog.shared.add("web", "rate limited, retry in \(Int(retryAfter))s")
             backoffUntil = now + retryAfter
             return retryAfter
         } catch SpotifyAPIError.quotaExceeded(let retryAfter) {
@@ -346,7 +486,9 @@ final class PlayerModel {
         } catch is CancellationError {
             return 1
         } catch {
-            statusMessage = error.localizedDescription
+            SyncLog.shared.add("web", "poll failed: \(error.localizedDescription)")
+            // Offline is fine while the Spotify app on this phone keeps the time.
+            if !remoteAuthority { statusMessage = error.localizedDescription }
             // Right after returning to the app the first request often hits a stale connection:
             // retry quickly instead of showing the old track for seconds.
             return isResyncing ? 0.6 : 4
@@ -357,13 +499,15 @@ final class PlayerModel {
     /// playing (the quota is shared by everyone on a Client ID) and sooner near the end of a track,
     /// so the next song is picked up promptly.
     private func nextPollInterval() -> Double {
+        // App Remote keeps time: the Web API only fills in details, so ask it less often.
+        if remoteAuthority { return 5 }
         guard isPlaying else { return 3 }
         if refineSamples > 0 { return 0.35 }
         if let duration = track?.duration, duration > 0 {
             let remaining = duration - playbackPosition()
             if remaining > 0, remaining < 2 { return max(0.5, remaining + 0.3) }
         }
-        return 2
+        return settings.webPollInterval
     }
 
     func refreshNow() {

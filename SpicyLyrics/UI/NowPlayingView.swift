@@ -534,6 +534,13 @@ struct NowPlayingView: View {
                 onBackgroundTap: { toggleChrome() }
             )
             .id(player.lyricsRevision)
+            .overlay(alignment: .topTrailing) {
+                if settings.showSyncIndicator {
+                    SyncIndicator()
+                        .padding(.top, topInset + 6)
+                        .padding(.trailing, horizontalPadding)
+                }
+            }
             .transition(.opacity)
         case .loading:
             LyricsSkeleton()

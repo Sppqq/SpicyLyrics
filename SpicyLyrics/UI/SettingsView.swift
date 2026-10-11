@@ -40,6 +40,8 @@ struct SettingsView: View {
                              value: settings.powerSaving ? String(localized: "Экономия") : (performance.constrained ? String(localized: "Авто-экономия") : nil)) {
                         PerformanceSettings()
                     }
+                    category(String(localized: "Журнал синхронизации"), "list.bullet.rectangle.fill", .gray,
+                             value: settings.syncLogEnabled ? nil : String(localized: "Выкл.")) { SyncLogView() }
                     category(String(localized: "Источники текстов"), "doc.text.fill", .brown) { SourceSettings() }
                     category("Spotify", "music.note", Color(red: 0.12, green: 0.84, blue: 0.38),
                              value: settings.hasValidClientID ? "…" + String(settings.spotifyClientID.suffix(4)) : String(localized: "Не настроен")) { SpotifySettings() }
@@ -370,6 +372,33 @@ private struct PictureInPictureSettings: View {
             } footer: {
                 Text(String(localized: "Анимированный фон — плавающая обложка, как в приложении. На слабых устройствах выключите его; в режиме экономии он и так неподвижен."))
             }
+
+            Section {
+                SliderRow(title: String(localized: "Размер текста"), value: $settings.pipTextScale, range: 0.7...1.4)
+                SliderRow(title: String(localized: "Затемнение фона"), value: $settings.pipBackgroundDim, range: 0.1...0.8)
+                Picker(String(localized: "Частота кадров"), selection: $settings.pipFrameRate) {
+                    Text("15").tag(15.0)
+                    Text("24").tag(24.0)
+                    Text("30").tag(30.0)
+                    Text("60").tag(60.0)
+                }
+                Toggle(String(localized: "Размытие соседних строк"), isOn: $settings.pipBlurLines)
+                Toggle(String(localized: "Перевод в окне"), isOn: $settings.pipShowTranslation)
+                Toggle(String(localized: "Титры в конце песни"), isOn: $settings.pipShowCredits)
+            } header: {
+                Text(String(localized: "Текст в окне"))
+            } footer: {
+                Text(String(localized: "Меньше кадров — меньше нагрузка и нагрев. Размытие строк работает, только если оно включено и в «Эффектах»."))
+            }
+
+            ResetSection(title: String(localized: "Сбросить вид окна")) {
+                settings.pipTextScale = 1
+                settings.pipBackgroundDim = 0.42
+                settings.pipFrameRate = 30
+                settings.pipBlurLines = true
+                settings.pipShowTranslation = true
+                settings.pipShowCredits = true
+            }
         }
     }
 }
@@ -459,6 +488,21 @@ private struct SyncSettings: View {
                     .disabled(settings.timingOffsetMs == 0)
             } footer: {
                 Text(String(localized: "Положительный сдвиг показывает слова раньше."))
+            }
+
+            Section {
+                SliderRow(title: String(localized: "Опрос Spotify Web API"), value: $settings.webPollInterval, range: 1...5,
+                          step: 0.5, format: { String(format: "%.1f", $0) + " " + String(localized: "с") })
+                SliderRow(title: String(localized: "Сверка с приложением Spotify"), value: $settings.remoteQueryInterval,
+                          range: 0.5...5, step: 0.5, format: { String(format: "%.1f", $0) + " " + String(localized: "с") })
+                Toggle(String(localized: "Индикатор синхронизации"), isOn: $settings.showSyncIndicator)
+                NavigationLink(String(localized: "Журнал синхронизации")) {
+                    SyncLogView().navigationTitle(String(localized: "Журнал синхронизации"))
+                }
+            } header: {
+                Text(String(localized: "Как часто сверять время"))
+            } footer: {
+                Text(String(localized: "Индикатор над текстом показывает, откуда пришло время (App Remote или Web API), насколько часы расходились и как давно была сверка. Частый опрос Web API тратит общий лимит запросов вашего Client ID."))
             }
 
             Section {

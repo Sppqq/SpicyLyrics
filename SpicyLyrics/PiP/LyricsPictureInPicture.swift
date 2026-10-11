@@ -139,7 +139,8 @@ final class LyricsPictureInPicture: NSObject {
         // Full rate only while something moves: playing, or a line still sliding into place.
         if isActive {
             let moving = snapshot.isPlaying || renderer.isAnimating
-            scheduleFrames(fps: moving ? (reduced ? 20 : 30) : 5)
+            let fps = MainActor.assumeIsolated { settings?.pipFrameRate ?? 30 }
+            scheduleFrames(fps: moving ? (reduced ? min(20, fps) : fps) : 5)
         }
 
         // Keep the PiP play/pause button in step with Spotify.
@@ -221,6 +222,9 @@ struct PiPStyle: Equatable {
     var blur: Double = 0
     var lineSpacing: CGFloat = 1
     var translationScale: CGFloat = 1
+    /// Lyric size multiplier for the window.
+    var textScale: CGFloat = 1
+    var showCredits = true
 
     /// Same as the app's `LyricsTypography.opacity`.
     func opacity(_ value: Double) -> CGFloat {
@@ -250,6 +254,8 @@ struct PiPSnapshot: @unchecked Sendable {
     /// Translations shown under the lines ("Под строкой" mode).
     var translations: [String: String] = [:]
     var style = PiPStyle()
+    /// How much the cover behind the lyrics is darkened.
+    var backgroundDim: CGFloat = 0.42
 
     @MainActor
     init(player: PlayerModel, settings: AppSettings?, animator: LyricsAnimator?, reduced: Bool = false) {
@@ -270,7 +276,10 @@ struct PiPSnapshot: @unchecked Sendable {
             style.centered = settings.centerLyrics
             style.glow = settings.glowStrength
             style.inactiveBrightness = settings.inactiveBrightness
-            style.blur = settings.blurInactiveLines && !reduced ? settings.blurStrength : 0
+            style.blur = settings.blurInactiveLines && settings.pipBlurLines && !reduced ? settings.blurStrength : 0
+            style.textScale = CGFloat(settings.pipTextScale)
+            style.showCredits = settings.pipShowCredits
+            backgroundDim = CGFloat(settings.pipBackgroundDim)
             style.lineSpacing = CGFloat(settings.lineSpacingScale)
             style.translationScale = CGFloat(settings.translationScale)
         }
@@ -287,7 +296,8 @@ struct PiPSnapshot: @unchecked Sendable {
             focus = animator.focusIndex
             position = player.position()
             duration = player.track?.duration ?? 0
-            if settings?.translateLyrics == true, settings?.translationReplaces != true {
+            if settings?.translateLyrics == true, settings?.translationReplaces != true,
+               settings?.pipShowTranslation != false {
                 translations = player.translations
             }
         case .loading:
@@ -321,8 +331,10 @@ final class PiPFrameRenderer {
 
     // Layout of the 800×400 frame.
     private static let inset: CGFloat = 36
-    /// Lyric size in frame pixels (the app's 32 pt on a phone, scaled to the window).
-    private static let leadSize: CGFloat = 56
+    /// Lyric size in frame pixels (the app's 32 pt on a phone, scaled to the window), times the
+    /// window's text size setting.
+    private static let baseLeadSize: CGFloat = 56
+    private var leadSize: CGFloat = 56
     /// Where the line in focus sits, from the top.
     private static let anchor: CGFloat = 28
     private static let clipTop: CGFloat = 12
@@ -384,7 +396,7 @@ final class PiPFrameRenderer {
     ]
     private var coverImages: (id: String, base: CGImage, blob: CGImage)?
     private var backdrop: CGContext?
-    private var backdropKey: (artworkID: String, animated: Bool, hasArtwork: Bool)?
+    private var backdropKey: (artworkID: String, animated: Bool, hasArtwork: Bool, dim: CGFloat)?
     private var backdropRenderedAt: CFTimeInterval = 0
 
     init(size: CGSize) {
@@ -487,7 +499,7 @@ final class PiPFrameRenderer {
         let style = snapshot.style
         let cqw = column / 100
         let hasDuets = lyrics.lines.contains(where: \.oppositeAligned)
-        let size = Self.leadSize
+        let size = leadSize
         let lead = ctFont(size, .bold, style.design)
         let background = ctFont(size * 0.75, .bold, style.design)
         let still = ctFont(size * 5 / 7, .medium, style.design)
@@ -549,12 +561,12 @@ final class PiPFrameRenderer {
                        runs: runs, fontSize: CTFontGetSize(font), anchor: alignment, isBackground: line.isBackground)
         }
         lastLyricEnd = lyrics.kind == .static ? 0 : lyrics.lines.map(\.end).max() ?? 0
-        credits = creditsLayout(lyrics, width: column - cqw * 5, design: style.design)
+        credits = style.showCredits ? creditsLayout(lyrics, width: column - cqw * 5, design: style.design) : nil
     }
 
     /// The block after the last line, as in the app (`LyricsCreditsView`).
     private func creditsLayout(_ lyrics: PreparedLyrics, width: CGFloat, design: UIFontDescriptor.SystemDesign) -> PiPTextLayout? {
-        let size = Self.leadSize
+        let size = leadSize
         let gap = size * 0.25
         let small = ctFont(size * 0.41, .semibold, design)
         var blocks: [PiPTextBlock] = []
@@ -583,10 +595,11 @@ final class PiPFrameRenderer {
         let style = snapshot.style
         let key = LayoutKey(revision: snapshot.revision, style: style, translations: snapshot.translations.count)
         if key != layoutKey || rows.count != lyrics.lines.count {
+            leadSize = (Self.baseLeadSize * style.textScale).rounded()
             buildRows(lyrics, snapshot, width: column)
             layoutKey = key
         }
-        let size = Self.leadSize
+        let size = leadSize
         let cqw = column / 100
         // The app's `1cqw` gap, a little roomier at this size.
         let spacing = (cqw * 1.6 * style.lineSpacing).rounded()
@@ -702,7 +715,7 @@ final class PiPFrameRenderer {
         let layout = row.layout
         let reduceMotion = UIAccessibility.isReduceMotionEnabled
         // The app's distance blur (`blur(radius: blur × strength / 2)` at 32 pt), at this size.
-        let radius = CGFloat(visual.blur * style.blur / 2) * Self.leadSize / 32
+        let radius = CGFloat(visual.blur * style.blur / 2) * leadSize / 32
         let soft = style.blur > 0 ? min(1, radius / Self.softRadius) : 0
         let alpha: GradientAlpha = row.isBackground ? .background
             : (style.simple ? GradientAlpha(lit: 1, unlit: 0.3) : .lead)
@@ -835,7 +848,7 @@ final class PiPFrameRenderer {
         let reduceMotion = UIAccessibility.isReduceMotionEnabled
         let groupScale = reduceMotion ? 1 : CGFloat(visual.dotGroupScale)
         guard groupScale > 0.001, !visual.dots.isEmpty, opacity > 0.01 else { return }
-        let size = Self.leadSize
+        let size = leadSize
         let dotFont = size * 1.3
         let diameter = dotFont * 0.348
         let advance = dotFont * 0.485 + 2.88
@@ -891,7 +904,7 @@ final class PiPFrameRenderer {
         }
         let hasArtwork = snapshot.artwork != nil && coverImages != nil
         let stale = backdropKey?.artworkID != snapshot.artworkID || backdropKey?.animated != snapshot.animatedBackground
-            || backdropKey?.hasArtwork != hasArtwork
+            || backdropKey?.hasArtwork != hasArtwork || backdropKey?.dim != snapshot.backgroundDim
         if stale || (snapshot.animatedBackground && hasArtwork && now - backdropRenderedAt >= Self.backgroundInterval) {
             let rect = CGRect(x: 0, y: 0, width: width, height: height)
             backdrop.setFillColor(red: 0.07, green: 0.07, blue: 0.09, alpha: 1)
@@ -902,9 +915,9 @@ final class PiPFrameRenderer {
                 backdrop.draw(frame, in: rect)
             }
             // Darker than the app's background: the window is small and has to stay readable.
-            backdrop.setFillColor(red: 0, green: 0, blue: 0, alpha: 0.42)
+            backdrop.setFillColor(red: 0, green: 0, blue: 0, alpha: snapshot.backgroundDim)
             backdrop.fill(rect)
-            backdropKey = (snapshot.artworkID, snapshot.animatedBackground, hasArtwork)
+            backdropKey = (snapshot.artworkID, snapshot.animatedBackground, hasArtwork, snapshot.backgroundDim)
             backdropRenderedAt = now
         }
         let rowBytes = width * 4
