@@ -135,7 +135,7 @@ These features work, but still need testing and refinement.
 | Instrumental breaks | Three animated dots during gaps of at least three seconds |
 | Line-synced and static lyrics | `Line` and `Static` lyric types |
 | Dynamic background | Port of the extension's Kawarp: the blurred cover warped like liquid by drifting noise, cross-fading from song to song and slowing down on pause. A Metal shader drawn at the original's 300×150 and stretched, so it stays light on battery |
-| Visualizer (experimental) | For songs without lyrics (when the "not found" notice is hidden): Nebula, Sunset or Tunnel in the cover's colours, following playback (iOS lets no app hear Spotify's audio) |
+| Instead of hidden lyrics | When the "not found" notice or unsynced lyrics are hidden: the background, the cover as big as fits, or an experimental visualizer (Nebula, Sunset or Tunnel) in the cover's colours, following playback (iOS lets no app hear Spotify's audio) |
 | Skip songs without sync | Optionally skips songs that have no Spicy Lyrics sync (or no word-by-word sync); songs you pick or go back to are kept |
 | Lyrics sources | Spicy Lyrics API with [LRCLIB](https://lrclib.net) as a fallback |
 | Romanization | Supported when returned by the API (`TransliteratedText`) |

@@ -698,18 +698,22 @@ private struct SourceSettings: View {
 
             if settings.hideNotFoundNotice || settings.hideStaticLyrics {
                 Section {
-                    Toggle(String(localized: "Визуализатор"), isOn: $settings.visualizerEnabled)
-                    if settings.visualizerEnabled {
+                    Picker(String(localized: "Вместо текста"), selection: $settings.hiddenLyricsView) {
+                        ForEach(HiddenLyricsView.allCases) { view in
+                            Text(view.title).tag(view.rawValue)
+                        }
+                    }
+                    if settings.hiddenLyricsView == HiddenLyricsView.visualizer.rawValue {
                         Picker(String(localized: "Стиль"), selection: $settings.visualizerStyle) {
                             ForEach(VisualizerStyle.allCases) { style in
                                 Text(style.title).tag(style.rawValue)
                             }
                         }
                     }
-                } header: {
-                    Text(String(localized: "Эксперимент"))
                 } footer: {
-                    Text(String(localized: "Вместо пустого фона — визуализатор в цветах обложки. iOS не даёт приложениям слышать звук Spotify, поэтому он следует за воспроизведением, а не за громкостью: течёт, пока песня играет, почти замирает на паузе, а «Закат» садится к концу песни."))
+                    Text(settings.hiddenLyricsView == HiddenLyricsView.visualizer.rawValue
+                         ? String(localized: "Экспериментально: визуализатор в цветах обложки. iOS не даёт приложениям слышать звук Spotify, поэтому он следует за воспроизведением, а не за громкостью: течёт, пока песня играет, почти замирает на паузе, а «Закат» садится к концу песни.")
+                         : String(localized: "Большая обложка — во весь экран поверх фона, как в Apple Music: становится больше, когда кнопки прячутся, и чуть уменьшается на паузе."))
                 }
             }
 

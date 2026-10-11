@@ -89,8 +89,8 @@ final class AppSettings {
     var hideNotFoundNotice: Bool { didSet { defaults.set(hideNotFoundNotice, forKey: Keys.hideNotFound) } }
     /// Show just the background instead of unsynced (static) lyrics.
     var hideStaticLyrics: Bool { didSet { defaults.set(hideStaticLyrics, forKey: Keys.hideStatic) } }
-    /// Experimental: a visualizer in place of hidden lyrics (see `hideNotFoundNotice`).
-    var visualizerEnabled: Bool { didSet { defaults.set(visualizerEnabled, forKey: Keys.visualizer) } }
+    /// `HiddenLyricsView.rawValue`: what fills the screen where lyrics were hidden.
+    var hiddenLyricsView: String { didSet { defaults.set(hiddenLyricsView, forKey: Keys.hiddenLyricsView) } }
     /// `VisualizerStyle.rawValue`.
     var visualizerStyle: String { didSet { defaults.set(visualizerStyle, forKey: Keys.visualizerStyle) } }
     /// `AutoSkipMode.rawValue`: skip songs without a Spicy Lyrics sync.
@@ -169,7 +169,7 @@ final class AppSettings {
             Keys.landscapeLyricsOnly: false,
             Keys.hideNotFound: false,
             Keys.hideStatic: false,
-            Keys.visualizer: false,
+            Keys.hiddenLyricsView: HiddenLyricsView.background.rawValue,
             Keys.visualizerStyle: VisualizerStyle.nebula.rawValue,
             Keys.autoSkip: AutoSkipMode.off.rawValue,
             Keys.blurStrength: 1.0,
@@ -233,7 +233,7 @@ final class AppSettings {
         landscapeLyricsOnly = defaults.bool(forKey: Keys.landscapeLyricsOnly)
         hideNotFoundNotice = defaults.bool(forKey: Keys.hideNotFound)
         hideStaticLyrics = defaults.bool(forKey: Keys.hideStatic)
-        visualizerEnabled = defaults.bool(forKey: Keys.visualizer)
+        hiddenLyricsView = defaults.string(forKey: Keys.hiddenLyricsView) ?? HiddenLyricsView.background.rawValue
         visualizerStyle = defaults.string(forKey: Keys.visualizerStyle) ?? VisualizerStyle.nebula.rawValue
         autoSkipMode = defaults.string(forKey: Keys.autoSkip) ?? AutoSkipMode.off.rawValue
         blurStrength = defaults.double(forKey: Keys.blurStrength)
@@ -375,7 +375,7 @@ final class AppSettings {
         static let landscapeLyricsOnly = "landscapeLyricsOnly"
         static let hideNotFound = "hideNotFoundNotice"
         static let hideStatic = "hideStaticLyrics"
-        static let visualizer = "visualizerEnabled"
+        static let hiddenLyricsView = "hiddenLyricsView"
         static let visualizerStyle = "visualizerStyle"
         static let autoSkip = "autoSkipMode"
         static let blurStrength = "blurStrength"
@@ -398,6 +398,26 @@ final class AppSettings {
         static let showLyricsFPS = "showLyricsFPS"
         static let pipShowFPS = "pipShowFPS"
         static let autoWakeSpotify = "autoWakeSpotify"
+    }
+}
+
+/// What fills the screen where lyrics were hidden ("not found" notice or unsynced lyrics).
+enum HiddenLyricsView: String, CaseIterable, Identifiable {
+    /// Just the moving background.
+    case background
+    /// The cover, as big as fits, over the background.
+    case artwork
+    /// The experimental visualizer.
+    case visualizer
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .background: return String(localized: "Фон")
+        case .artwork: return String(localized: "Большая обложка")
+        case .visualizer: return String(localized: "Визуализатор")
+        }
     }
 }
 

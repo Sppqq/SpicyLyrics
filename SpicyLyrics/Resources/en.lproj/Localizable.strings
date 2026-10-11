@@ -372,5 +372,7 @@
 "Песня, у которой нет синхронизации в Spicy Lyrics (текст не найден, есть только в LRCLIB или без таймингов), пропускается сама. Свои TTML считаются. Не пропускаются песни, выбранные вручную или возвращённые кнопкой «назад»; после %lld пропусков подряд пропуск встаёт на паузу." = "A song with no Spicy Lyrics sync (no lyrics, only LRCLIB's, or untimed) is skipped by itself. Your own TTML counts. Songs you picked or went back to are never skipped; after %lld skips in a row skipping pauses.";
 "Визуализатор" = "Visualizer";
 "Стиль" = "Style";
-"Эксперимент" = "Experimental";
-"Вместо пустого фона — визуализатор в цветах обложки. iOS не даёт приложениям слышать звук Spotify, поэтому он следует за воспроизведением, а не за громкостью: течёт, пока песня играет, почти замирает на паузе, а «Закат» садится к концу песни." = "A visualizer in the cover's colours instead of the empty background. iOS lets no app hear Spotify's sound, so it follows the playback rather than the volume: it flows while the song plays, nearly stops on pause, and the Sunset sets as the song ends.";
+"Большая обложка" = "Big Artwork";
+"Вместо текста" = "Instead of Lyrics";
+"Экспериментально: визуализатор в цветах обложки. iOS не даёт приложениям слышать звук Spotify, поэтому он следует за воспроизведением, а не за громкостью: течёт, пока песня играет, почти замирает на паузе, а «Закат» садится к концу песни." = "Experimental: a visualizer in the cover's colours. iOS lets no app hear Spotify's sound, so it follows the playback rather than the volume: it flows while the song plays, nearly stops on pause, and the Sunset sets as the song ends.";
+"Большая обложка — во весь экран поверх фона, как в Apple Music: становится больше, когда кнопки прячутся, и чуть уменьшается на паузе." = "Big artwork fills the screen over the background, like Apple Music: it grows when the controls hide and shrinks a little on pause.";

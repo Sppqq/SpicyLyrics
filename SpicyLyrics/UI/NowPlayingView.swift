@@ -312,7 +312,7 @@ struct NowPlayingView: View {
 
     /// The experimental visualizer fills in for lyrics hidden by the user's choice.
     private var showVisualizer: Bool {
-        settings.visualizerEnabled && lyricsHidden && CoverVisualizer.isSupported
+        settings.hiddenLyricsView == HiddenLyricsView.visualizer.rawValue && lyricsHidden && CoverVisualizer.isSupported
     }
 
     /// Landscape with hidden lyrics: the controls fade away too, leaving the background alone.
@@ -666,14 +666,44 @@ struct NowPlayingView: View {
     @ViewBuilder
     private func lyricsArea(topInset: CGFloat, bottomInset: CGFloat, horizontalPadding: CGFloat) -> some View {
         if lyricsHidden {
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture { toggleChrome() }
-                .trackSwipes(enabled: settings.gesturesEnabled && player.track != nil,
-                             onNext: { skip(.next) }, onPrevious: { skip(.previous) })
+            ZStack {
+                Color.clear
+                if settings.hiddenLyricsView == HiddenLyricsView.artwork.rawValue {
+                    bigArtwork(topInset: topInset, bottomInset: bottomInset)
+                        .transition(.opacity)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { toggleChrome() }
+            .trackSwipes(enabled: settings.gesturesEnabled && player.track != nil,
+                         onNext: { skip(.next) }, onPrevious: { skip(.previous) })
         } else {
             visibleLyricsArea(topInset: topInset, bottomInset: bottomInset, horizontalPadding: horizontalPadding)
         }
+    }
+
+    /// A song without lyrics shown: its cover, as big as the free space allows, over the moving
+    /// background. It grows when the controls hide and sinks back a little on pause, like Apple
+    /// Music; a new song's cover fades in over the old one.
+    private func bigArtwork(topInset: CGFloat, bottomInset: CGFloat) -> some View {
+        GeometryReader { geometry in
+            let margin: CGFloat = isLandscape ? 24 : 28
+            let freeHeight = geometry.size.height - topInset - bottomInset
+            let side = max(0, min(geometry.size.width - margin * 2, freeHeight - margin * 2, 720))
+            ZStack {
+                artwork(side: side, cornerRadius: max(10, side * 0.035))
+                    .id(player.artworkID)
+                    .transition(.opacity)
+            }
+            .shadow(color: .black.opacity(0.4), radius: 30, y: 16)
+            .scaleEffect(player.isPlaying ? 1 : 0.88)
+            .position(x: geometry.size.width / 2, y: topInset + freeHeight / 2)
+            .animation(.spring(response: 0.5, dampingFraction: 0.75), value: player.isPlaying)
+            .animation(.easeInOut(duration: 0.6), value: player.artworkID)
+            .animation(Self.chromeAnimation, value: topInset)
+            .animation(Self.chromeAnimation, value: bottomInset)
+        }
+        .accessibilityHidden(true)
     }
 
     private func visibleLyricsArea(topInset: CGFloat, bottomInset: CGFloat, horizontalPadding: CGFloat) -> some View {
