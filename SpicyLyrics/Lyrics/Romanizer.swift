@@ -3,7 +3,7 @@ import Foundation
 /// On-device romanization, like Spicy Lyrics' `ProcessLyrics.ts`: the song's script is decided
 /// once, then every syllable / line is converted. Japanese goes through the system tokenizer
 /// (kanji get their Japanese readings, as kuroshiro gives the extension); Chinese becomes
-/// pinyin; Korean, Cyrillic and Greek use the standard transliterations.
+/// pinyin; Korean and Greek use the standard transliterations, Cyrillic an everyday one.
 enum Romanizer {
     enum Script {
         case japanese, chinese, korean, cyrillic, greek
@@ -41,12 +41,48 @@ enum Romanizer {
             result = japanese(text)
         case .chinese:
             result = text.applyingTransform(.mandarinToLatin, reverse: false)
-        case .korean, .cyrillic, .greek:
+        case .cyrillic:
+            result = cyrillic(text)
+        case .korean, .greek:
             result = text.applyingTransform(.toLatin, reverse: false)
         }
         guard let result, !result.trimmingCharacters(in: .whitespaces).isEmpty else { return text }
         return result
     }
+
+    /// Everyday transliteration ("Vremya shest utra"), not the system's scholarly ISO 9
+    /// ("Vremâ šestʹ utra") that nobody can sing along to. Letters outside the table (Serbian,
+    /// Kazakh…) still go through the system transform.
+    private static func cyrillic(_ text: String) -> String? {
+        var output = ""
+        let characters = Array(text)
+        for (index, character) in characters.enumerated() {
+            let lower = Character(character.lowercased())
+            guard let latin = cyrillicTable[lower] else {
+                output.append(character)
+                continue
+            }
+            guard character != lower, !latin.isEmpty else {
+                output += latin
+                continue
+            }
+            // Capital letter: "Zh" in a word, "ZH" in a word written in capitals.
+            let neighbour = index + 1 < characters.count ? characters[index + 1]
+                : (index > 0 ? characters[index - 1] : character)
+            let shouting = neighbour.isLetter && neighbour.isUppercase
+            output += shouting ? latin.uppercased() : latin.prefix(1).uppercased() + latin.dropFirst()
+        }
+        return output.applyingTransform(.toLatin, reverse: false) ?? output
+    }
+
+    private static let cyrillicTable: [Character: String] = [
+        "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "yo", "ж": "zh", "з": "z",
+        "и": "i", "й": "y", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r",
+        "с": "s", "т": "t", "у": "u", "ф": "f", "х": "kh", "ц": "ts", "ч": "ch", "ш": "sh",
+        "щ": "shch", "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+        // Ukrainian and Belarusian.
+        "є": "ye", "і": "i", "ї": "yi", "ґ": "g", "ў": "w",
+    ]
 
     /// Japanese → romaji through CFStringTokenizer's Latin transcription, word by word.
     private static func japanese(_ text: String) -> String? {
