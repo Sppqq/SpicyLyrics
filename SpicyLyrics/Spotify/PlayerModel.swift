@@ -75,6 +75,12 @@ final class PlayerModel {
     /// Quick follow-up polls left after the clock was set from a single report: one answer is
     /// only as exact as half its round trip, a few more narrow it down.
     @ObservationIgnored private var refineSamples = 0
+    /// App Remote keeps the clock until then (each of its readings extends it).
+    @ObservationIgnored private var remoteUntil: CFTimeInterval = 0
+    /// Its queried positions stopped moving while playing: only trust its events.
+    @ObservationIgnored private var remoteQueriesFrozen = false
+    @ObservationIgnored private var lastRemoteQuery: (position: Double, at: CFTimeInterval)?
+    @ObservationIgnored private var lastRemoteMismatch: String?
     @ObservationIgnored private var holdUntil: CFTimeInterval = 0
     @ObservationIgnored private var backoffUntil: CFTimeInterval = 0
 
@@ -170,6 +176,11 @@ final class PlayerModel {
         let trackChanged = content != snapshot.content
         // Right after a control action, polls may still describe the old state.
         if now < holdUntil && !trackChanged { return }
+        // The Spotify app on this phone tells the time far better: leave the clock to it.
+        if now < remoteUntil && !trackChanged {
+            lastSample = nil
+            return
+        }
 
         // Live or frozen? A playing position that did not move between two reports is frozen:
         // Spotify only refreshes it on play / pause / seek for some devices (its phone app).
@@ -241,6 +252,50 @@ final class PlayerModel {
         if trackChanged {
             content = snapshot.content
             onContentChanged()
+        }
+    }
+
+    /// A reading from the Spotify app on this phone (App Remote): exact to a few milliseconds.
+    func applyRemote(_ sample: SpotifyAppRemote.Sample) {
+        let now = CACurrentMediaTime()
+        guard let track, track.uri == sample.uri else {
+            // Spotify moved on before the Web API noticed: ask it now (once per track).
+            if lastRemoteMismatch != sample.uri {
+                lastRemoteMismatch = sample.uri
+                refreshNow()
+            }
+            return
+        }
+        lastRemoteMismatch = nil
+        if now < holdUntil { return }
+
+        if !sample.event {
+            // A queried position that does not advance while playing is a cached one.
+            if !sample.paused, let last = lastRemoteQuery, sample.measuredAt - last.at > 0.8 {
+                remoteQueriesFrozen = sample.position - last.position < (sample.measuredAt - last.at) * 0.5
+            }
+            lastRemoteQuery = (sample.position, sample.measuredAt)
+            if remoteQueriesFrozen { return }
+        }
+        remoteUntil = now + 4
+
+        let measured = sample.position + (sample.paused ? 0 : max(0, now - sample.measuredAt))
+        if sample.paused == isPlaying {
+            setClock(measured, at: now)
+            isPlaying = !sample.paused
+            return
+        }
+        guard !sample.paused else {
+            setClock(measured, at: now)
+            return
+        }
+        let predicted = rawPosition(at: now)
+        let unapplied = slew * (1 - min(1, max(0, now - anchorTime) / slewSpan))
+        let drift = measured - (predicted + unapplied)
+        if abs(drift) > Self.resyncThreshold || (sample.event && abs(drift) > 0.02) {
+            setClock(measured, at: now)
+        } else if abs(drift) > 0.03 {
+            blend(to: measured, predicted: predicted, now: now)
         }
     }
 

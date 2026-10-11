@@ -8,6 +8,7 @@ struct SpicyLyricsApp: App {
     @State private var player: PlayerModel
     @State private var performance = PerformanceMonitor()
     @State private var pip = LyricsPictureInPicture()
+    @State private var appRemote: SpotifyAppRemote
 
     init() {
         AudioRoute.prepare()
@@ -18,6 +19,7 @@ struct SpicyLyricsApp: App {
         let lyrics = LyricsService(settings: settings, auth: auth, local: localLyrics)
         _settings = State(initialValue: settings)
         _auth = StateObject(wrappedValue: auth)
+        _appRemote = State(initialValue: SpotifyAppRemote(auth: auth, settings: settings))
         _player = State(initialValue: PlayerModel(api: api, lyrics: lyrics, settings: settings, localLyrics: localLyrics))
     }
 
@@ -28,6 +30,7 @@ struct SpicyLyricsApp: App {
                 .environment(player)
                 .environment(performance)
                 .environment(pip)
+                .environment(appRemote)
                 .environmentObject(auth)
                 .preferredColorScheme(.dark)
                 .tint(.white)
@@ -41,6 +44,7 @@ struct RootView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(\.scenePhase) private var scenePhase
     @Environment(LyricsPictureInPicture.self) private var pip
+    @Environment(SpotifyAppRemote.self) private var appRemote
 
     var body: some View {
         Group {
@@ -54,6 +58,8 @@ struct RootView: View {
         .onChange(of: auth.isLoggedIn) { _, _ in updateActivity(scenePhase) }
         .onChange(of: settings.keepScreenOn) { _, _ in updateActivity(scenePhase) }
         .onChange(of: pip.isActive) { _, _ in updateActivity(scenePhase) }
+        .onChange(of: settings.useAppRemote) { _, _ in appRemote.refresh() }
+        .onOpenURL { url in appRemote.handle(url) }
     }
 
     private func updateActivity(_ phase: ScenePhase) {
@@ -61,8 +67,10 @@ struct RootView: View {
         // The floating lyrics window keeps following Spotify while the app is in the background.
         if active || (pip.isActive && auth.isLoggedIn) {
             player.startPolling()
+            if settings.useAppRemote { appRemote.start(player: player) }
         } else {
             player.stopPolling()
+            appRemote.stop()
         }
         UIApplication.shared.isIdleTimerDisabled = active && settings.keepScreenOn
     }

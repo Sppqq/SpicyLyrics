@@ -270,3 +270,13 @@
 "спрятать кнопки" = "hide controls";
 "• 5 минут и браузер." = "• 5 minutes and a browser.";
 "• Аккаунт **Spotify Premium**: с 2026 года Spotify запускает приложения разработчиков только у владельцев с Premium." = "• A **Spotify Premium** account: since 2026 Spotify runs developer apps only for owners with Premium.";
+"Выключено" = "Off";
+"Нужно войти заново" = "Sign in again";
+"Подключение…" = "Connecting…";
+"Подключено" = "Connected";
+"Spotify не отвечает" = "Spotify isn't responding";
+"Точное время из приложения Spotify" = "Exact timing from the Spotify app";
+"Состояние" = "Status";
+"Войти заново" = "Sign In Again";
+"Открыть Spotify и подключиться" = "Open Spotify and Connect";
+"Когда Spotify играет на этом iPhone, позиция берётся прямо из его приложения, без задержек интернета. Иначе время берётся из Spotify Web API." = "When Spotify plays on this iPhone, the position comes straight from its app, with no network delay. Otherwise timing comes from the Spotify Web API.";

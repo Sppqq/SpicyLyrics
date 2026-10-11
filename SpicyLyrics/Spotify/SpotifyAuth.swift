@@ -43,6 +43,8 @@ final class SpotifyAuth: NSObject, ObservableObject {
         "user-read-playback-state",
         "user-modify-playback-state",
         "user-read-recently-played",
+        // Lets App Remote read the exact position from the Spotify app on this phone.
+        "app-remote-control",
     ]
 
     @Published private(set) var isLoggedIn = false

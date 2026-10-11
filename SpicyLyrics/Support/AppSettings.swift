@@ -22,6 +22,8 @@ final class AppSettings {
     var autoHideControls: Bool { didSet { defaults.set(autoHideControls, forKey: Keys.autoHide) } }
     /// Subtract the audio output delay (Bluetooth) when Spotify plays on this iPhone.
     var compensateOutputLatency: Bool { didSet { defaults.set(compensateOutputLatency, forKey: Keys.outputLatency) } }
+    /// Read the position from the Spotify app on this phone (App Remote) when it is reachable.
+    var useAppRemote: Bool { didSet { defaults.set(useAppRemote, forKey: Keys.appRemote) } }
     /// Translate the lyrics on the device and show the translation under each line.
     var translateLyrics: Bool { didSet { defaults.set(translateLyrics, forKey: Keys.translate) } }
     var translationLanguage: String { didSet { defaults.set(translationLanguage, forKey: Keys.translationLanguage) } }
@@ -134,6 +136,7 @@ final class AppSettings {
         showVolumeSlider = defaults.bool(forKey: Keys.volumeSlider)
         gesturesEnabled = defaults.bool(forKey: Keys.gestures)
         compensateOutputLatency = defaults.bool(forKey: Keys.outputLatency)
+        useAppRemote = defaults.object(forKey: Keys.appRemote) as? Bool ?? true
         simpleLyricsMode = defaults.bool(forKey: Keys.simpleMode)
         autoPictureInPicture = defaults.bool(forKey: Keys.autoPiP)
         pipAnimatedBackground = defaults.bool(forKey: Keys.pipAnimatedBackground)
@@ -238,6 +241,7 @@ final class AppSettings {
         static let volumeSlider = "showVolumeSlider"
         static let gestures = "gesturesEnabled"
         static let outputLatency = "compensateOutputLatency"
+        static let appRemote = "useAppRemote"
         static let simpleMode = "simpleLyricsMode"
         static let autoPiP = "autoPictureInPicture"
         static let pipAnimatedBackground = "pipAnimatedBackground"

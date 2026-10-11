@@ -8,6 +8,12 @@ options:
   # Creates SpicyLyrics/Generated/BundledKeys+Generated.swift so it exists before the project is generated.
   preGenCommand: scripts/generate-bundled-keys.sh
 
+packages:
+  # App Remote: the exact playback position straight from the Spotify app on this phone.
+  SpotifyiOS:
+    url: https://github.com/spotify/ios-sdk
+    from: 5.0.1
+
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -30,6 +36,8 @@ targets:
         basedOnDependencyAnalysis: false
     sources:
       - path: SpicyLyrics
+    dependencies:
+      - package: SpotifyiOS
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.spicylyrics.unofficial.ios

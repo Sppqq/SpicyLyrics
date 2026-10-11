@@ -415,10 +415,41 @@ private struct GestureSettings: View {
 
 private struct SyncSettings: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(SpotifyAppRemote.self) private var appRemote
+    @EnvironmentObject private var auth: SpotifyAuth
+
+    private var remoteStatus: String {
+        switch appRemote.status {
+        case .off: return String(localized: "Выключено")
+        case .needsLogin: return String(localized: "Нужно войти заново")
+        case .connecting: return String(localized: "Подключение…")
+        case .connected: return String(localized: "Подключено")
+        case .unavailable: return String(localized: "Spotify не отвечает")
+        }
+    }
 
     var body: some View {
         @Bindable var settings = settings
         Form {
+            Section {
+                Toggle(String(localized: "Точное время из приложения Spotify"), isOn: $settings.useAppRemote)
+                if settings.useAppRemote {
+                    LabeledContent(String(localized: "Состояние"), value: remoteStatus)
+                    if appRemote.status == .needsLogin {
+                        Button(String(localized: "Войти заново")) {
+                            Task {
+                                try? await auth.logIn()
+                                appRemote.refresh()
+                            }
+                        }
+                    } else if appRemote.status == .unavailable {
+                        Button(String(localized: "Открыть Spotify и подключиться")) { appRemote.wakeSpotify() }
+                    }
+                }
+            } footer: {
+                Text(String(localized: "Когда Spotify играет на этом iPhone, позиция берётся прямо из его приложения, без задержек интернета. Иначе время берётся из Spotify Web API."))
+            }
+
             Section {
                 VStack(alignment: .leading) {
                     Text(String(localized: "Сдвиг текста: \(Int(settings.timingOffsetMs)) мс"))
