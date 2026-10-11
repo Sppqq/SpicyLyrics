@@ -49,7 +49,7 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if auth.isLoggedIn {
+            if auth.isLoggedIn || isDemo {
                 NowPlayingView()
             } else {
                 OnboardingView()
@@ -62,6 +62,19 @@ struct RootView: View {
         .onChange(of: settings.useAppRemote) { _, _ in appRemote.refresh() }
         .onChange(of: settings.syncLogEnabled) { _, enabled in SyncLog.shared.enabled = enabled }
         .onOpenURL { url in appRemote.handle(url) }
+        #if DEBUG
+        .task {
+            if let demo = DemoTrack.current { player.startDemo(demo) }
+        }
+        #endif
+    }
+
+    private var isDemo: Bool {
+        #if DEBUG
+        return DemoTrack.current != nil
+        #else
+        return false
+        #endif
     }
 
     private func updateActivity(_ phase: ScenePhase) {

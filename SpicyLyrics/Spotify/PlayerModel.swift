@@ -512,6 +512,9 @@ final class PlayerModel {
     // MARK: Polling
 
     func startPolling() {
+        #if DEBUG
+        if DemoTrack.current != nil { return }
+        #endif
         guard pollTask == nil else { return }
         // Coming back from the background: the song may have changed meanwhile.
         if content != nil { isResyncing = true }
@@ -608,6 +611,17 @@ final class PlayerModel {
             self?.setClock(seconds)
         })
     }
+
+    #if DEBUG
+    /// README recordings: the demo song "plays" from its start time on the local clock.
+    func startDemo(_ demo: DemoTrack) {
+        guard track?.id != demo.info.id else { return }
+        content = .track(demo.info)
+        onContentChanged()
+        setClock(demo.start)
+        isPlaying = true
+    }
+    #endif
 
     /// Jumps to an upcoming track by skipping everything queued before it.
     func skipAhead(_ count: Int) {
@@ -829,10 +843,13 @@ final class PlayerModel {
             for delay in [0.0, 1, 3, 8] {
                 if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
                 guard !Task.isCancelled else { return }
-                if let data = try? await URLSession.shared.data(from: url).0, let decoded = UIImage(data: data) {
-                    image = decoded
-                    break
+                for source in Self.artworkMirrors(url) {
+                    if let data = try? await URLSession.shared.data(from: source).0, let decoded = UIImage(data: data) {
+                        image = decoded
+                        break
+                    }
                 }
+                if image != nil { break }
             }
             guard let self, !Task.isCancelled else { return }
             guard let image else {
@@ -843,6 +860,17 @@ final class PlayerModel {
             self.artwork = image
             self.backgroundArtwork = image.downscaled(to: 160)
             self.artworkID = url.absoluteString
+        }
+    }
+
+    /// `i.scdn.co` is unreachable on some networks (TLS fails); Spotify serves the same covers
+    /// from its other CDN hosts.
+    private static func artworkMirrors(_ url: URL) -> [URL] {
+        guard url.host == "i.scdn.co", var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else { return [url] }
+        return [url] + ["image-cdn-ak.spotifycdn.com", "image-cdn-fa.spotifycdn.com"].compactMap { host in
+            components.host = host
+            return components.url
         }
     }
 }

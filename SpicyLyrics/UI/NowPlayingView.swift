@@ -123,6 +123,17 @@ struct NowPlayingView: View {
         .onChange(of: settings.translateLyrics) { _, _ in player.settingsChanged() }
         .modifier(LyricsTranslation(player: player, settings: settings))
         .task { pip.configure(player: player, settings: settings, performance: performance) }
+        #if DEBUG
+        .task {
+            guard DemoTrack.current != nil else { return }
+            let defaults = UserDefaults.standard
+            if defaults.bool(forKey: "demoLandscape"),
+               let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
+            }
+            if defaults.bool(forKey: "demoSettings") { showSettings = true }
+        }
+        #endif
         .onChange(of: settings.autoPictureInPicture) { _, enabled in pip.setAutomaticStart(enabled) }
         .alert(String(localized: "Картинка в картинке"), isPresented: Binding(
             get: { pip.lastError != nil && !pip.isActive },

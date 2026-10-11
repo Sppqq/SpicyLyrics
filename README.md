@@ -13,6 +13,26 @@ Spicetify extension, taking inspiration from the Android app
 Made by **[sppq](https://spicylyrics.org/sppq)** ([GitHub](https://github.com/Sppqq)), tested by
 **[nie4ick](https://spicylyrics.org/nie4ick)**.
 
+## In Action
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/media/code.webp" width="240" alt="Word-by-word lyrics over the drifting cover"><br><sub>Word by word, over the cover</sub></td>
+    <td align="center"><img src="docs/media/duets.webp" width="240" alt="A fast duet: lines of the second voice sit on the right"><br><sub>Duets, both voices apart</sub></td>
+    <td align="center"><img src="docs/media/player.webp" width="240" alt="The player with its controls"><br><sub>Apple Music style player</sub></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><img src="docs/media/landscape.webp" width="490" alt="Landscape: artwork and controls next to the lyrics"><br><sub>Landscape</sub></td>
+    <td align="center"><img src="docs/media/simple.webp" width="240" alt="Simple Lyrics Mode"><br><sub>Simple Lyrics Mode</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/media/settings.png" width="240" alt="Settings"><br><sub>Plenty of settings</sub></td>
+    <td colspan="2"><sub>Recorded in the iOS Simulator with the Debug-only demo mode
+    (<code>SpicyLyrics/Support/DemoMode.swift</code>); songs: Nemo — The Code, Bao The Whale &amp;
+    Neuro-sama — Mesmerizer, KIDSCRY2DAY — sleep mode. On a phone it follows Spotify instead.</sub></td>
+  </tr>
+</table>
+
 ## Ported Features
 
 These features work, but still need testing and refinement.
