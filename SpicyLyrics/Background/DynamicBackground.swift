@@ -3,16 +3,18 @@ import QuartzCore
 import SwiftUI
 import UIKit
 
-/// Blurred, slowly drifting cover art behind the lyrics.
+/// The cover behind the lyrics, flowing like liquid (the original's Kawarp, see
+/// `KawarpBackground`) and cross-fading from song to song.
 ///
-/// The cover is blurred and saturated once per track; the motion is plain Core Animation
-/// (rotations and drifts of a few pre-rendered layers), which the system render server runs
-/// on its own. No per-frame work in the app and no full-screen live blur, which is what made
-/// the earlier shader-based background heat the phone.
+/// Kawarp draws only 300×150 pixels a frame; no full-screen live blur, which is what made an
+/// earlier shader-based background heat the phone. Without Metal it falls back to blurred
+/// copies of the cover drifting on Core Animation (`CoverBlobsView`).
 struct DynamicBackground: View {
     let image: UIImage?
     let imageID: String
     let animated: Bool
+    /// The flow slows to a tenth while the song is paused.
+    var playing = true
     /// Black layer on top, keeps white lyrics readable on bright covers.
     var dim: Double = AppSettings.defaultBackgroundDim
     /// × the default drift speed.
@@ -25,7 +27,12 @@ struct DynamicBackground: View {
     var body: some View {
         ZStack {
             Color(red: 0.07, green: 0.07, blue: 0.08)
-            CoverBlobs(image: image, imageID: imageID, animated: animated, speed: speed, blur: blur, saturation: saturation)
+            if KawarpBackground.isSupported {
+                KawarpBackground(image: image, imageID: imageID, animated: animated, playing: playing,
+                                 speed: speed, blur: blur, saturation: saturation)
+            } else {
+                CoverBlobs(image: image, imageID: imageID, animated: animated, speed: speed, blur: blur, saturation: saturation)
+            }
             Color.black.opacity(dim)
         }
         .ignoresSafeArea()

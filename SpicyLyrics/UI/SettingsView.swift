@@ -680,10 +680,37 @@ private struct SourceSettings: View {
             }
 
             Section {
+                Picker(String(localized: "Пропускать песни"), selection: $settings.autoSkipMode) {
+                    ForEach(AutoSkipMode.allCases) { mode in
+                        Text(mode.title).tag(mode.rawValue)
+                    }
+                }
+            } footer: {
+                Text(String(localized: "Песня, у которой нет синхронизации в Spicy Lyrics (текст не найден, есть только в LRCLIB или без таймингов), пропускается сама. Свои TTML считаются. Не пропускаются песни, выбранные вручную или возвращённые кнопкой «назад»; после \(PlayerModel.autoSkipLimit) пропусков подряд пропуск встаёт на паузу."))
+            }
+
+            Section {
                 Toggle(String(localized: "Скрывать «Текст не найден»"), isOn: $settings.hideNotFoundNotice)
                 Toggle(String(localized: "Скрывать несинхронный текст"), isOn: $settings.hideStaticLyrics)
             } footer: {
                 Text(String(localized: "Вместо сообщения или статичного текста остаётся только фон. В горизонтальном режиме кнопки тоже прячутся; касание возвращает их."))
+            }
+
+            if settings.hideNotFoundNotice || settings.hideStaticLyrics {
+                Section {
+                    Toggle(String(localized: "Визуализатор"), isOn: $settings.visualizerEnabled)
+                    if settings.visualizerEnabled {
+                        Picker(String(localized: "Стиль"), selection: $settings.visualizerStyle) {
+                            ForEach(VisualizerStyle.allCases) { style in
+                                Text(style.title).tag(style.rawValue)
+                            }
+                        }
+                    }
+                } header: {
+                    Text(String(localized: "Эксперимент"))
+                } footer: {
+                    Text(String(localized: "Вместо пустого фона — визуализатор в цветах обложки. iOS не даёт приложениям слышать звук Spotify, поэтому он следует за воспроизведением, а не за громкостью: течёт, пока песня играет, почти замирает на паузе, а «Закат» садится к концу песни."))
+                }
             }
 
             Section {

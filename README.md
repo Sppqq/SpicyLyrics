@@ -16,7 +16,7 @@ Made by **[sppq](https://spicylyrics.org/sppq)** ([GitHub](https://github.com/Sp
 ## In Action
 
 <p align="center">
-  <img src="docs/media/code.webp" width="250" alt="Word-by-word lyrics over the drifting cover">
+  <img src="docs/media/code.webp" width="250" alt="Word-by-word lyrics over the flowing cover">
   <img src="docs/media/duets.webp" width="250" alt="A fast duet: the second voice's lines sit on the right">
   <img src="docs/media/player.webp" width="250" alt="The player with its controls">
 </p>
@@ -134,7 +134,9 @@ These features work, but still need testing and refinement.
 | Duets and backing vocals | Right-aligned `OppositeAligned` lines; each backing-vocal group is its own smaller row under the main line (`bg-line`), so two can follow each other |
 | Instrumental breaks | Three animated dots during gaps of at least three seconds |
 | Line-synced and static lyrics | `Line` and `Static` lyric types |
-| Dynamic background | Pre-blurred, saturated album artwork drifting on Core Animation (light on battery) |
+| Dynamic background | Port of the extension's Kawarp: the blurred cover warped like liquid by drifting noise, cross-fading from song to song and slowing down on pause. A Metal shader drawn at the original's 300×150 and stretched, so it stays light on battery |
+| Visualizer (experimental) | For songs without lyrics (when the "not found" notice is hidden): Nebula, Sunset or Tunnel in the cover's colours, following playback (iOS lets no app hear Spotify's audio) |
+| Skip songs without sync | Optionally skips songs that have no Spicy Lyrics sync (or no word-by-word sync); songs you pick or go back to are kept |
 | Lyrics sources | Spicy Lyrics API with [LRCLIB](https://lrclib.net) as a fallback |
 | Romanization | Supported when returned by the API (`TransliteratedText`) |
 | Seeking | Tap a lyric line to seek to it; requires Spotify Premium |
@@ -143,8 +145,8 @@ These features work, but still need testing and refinement.
 | Apple Music style player | Controls fade away while a song plays; landscape and iPad put artwork and controls beside the lyrics |
 | Gestures | Swipe the lyrics sideways to change tracks, pinch to resize, long-press a line to seek / copy / share (iOS 18+) |
 | iPad | Side-by-side layout in both orientations, larger lyrics, pointer hover, keyboard shortcuts (space, ⌘← / ⌘→) |
-| Floating lyrics (Picture in Picture) | The current line, word by word, in a PiP window over any app; starts from *•••* or when leaving the app; play/pause and ±15 s from the window |
-| Romanization and translation | On-device: Japanese (with kanji readings), Chinese pinyin, Korean, Cyrillic, Greek; translation under each line with Apple Translation (iOS 18+) |
+| Floating lyrics (Picture in Picture) | The current line, word by word, in a PiP window over any app; wide, square, portrait or tall; opens out of the lyrics and closes back onto them; starts from *•••* or when leaving the app; play/pause and ±15 s from the window |
+| Romanization and translation | On-device: Japanese (with kanji readings), Chinese pinyin, Korean, Cyrillic, Greek; translation under or instead of each line, by Apple Translation on the device (iOS 18+), Google, Yandex or DeepL (your own key) |
 | Interface language | English and Russian; follows the phone's language (English otherwise), or pick one in *Settings → Interface* |
 | Display modes | Spicy Lyrics' Simple Lyrics Mode, centred lyrics, SF Pro / Rounded / New York |
 
@@ -256,16 +258,16 @@ SpicyLyrics/
   Spotify/      OAuth PKCE, Web API, player model, and playback clock
   Lyrics/       Models, parsers (Spicy JSON, LRC), SLObjPack, service, and disk cache
   Rendering/    Springs, splines, animator, lyric line rendering, and scrolling
-  Background/   Dynamic background
+  Background/   Kawarp background and visualizer (Metal)
   UI/           Onboarding, now playing screen, playback controls, and settings
 ```
 
 ## Current Limitations
 
 - **Still raw:** expect bugs and rough edges; features, UI, and integrations may change between versions.
-- Spotify polling runs while the app is open; continuous background polling is not supported.
+- Spotify is followed while the app is open or its Picture in Picture window is up; not in the background otherwise.
 - Playback controls require Spotify Premium.
-- Lyric translations, Genius integration, and local TTML files are not supported in this version.
+- Genius integration is not supported in this version.
 
 ## License and Credits
 

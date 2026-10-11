@@ -53,16 +53,46 @@ struct NowPlayingView: View {
                     image: settings.dynamicBackground ? player.backgroundArtwork : nil,
                     imageID: player.artworkID,
                     animated: settings.dynamicBackground && !reduced,
+                    playing: player.isPlaying,
                     dim: settings.backgroundDim,
                     speed: settings.backgroundSpeed,
                     blur: settings.backgroundBlur,
                     saturation: settings.backgroundSaturation
                 )
 
+                // Experimental: a visualizer where the lyrics were hidden.
+                ZStack {
+                    if showVisualizer {
+                        CoverVisualizer(style: VisualizerStyle(rawValue: settings.visualizerStyle) ?? .nebula,
+                                        image: player.backgroundArtwork, imageID: player.artworkID,
+                                        player: player, reduced: reduced)
+                            .ignoresSafeArea()
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.8), value: showVisualizer)
+
                 if landscape {
                     landscapeLayout(size)
                 } else {
                     portraitLayout(size)
+                }
+
+                if let notice = player.autoSkipNotice {
+                    Label(notice, systemImage: "forward.end.fill")
+                        .font(.footnote.weight(.semibold))
+                        .lineLimit(2)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .environment(\.colorScheme, .dark)
+                        .padding(.horizontal, 24)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .padding(.top, (chromeVisible && !landscape ? headerHeight : 0) + 8)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .allowsHitTesting(false)
                 }
 
                 Color.clear
@@ -107,6 +137,7 @@ struct NowPlayingView: View {
             if phase == .active { Self.relayoutWindows() }
         }
         .onChange(of: settings.pipFormat) { _, _ in pip.refreshFrame() }
+        .animation(.easeInOut(duration: 0.3), value: player.autoSkipNotice)
         .onChange(of: lyricsOnly) { _, value in
             if value { hideChrome() }
         }
@@ -277,6 +308,11 @@ struct NowPlayingView: View {
         case .loaded(let lyrics): return settings.hideStaticLyrics && lyrics.kind == .static
         default: return false
         }
+    }
+
+    /// The experimental visualizer fills in for lyrics hidden by the user's choice.
+    private var showVisualizer: Bool {
+        settings.visualizerEnabled && lyricsHidden && CoverVisualizer.isSupported
     }
 
     /// Landscape with hidden lyrics: the controls fade away too, leaving the background alone.

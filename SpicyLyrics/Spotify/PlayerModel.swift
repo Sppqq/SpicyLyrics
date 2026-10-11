@@ -108,6 +108,20 @@ final class PlayerModel {
     /// (the app or the floating window was just opened, the phone stalled).
     private(set) var snapToken = 0
 
+    // Skipping songs without a Spicy Lyrics sync (`AppSettings.autoSkipMode`).
+    /// Songs skipped in a row; past `autoSkipLimit` skipping pauses (a playlist of nothing synced).
+    @ObservationIgnored private var autoSkipped = 0
+    /// The song last checked, so each is judged (and skipped) once.
+    @ObservationIgnored private var skipCheckedURI: String?
+    /// A song the user picked or went back to: never skipped.
+    @ObservationIgnored private var skipExemptURI: String?
+    /// Until then the next new song counts as one the user went back to.
+    @ObservationIgnored private var exemptNextSongUntil: CFTimeInterval = 0
+    @ObservationIgnored private var noticeTask: Task<Void, Never>?
+    /// Shown for a moment over the player after a song was skipped.
+    private(set) var autoSkipNotice: String?
+    static let autoSkipLimit = 12
+
     private static let slewDuration: Double = 0.8
     /// Being behind Spotify by more than this jumps instead of catching up smoothly.
     private static let resyncThreshold: Double = 1.0
@@ -633,6 +647,7 @@ final class PlayerModel {
     }
 
     private func watch() {
+        checkAutoSkip()
         let media = MediaClock.now()
         let wall = Date().timeIntervalSince1970
         defer { lastWatch = (media, wall) }
@@ -727,7 +742,11 @@ final class PlayerModel {
     }
 
     func next() { control({ [api] in try await api.next() }) }
-    func previous() { control({ [api] in try await api.previous() }) }
+
+    func previous() {
+        exemptNextSongUntil = MediaClock.now() + 5
+        control({ [api] in try await api.previous() })
+    }
 
     func seek(to seconds: Double) {
         control({ [api] in try await api.seek(to: seconds) }, optimistic: { [weak self] in
@@ -759,6 +778,7 @@ final class PlayerModel {
 
     /// Plays `track`, continuing with the album or playlist it came from when there is one.
     func play(_ track: TrackSummary, context: String?) {
+        skipExemptURI = track.uri
         let contexts = [context, track.albumURI].compactMap { $0 }.filter(Self.supportsOffset)
         control({ [api] in
             for contextURI in contexts {
@@ -812,9 +832,64 @@ final class PlayerModel {
         }
     }
 
+    // MARK: Auto-skip
+
+    /// Lyrics count as a Spicy Lyrics sync when they come from Spicy Lyrics (or the user's own
+    /// TTML) and are timed: by line, or by word when only word-by-word sync is wanted.
+    private static func hasSpicySync(_ lyrics: PreparedLyrics, wordByWord: Bool) -> Bool {
+        let source = lyrics.sourceName
+        guard source.hasPrefix("Spicy Lyrics") || source.hasPrefix(LocalLyricsStore.sourceName) else { return false }
+        return wordByWord ? lyrics.kind == .syllable : lyrics.kind != .static
+    }
+
+    /// Skips the playing song when it has no Spicy Lyrics sync (and the setting asks for that).
+    /// Runs from the watchdog: twice a second while following Spotify.
+    private func checkAutoSkip() {
+        guard let mode = AutoSkipMode(rawValue: settings.autoSkipMode), mode != .off,
+              isPlaying, let track, skipCheckedURI != track.uri else { return }
+        let qualifies: Bool
+        switch lyricsState {
+        case .loaded(let lyrics): qualifies = Self.hasSpicySync(lyrics, wordByWord: mode == .wordByWord)
+        case .notFound: qualifies = false
+        // Still loading, or offline: no telling yet.
+        default: return
+        }
+        skipCheckedURI = track.uri
+        if qualifies {
+            autoSkipped = 0
+            return
+        }
+        guard track.uri != skipExemptURI else { return }
+        guard autoSkipped < Self.autoSkipLimit else {
+            if autoSkipped == Self.autoSkipLimit {
+                autoSkipped += 1
+                showNotice(String(localized: "\(Self.autoSkipLimit) песен подряд без синхронизации — пропуск на паузе"))
+            }
+            return
+        }
+        autoSkipped += 1
+        SyncLog.shared.add("skip", "\"\(track.title.prefix(30))\": no Spicy Lyrics sync, skipping (\(autoSkipped))")
+        showNotice(String(localized: "Пропущено: \(track.title)"))
+        next()
+    }
+
+    private func showNotice(_ text: String) {
+        autoSkipNotice = text
+        noticeTask?.cancel()
+        noticeTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            self?.autoSkipNotice = nil
+        }
+    }
+
     // MARK: Lyrics & artwork
 
     private func onContentChanged() {
+        if MediaClock.now() < exemptNextSongUntil, let uri = track?.uri {
+            skipExemptURI = uri
+            exemptNextSongUntil = 0
+        }
         translations = [:]
         lyricsTask?.cancel()
         lyricsTask = nil
@@ -955,6 +1030,10 @@ final class PlayerModel {
         lastArtworkURL = url
         artworkTask?.cancel()
         guard let url else {
+            // A song App Remote announced has no cover URL yet (its own cover or the Web API's
+            // comes in a moment): keep the last one until then, so the background flows from
+            // cover to cover instead of dipping to black.
+            if case .track = content, artwork != nil { return }
             artwork = nil
             backgroundArtwork = nil
             artworkID = ""

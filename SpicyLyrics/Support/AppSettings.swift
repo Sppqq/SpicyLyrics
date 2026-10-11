@@ -89,6 +89,12 @@ final class AppSettings {
     var hideNotFoundNotice: Bool { didSet { defaults.set(hideNotFoundNotice, forKey: Keys.hideNotFound) } }
     /// Show just the background instead of unsynced (static) lyrics.
     var hideStaticLyrics: Bool { didSet { defaults.set(hideStaticLyrics, forKey: Keys.hideStatic) } }
+    /// Experimental: a visualizer in place of hidden lyrics (see `hideNotFoundNotice`).
+    var visualizerEnabled: Bool { didSet { defaults.set(visualizerEnabled, forKey: Keys.visualizer) } }
+    /// `VisualizerStyle.rawValue`.
+    var visualizerStyle: String { didSet { defaults.set(visualizerStyle, forKey: Keys.visualizerStyle) } }
+    /// `AutoSkipMode.rawValue`: skip songs without a Spicy Lyrics sync.
+    var autoSkipMode: String { didSet { defaults.set(autoSkipMode, forKey: Keys.autoSkip) } }
 
     // Look & feel (multipliers are 1 at the original's values).
     /// Strength of the blur on lines away from the active one.
@@ -163,6 +169,9 @@ final class AppSettings {
             Keys.landscapeLyricsOnly: false,
             Keys.hideNotFound: false,
             Keys.hideStatic: false,
+            Keys.visualizer: false,
+            Keys.visualizerStyle: VisualizerStyle.nebula.rawValue,
+            Keys.autoSkip: AutoSkipMode.off.rawValue,
             Keys.blurStrength: 1.0,
             Keys.glowStrength: 1.0,
             Keys.inactiveBrightness: 1.0,
@@ -224,6 +233,9 @@ final class AppSettings {
         landscapeLyricsOnly = defaults.bool(forKey: Keys.landscapeLyricsOnly)
         hideNotFoundNotice = defaults.bool(forKey: Keys.hideNotFound)
         hideStaticLyrics = defaults.bool(forKey: Keys.hideStatic)
+        visualizerEnabled = defaults.bool(forKey: Keys.visualizer)
+        visualizerStyle = defaults.string(forKey: Keys.visualizerStyle) ?? VisualizerStyle.nebula.rawValue
+        autoSkipMode = defaults.string(forKey: Keys.autoSkip) ?? AutoSkipMode.off.rawValue
         blurStrength = defaults.double(forKey: Keys.blurStrength)
         glowStrength = defaults.double(forKey: Keys.glowStrength)
         inactiveBrightness = defaults.double(forKey: Keys.inactiveBrightness)
@@ -363,6 +375,9 @@ final class AppSettings {
         static let landscapeLyricsOnly = "landscapeLyricsOnly"
         static let hideNotFound = "hideNotFoundNotice"
         static let hideStatic = "hideStaticLyrics"
+        static let visualizer = "visualizerEnabled"
+        static let visualizerStyle = "visualizerStyle"
+        static let autoSkip = "autoSkipMode"
         static let blurStrength = "blurStrength"
         static let glowStrength = "glowStrength"
         static let inactiveBrightness = "inactiveBrightness"
@@ -383,6 +398,25 @@ final class AppSettings {
         static let showLyricsFPS = "showLyricsFPS"
         static let pipShowFPS = "pipShowFPS"
         static let autoWakeSpotify = "autoWakeSpotify"
+    }
+}
+
+/// Which songs get skipped for having no Spicy Lyrics sync.
+enum AutoSkipMode: String, CaseIterable, Identifiable {
+    case off
+    /// No Spicy Lyrics sync at all (not found, LRCLIB, or unsynced).
+    case synced
+    /// Anything short of word-by-word sync.
+    case wordByWord
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .off: return String(localized: "Не пропускать")
+        case .synced: return String(localized: "Без синхронизации")
+        case .wordByWord: return String(localized: "Без пословной синхронизации")
+        }
     }
 }
 

@@ -360,3 +360,17 @@
 "Строки текста отправляются в онлайн-переводчик. Нужен интернет; переводы запоминаются до перезапуска приложения. Строки, которые уже на выбранном языке, не переводятся." = "The lyric lines are sent to an online translator. Needs the internet; translations are remembered until the app restarts. Lines already in the chosen language aren't translated.";
 "DeepL переводит лучше всех, но нужен свой ключ API: бесплатного тарифа (500 000 символов в месяц) хватает с запасом. Ключ хранится в связке ключей iOS." = "DeepL translates best but needs your own API key: the free plan (500,000 characters a month) is plenty. The key is kept in the iOS Keychain.";
 "Широкое окно показывает одну-две строки, вертикальное — больше строк, как в плеере. Анимированный фон — плавающая обложка, как в приложении. На слабых устройствах выключите его; в режиме экономии он и так неподвижен." = "A wide window shows a line or two, a portrait one shows more, like the player. The animated background is the drifting cover, as in the app. Turn it off on slower devices; in battery saving it is still anyway.";
+"Туманность" = "Nebula";
+"Закат" = "Sunset";
+"Тоннель" = "Tunnel";
+"Не пропускать" = "Don't Skip";
+"Без синхронизации" = "Without Sync";
+"Без пословной синхронизации" = "Without Word-by-Word Sync";
+"%lld песен подряд без синхронизации — пропуск на паузе" = "%lld songs in a row without sync, skipping paused";
+"Пропущено: %@" = "Skipped: %@";
+"Пропускать песни" = "Skip Songs";
+"Песня, у которой нет синхронизации в Spicy Lyrics (текст не найден, есть только в LRCLIB или без таймингов), пропускается сама. Свои TTML считаются. Не пропускаются песни, выбранные вручную или возвращённые кнопкой «назад»; после %lld пропусков подряд пропуск встаёт на паузу." = "A song with no Spicy Lyrics sync (no lyrics, only LRCLIB's, or untimed) is skipped by itself. Your own TTML counts. Songs you picked or went back to are never skipped; after %lld skips in a row skipping pauses.";
+"Визуализатор" = "Visualizer";
+"Стиль" = "Style";
+"Эксперимент" = "Experimental";
+"Вместо пустого фона — визуализатор в цветах обложки. iOS не даёт приложениям слышать звук Spotify, поэтому он следует за воспроизведением, а не за громкостью: течёт, пока песня играет, почти замирает на паузе, а «Закат» садится к концу песни." = "A visualizer in the cover's colours instead of the empty background. iOS lets no app hear Spotify's sound, so it follows the playback rather than the volume: it flows while the song plays, nearly stops on pause, and the Sunset sets as the song ends.";

@@ -84,7 +84,7 @@ struct LyricsView: View {
     /// The virtualizer's glide: a critically damped 1 Hz spring (`SMOOTH_SCROLL_FREQUENCY/DAMPING`),
     /// quicker or slower with the setting.
     private var scrollAnimation: Animation {
-        .spring(response: 1 / clamp(settings.scrollSpeed, 0.25, 4), dampingFraction: 1)
+        .spring(response: 1 / clamp(settings.scrollSpeed, 0.25, 4) * MediaClock.durationScale, dampingFraction: 1)
     }
     /// `USER_SCROLL_COOLDOWN` in ScrollToActiveLine.ts.
     private static let userScrollCooldown: TimeInterval = 0.75

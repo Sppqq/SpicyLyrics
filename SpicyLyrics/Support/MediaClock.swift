@@ -15,8 +15,14 @@ enum MediaClock {
         guard scale != 1 else { return CACurrentMediaTime() }
         return origin + (CACurrentMediaTime() - origin) * scale
     }
+
+    /// SwiftUI animations run on the real clock: stretch their durations by this so they keep
+    /// pace with a slowed demo clock (else the recording, sped back up, shows them too fast).
+    static var durationScale: Double { 1 / scale }
     #else
     @inline(__always)
     static func now() -> CFTimeInterval { CACurrentMediaTime() }
+
+    static let durationScale: Double = 1
     #endif
 }
