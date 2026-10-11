@@ -72,6 +72,9 @@ final class PlayerModel {
     @ObservationIgnored private var frozenReports = false
     /// Consecutive live reports far behind our clock (a seek back on another device).
     @ObservationIgnored private var behindStreak = 0
+    /// Consecutive live reports saying we are ahead, and the smallest of those leads.
+    @ObservationIgnored private var aheadStreak = 0
+    @ObservationIgnored private var aheadLead: Double = 0
     /// Quick follow-up polls left after the clock was set from a single report: one answer is
     /// only as exact as half its round trip, a few more narrow it down.
     @ObservationIgnored private var refineSamples = 0
@@ -96,6 +99,11 @@ final class PlayerModel {
     private static let refineCount = 3
     /// A live report this far behind us, twice in a row, is a seek back elsewhere.
     private static let seekBackThreshold: Double = 2.5
+    /// Reports ahead of us are usually just late, but when this many in a row agree we are ahead
+    /// by more than `aheadThreshold`, playback really fell behind (a buffering stall that was
+    /// not a pause): ease back by the smallest lead they saw.
+    private static let aheadThreshold: Double = 0.05
+    private static let aheadCount = 3
 
     /// The user's saved TTML files.
     @ObservationIgnored let localLyrics: LocalLyricsStore
@@ -144,6 +152,7 @@ final class PlayerModel {
         anchorTime = now
         slew = 0
         behindStreak = 0
+        aheadStreak = 0
     }
 
     /// Blends the clock toward `target` over a short span instead of jumping (a jump back would
@@ -275,16 +284,29 @@ final class PlayerModel {
             } else if drift > (refining ? Self.refineThreshold : Self.catchUpThreshold) {
                 blend(to: measured, predicted: predicted, now: now)
                 behindStreak = 0
+                aheadStreak = 0
                 decision = refining ? "refine → blend" : "behind → blend"
             } else if drift < -Self.seekBackThreshold {
+                aheadStreak = 0
                 behindStreak += 1
                 decision = "report far behind (\(behindStreak))"
                 if behindStreak >= 2 {
                     setClock(measured, at: now)
                     decision = "seek back elsewhere → set"
                 }
+            } else if drift < -Self.aheadThreshold {
+                behindStreak = 0
+                aheadLead = aheadStreak == 0 ? -drift : min(aheadLead, -drift)
+                aheadStreak += 1
+                decision = "ahead (\(aheadStreak))"
+                if aheadStreak >= Self.aheadCount {
+                    blend(to: target - aheadLead, predicted: predicted, now: now)
+                    decision = "ahead \(aheadStreak)× → ease back \(aheadLead.signedMs)"
+                    aheadStreak = 0
+                }
             } else {
                 behindStreak = 0
+                aheadStreak = 0
             }
         }
         log.add("web", "\(summary) drift \(drift.signedMs) → \(decision)")
