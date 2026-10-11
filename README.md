@@ -15,23 +15,27 @@ Made by **[sppq](https://spicylyrics.org/sppq)** ([GitHub](https://github.com/Sp
 
 ## In Action
 
-<table>
-  <tr>
-    <td align="center"><img src="docs/media/code.webp" width="240" alt="Word-by-word lyrics over the drifting cover"><br><sub>Word by word, over the cover</sub></td>
-    <td align="center"><img src="docs/media/duets.webp" width="240" alt="A fast duet: lines of the second voice sit on the right"><br><sub>Duets, both voices apart</sub></td>
-    <td align="center"><img src="docs/media/player.webp" width="240" alt="The player with its controls"><br><sub>Apple Music style player</sub></td>
-  </tr>
-  <tr>
-    <td align="center" colspan="2"><img src="docs/media/landscape.webp" width="490" alt="Landscape: artwork and controls next to the lyrics"><br><sub>Landscape</sub></td>
-    <td align="center"><img src="docs/media/simple.webp" width="240" alt="Simple Lyrics Mode"><br><sub>Simple Lyrics Mode</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/media/settings.png" width="240" alt="Settings"><br><sub>Plenty of settings</sub></td>
-    <td colspan="2"><sub>Recorded in the iOS Simulator with the Debug-only demo mode
-    (<code>SpicyLyrics/Support/DemoMode.swift</code>); songs: Nemo — The Code, Bao The Whale &amp;
-    Neuro-sama — Mesmerizer, KIDSCRY2DAY — sleep mode. On a phone it follows Spotify instead.</sub></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/media/code.webp" width="250" alt="Word-by-word lyrics over the drifting cover">
+  <img src="docs/media/duets.webp" width="250" alt="A fast duet: the second voice's lines sit on the right">
+  <img src="docs/media/player.webp" width="250" alt="The player with its controls">
+</p>
+<p align="center"><sub>Word by word over the cover · duets, each voice on its own side · an Apple Music style player</sub></p>
+
+<p align="center">
+  <img src="docs/media/landscape.webp" width="770" alt="Landscape: artwork and controls next to the lyrics">
+</p>
+<p align="center"><sub>Landscape</sub></p>
+
+<p align="center">
+  <img src="docs/media/simple.webp" width="250" alt="Simple Lyrics Mode">
+  <img src="docs/media/settings.png" width="250" alt="Settings">
+</p>
+<p align="center"><sub>Simple Lyrics Mode · plenty of settings</sub></p>
+
+<sub>Recorded in the iOS Simulator with the Debug-only demo mode (`SpicyLyrics/Support/DemoMode.swift`).
+Songs: Nemo — The Code, Bao The Whale &amp; Neuro-sama — Mesmerizer, KIDSCRY2DAY — sleep mode. On a phone
+the app follows Spotify instead.</sub>
 
 ## Ported Features
 
