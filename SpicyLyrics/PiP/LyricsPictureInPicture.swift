@@ -223,6 +223,8 @@ struct PiPSnapshot: @unchecked Sendable {
         var visual: GlyphVisual
     }
     var animatedRuns: [AnimatedRun] = []
+    /// Backing vocals under the current line (one row per group, so two in a row both show).
+    var backgrounds: [[(text: String, lit: Double)]] = []
     var dots: [GlyphVisual] = []
     var dotGroupScale: Double = 0
     var next: String?
@@ -302,16 +304,11 @@ struct PiPSnapshot: @unchecked Sendable {
                 dotGroupScale = visual?.dotGroupScale ?? 0
                 if !interlude { current = [(row.plainText, 1)] }
             case .syllable(let lead, _):
-                current = lead.enumerated().flatMap { w, word -> [(text: String, lit: Double)] in
-                    let syllables = word.syllables.map { syllable -> (text: String, lit: Double) in
-                        let lit: Double
-                        if time >= syllable.end { lit = 1 }
-                        else if time <= syllable.start { lit = 0 }
-                        else { lit = (time - syllable.start) / max(syllable.end - syllable.start, 0.01) }
-                        return (syllable.text, lit)
-                    }
-                    let gap: [(text: String, lit: Double)] = w == 0 ? [] : [(text: " ", lit: 1)]
-                    return gap + syllables
+                current = Self.runs(lead, at: time)
+                backgrounds = lyrics.lines.compactMap { line in
+                    guard line.isBackground, line.leadID == row.id,
+                          case .syllable(let words, _) = line.kind else { return nil }
+                    return Self.runs(words, at: time)
                 }
                 for (w, word) in lead.enumerated() {
                     if w > 0 { animatedRuns.append(AnimatedRun(text: " ", visual: GlyphVisual(gradient: 1))) }
@@ -343,6 +340,23 @@ struct PiPSnapshot: @unchecked Sendable {
             message = "Текст недоступен"
         case .idle:
             message = player.statusMessage ?? "Включите музыку в Spotify"
+        }
+    }
+}
+
+extension PiPSnapshot {
+    /// Syllables as (text, how lit 0…1) runs, with a space run between words.
+    static func runs(_ words: [PreparedWord], at time: Double) -> [(text: String, lit: Double)] {
+        words.enumerated().flatMap { w, word -> [(text: String, lit: Double)] in
+            let syllables = word.syllables.map { syllable -> (text: String, lit: Double) in
+                let lit: Double
+                if time >= syllable.end { lit = 1 }
+                else if time <= syllable.start { lit = 0 }
+                else { lit = (time - syllable.start) / max(syllable.end - syllable.start, 0.01) }
+                return (syllable.text, lit)
+            }
+            let gap: [(text: String, lit: Double)] = w == 0 ? [] : [(text: " ", lit: 1)]
+            return gap + syllables
         }
     }
 }
@@ -515,14 +529,18 @@ final class PiPFrameRenderer {
             [Row(id: value.lineID, text: value.interlude ? "•  •  •" : value.current.map(\.text).joined(), offset: 0)] +
                 value.neighbors.map { Row(id: $0.id, text: $0.text, offset: $0.offset) }
         }
-        func y(_ offset: Int) -> CGFloat {
+        // Room for backing vocal rows under the active line: half from the active slot, half by
+        // moving the rows below it down.
+        func extra(_ value: PiPSnapshot) -> CGFloat { CGFloat(value.backgrounds.count) * Self.backgroundRowHeight }
+        func y(_ offset: Int, _ value: PiPSnapshot) -> CGFloat {
             switch offset {
             case ..<0: return 34
             case 0: return 104
-            case 1: return 232
-            default: return 286
+            case 1: return 232 + extra(value) / 2
+            default: return 286 + extra(value) / 2
             }
         }
+        let activeHeight = 116 - extra(snapshot) / 2
         func emphasis(_ offset: Int) -> CGFloat { offset == 0 ? 1 : 0 }
         let targetRows = rows(snapshot)
         let oldRows = previous.map(rows) ?? targetRows
@@ -532,8 +550,8 @@ final class PiPFrameRenderer {
         for row in allRows where !row.text.isEmpty {
             let old = oldByID[row.id]
             let exists = targetIDs.contains(row.id)
-            let startY = old.map { y($0.offset) } ?? (y(row.offset) + 44)
-            let endY = exists ? y(row.offset) : -50
+            let startY = old.map { y($0.offset, previous ?? snapshot) } ?? (y(row.offset, snapshot) + 44)
+            let endY = exists ? y(row.offset, snapshot) : -50
             let rowY = startY + (endY - startY) * progress
             let startEmphasis = old.map { emphasis($0.offset) } ?? 0
             let endEmphasis = exists ? emphasis(row.offset) : 0
@@ -542,19 +560,20 @@ final class PiPFrameRenderer {
             context.saveGState()
             context.setAlpha(alpha)
             let weight: UIFont.Weight = active > 0.5 ? .bold : .semibold
-            let box = CGRect(x: inset, y: rowY, width: width, height: 48 + 68 * active)
+            let box = CGRect(x: inset, y: rowY, width: width, height: 48 + (activeHeight - 48) * active)
             // Long lines get a smaller font instead of being cut off with "…". Sizes are fitted
             // for the two slots and blended while a row moves between them.
             let small = fittedSize(row.text, preferred: 32, weight: .semibold, design: snapshot.fontDesign,
                                    box: CGSize(width: width, height: 48))
             let large = fittedSize(row.text, preferred: 44, weight: .bold, design: snapshot.fontDesign,
-                                   box: CGSize(width: width, height: 116))
+                                   box: CGSize(width: width, height: activeHeight))
             let size = (small + (large - small) * active).rounded()
             let textFont = font(size, weight, snapshot.fontDesign)
             if row.offset == 0, exists, snapshot.interlude, !snapshot.dots.isEmpty {
                 drawDots(snapshot, in: box, context: context)
             } else if row.offset == 0, exists, !snapshot.interlude {
-                drawSyllables(snapshot, font: textFont, in: box, context: context)
+                let used = drawSyllables(snapshot, font: textFont, in: box, context: context)
+                drawBackgroundVocals(snapshot, below: box.minY + used + 4, inset: inset, width: width)
             } else {
                 let opacity: CGFloat = 0.28 + 0.65 * active
                 NSAttributedString(string: row.text, attributes: [
@@ -565,8 +584,10 @@ final class PiPFrameRenderer {
         }
     }
 
+    /// Draws the active line and returns the height its text takes.
+    @discardableResult
     private func drawSyllables(_ snapshot: PiPSnapshot, font textFont: UIFont,
-                               in box: CGRect, context: CGContext) {
+                               in box: CGRect, context: CGContext) -> CGFloat {
         // Lay out once, then apply the main player's spring-driven transforms to each
         // syllable or emphasized letter without letting animation change wrapping.
         let runs = snapshot.animatedRuns.isEmpty
@@ -594,8 +615,9 @@ final class PiPFrameRenderer {
             layout.ensureLayout(for: container)
             textLayout = TextLayout(key: key, storage: storage, layout: layout, container: container, ranges: ranges)
         }
-        guard let cached = textLayout else { return }
+        guard let cached = textLayout else { return 0 }
         let storage = cached.storage, layout = cached.layout, container = cached.container, ranges = cached.ranges
+        let usedHeight = layout.usedRect(for: container).height
         let reduceMotion = UIAccessibility.isReduceMotionEnabled
         for (run, characters) in zip(runs, ranges) where characters.length > 0 {
             let glyphs = layout.glyphRange(forCharacterRange: characters, actualCharacterRange: nil)
@@ -642,6 +664,30 @@ final class PiPFrameRenderer {
                 context.restoreGState()
                 advance += fragment.width
             }
+        }
+        return usedHeight
+    }
+
+    private static let backgroundRowHeight: CGFloat = 32
+
+    /// Backing vocals under the active line, smaller and dimmer (`.bg-line` is 0.75× the lead
+    /// size at a lower alpha), lit syllable by syllable.
+    private func drawBackgroundVocals(_ snapshot: PiPSnapshot, below top: CGFloat, inset: CGFloat, width: CGFloat) {
+        for (index, runs) in snapshot.backgrounds.enumerated() {
+            let text = runs.map(\.text).joined()
+            let size = fittedSize(text, preferred: 26, weight: .semibold, design: snapshot.fontDesign,
+                                  box: CGSize(width: width, height: Self.backgroundRowHeight))
+            let font = font(size, .semibold, snapshot.fontDesign)
+            let line = NSMutableAttributedString()
+            for run in runs {
+                line.append(NSAttributedString(string: run.text, attributes: [
+                    .font: font,
+                    .foregroundColor: UIColor.white.withAlphaComponent(0.3 + 0.4 * CGFloat(run.lit)),
+                ]))
+            }
+            line.draw(with: CGRect(x: inset, y: top + CGFloat(index) * Self.backgroundRowHeight,
+                                   width: width, height: Self.backgroundRowHeight),
+                      options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
         }
     }
 
