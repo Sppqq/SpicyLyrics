@@ -91,8 +91,8 @@ final class AppSettings {
     var hideStaticLyrics: Bool { didSet { defaults.set(hideStaticLyrics, forKey: Keys.hideStatic) } }
     /// `HiddenLyricsView.rawValue`: what fills the screen where lyrics were hidden.
     var hiddenLyricsView: String { didSet { defaults.set(hiddenLyricsView, forKey: Keys.hiddenLyricsView) } }
-    /// `VisualizerStyle.rawValue`.
-    var visualizerStyle: String { didSet { defaults.set(visualizerStyle, forKey: Keys.visualizerStyle) } }
+    /// One synced line under the big cover.
+    var artworkLyricLine: Bool { didSet { defaults.set(artworkLyricLine, forKey: Keys.artworkLyricLine) } }
     /// The current line on the lock screen and in the Dynamic Island (Live Activity).
     var liveActivity: Bool { didSet { defaults.set(liveActivity, forKey: Keys.liveActivity) } }
     var liveActivityNextLine: Bool { didSet { defaults.set(liveActivityNextLine, forKey: Keys.liveActivityNextLine) } }
@@ -174,7 +174,7 @@ final class AppSettings {
             Keys.hideNotFound: false,
             Keys.hideStatic: false,
             Keys.hiddenLyricsView: HiddenLyricsView.background.rawValue,
-            Keys.visualizerStyle: VisualizerStyle.nebula.rawValue,
+            Keys.artworkLyricLine: true,
             Keys.autoSkip: AutoSkipMode.off.rawValue,
             Keys.liveActivity: false,
             Keys.liveActivityNextLine: true,
@@ -241,7 +241,7 @@ final class AppSettings {
         hideNotFoundNotice = defaults.bool(forKey: Keys.hideNotFound)
         hideStaticLyrics = defaults.bool(forKey: Keys.hideStatic)
         hiddenLyricsView = defaults.string(forKey: Keys.hiddenLyricsView) ?? HiddenLyricsView.background.rawValue
-        visualizerStyle = defaults.string(forKey: Keys.visualizerStyle) ?? VisualizerStyle.nebula.rawValue
+        artworkLyricLine = defaults.bool(forKey: Keys.artworkLyricLine)
         autoSkipMode = defaults.string(forKey: Keys.autoSkip) ?? AutoSkipMode.off.rawValue
         liveActivity = defaults.bool(forKey: Keys.liveActivity)
         liveActivityNextLine = defaults.bool(forKey: Keys.liveActivityNextLine)
@@ -386,7 +386,7 @@ final class AppSettings {
         static let hideNotFound = "hideNotFoundNotice"
         static let hideStatic = "hideStaticLyrics"
         static let hiddenLyricsView = "hiddenLyricsView"
-        static let visualizerStyle = "visualizerStyle"
+        static let artworkLyricLine = "artworkLyricLine"
         static let autoSkip = "autoSkipMode"
         static let liveActivity = "liveActivity"
         static let liveActivityNextLine = "liveActivityNextLine"
@@ -418,9 +418,9 @@ final class AppSettings {
 enum HiddenLyricsView: String, CaseIterable, Identifiable {
     /// Just the moving background.
     case background
-    /// The cover, as big as fits, over the background.
+    /// The cover, as big as fits, over the nebula.
     case artwork
-    /// The experimental visualizer.
+    /// The nebula alone.
     case visualizer
 
     var id: String { rawValue }
@@ -429,7 +429,7 @@ enum HiddenLyricsView: String, CaseIterable, Identifiable {
         switch self {
         case .background: return String(localized: "Фон")
         case .artwork: return String(localized: "Большая обложка")
-        case .visualizer: return String(localized: "Визуализатор")
+        case .visualizer: return String(localized: "Туманность")
         }
     }
 }

@@ -10,7 +10,10 @@ struct PlaybackBar: View {
     /// Called on every touch, so the auto-hide timer starts over.
     var onInteraction: () -> Void = {}
     var onShowQueue: () -> Void = {}
-    var onHideControls: () -> Void = {}
+    /// The bottom-left button: lyrics ⇄ big cover.
+    var onToggleLyrics: () -> Void = {}
+    /// Lyrics are on screen (the button is lit), not the big cover.
+    var lyricsShown = true
     /// False while the controls are faded out: the scrubber stops ticking.
     var isVisible = true
     /// Landscape: tighter spacing and no bottom icon row (it does not fit beside the lyrics).
@@ -52,15 +55,17 @@ struct PlaybackBar: View {
     private var accessoryRow: some View {
         HStack {
             Button {
-                onHideControls()
+                onInteraction()
+                onToggleLyrics()
             } label: {
+                // Lit while the lyrics show, like Apple Music's lyrics button.
                 Image(systemName: "quote.bubble.fill")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.black.opacity(0.75))
+                    .foregroundStyle(lyricsShown ? .black.opacity(0.75) : .white.opacity(0.6))
                     .frame(width: 34, height: 30)
-                    .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(.white.opacity(lyricsShown ? 0.85 : 0), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
-            .accessibilityLabel(String(localized: "Скрыть элементы управления"))
+            .accessibilityLabel(lyricsShown ? String(localized: "Показать обложку") : String(localized: "Показать текст"))
             Spacer()
             AirPlayButton()
                 .frame(width: 34, height: 30)

@@ -136,7 +136,6 @@ struct VisualizerUniforms {
     float time;      // runs with the music, slows almost to a stop on pause
     float progress;  // 0…1 through the song
     float energy;    // 0 paused … 1 playing, eased
-    float style;
 };
 
 static float3 stars(float2 p, float time, float density) {
@@ -172,99 +171,10 @@ static float3 nebula(float2 p, constant VisualizerUniforms &u) {
     return col;
 }
 
-/// One bar of a made-up spectrum: more in the lows, a hump in the mids, each bar wandering on
-/// its own noise (iOS gives no app Spotify's sound, so there is nothing real to measure).
-static float barLevel(float i, float count, float t, float energy) {
-    float x = i / count;
-    float shape = 0.5 * exp(-x * 2.4) + 0.28 * exp(-pow((x - 0.42) * 4.0, 2.0)) + 0.14;
-    float slow = valueNoise(float2(i * 0.37, t * 1.7));
-    float fast = valueNoise(float2(i * 0.13 + 17.0, t * 4.6));
-    float level = shape * (0.3 + 0.95 * slow) + 0.3 * shape * fast;
-    return clamp(level, 0.0, 1.0) * (0.2 + 0.8 * energy);
-}
-
-/// "Спектр": an equalizer along the bottom, mirrored in a dark floor.
-static float3 bars(float2 uv, float2 res, constant VisualizerUniforms &u) {
-    const float count = 40.0;
-    float margin = 0.06;
-    float x = (uv.x - margin) / (1.0 - 2.0 * margin);
-    float base = 0.32;
-    float3 col = mix(u.deep * 0.05, u.deep * 0.22, smoothstep(0.0, 1.0, uv.y));
-    // A soft glow behind the bars, brighter the louder they "play".
-    float avg = barLevel(5.0, count, u.time, u.energy);
-    col += u.vivid * 0.18 * avg * exp(-abs(uv.y - base - 0.15) * 4.0);
-    if (x < 0.0 || x > 1.0) return col;
-
-    float index = floor(x * count);
-    float local = fract(x * count);
-    float level = barLevel(index, count, u.time, u.energy);
-    // A slowly falling cap above each bar, like the classic analysers.
-    float peak = max(level, max(barLevel(index, count, u.time - 0.2, u.energy) * 0.97,
-                                barLevel(index, count, u.time - 0.4, u.energy) * 0.92));
-    float height = 0.5 * level;
-    float aspect = res.x / res.y;
-    float gap = smoothstep(0.12, 0.2, local) * smoothstep(0.88, 0.8, local);
-    float3 tint = mix(u.vivid, u.accent, smoothstep(0.0, 0.5, uv.y - base));
-
-    float above = uv.y - base;
-    if (above >= 0.0) {
-        float bar = step(above, height) * gap;
-        col = mix(col, tint * (0.75 + 0.5 * above / max(height, 0.01)), bar);
-        float capY = 0.5 * peak + 0.012;
-        float cap = smoothstep(0.006, 0.0, abs(above - capY)) * gap;
-        col += mix(u.accent, float3(1.0), 0.4) * cap * 0.9;
-        col += tint * 0.25 * gap * exp(-max(above - height, 0.0) * 30.0 / max(aspect, 0.4)) * step(height, above);
-    } else {
-        // The floor reflection, fading with depth.
-        float below = -above;
-        float bar = step(below, height * 0.6) * gap;
-        col = mix(col, tint * 0.35 * (1.0 - below / 0.25), bar * smoothstep(0.25, 0.0, below));
-    }
-    col += u.vivid * exp(-abs(above) * 220.0) * 0.5;
-    return col;
-}
-
-/// Radius of the cover in "Круг", in the shader's units (fraction of the height); the app puts
-/// the round cover exactly there.
-static float circleRadius(float2 res) {
-    return 0.27 * min(res.x, res.y) / res.y;
-}
-
-/// "Круг": bars all around the cover, mirrored left and right.
-static float3 circleBars(float2 p, float2 res, constant VisualizerUniforms &u) {
-    const float count = 36.0;
-    float radius = circleRadius(res);
-    float r = length(p);
-    float3 col = mix(u.deep * 0.25, u.deep * 0.04, smoothstep(0.0, 0.9, r));
-    // From the top, the same on both sides.
-    float angle = abs(atan2(p.x, p.y)) / M_PI_F;
-    float index = floor(angle * count);
-    float local = fract(angle * count);
-    float level = barLevel(index, count, u.time, u.energy);
-    float inner = radius * 1.06;
-    float length_ = radius * (0.08 + 0.55 * level);
-    float gap = smoothstep(0.15, 0.25, local) * smoothstep(0.85, 0.75, local);
-    float t = (r - inner) / max(length_, 1e-3);
-    float3 tint = mix(u.vivid, u.accent, clamp(t, 0.0, 1.0));
-    float bar = step(inner, r) * step(r, inner + length_) * gap;
-    col = mix(col, tint, bar);
-    // The cover's halo, breathing with the "music".
-    float halo = exp(-max(r - radius, 0.0) * 18.0) * step(radius, r);
-    col += u.vivid * halo * (0.25 + 0.5 * level * u.energy);
-    return col;
-}
-
 fragment half4 visualizerFragment(SurfaceVertex in [[stage_in]], constant VisualizerUniforms &u [[buffer(0)]]) {
     float2 frag = in.uv * u.resolution;
     float2 p = (frag - 0.5 * u.resolution) / u.resolution.y;
-    float3 col;
-    if (u.style < 0.5) {
-        col = nebula(p, u);
-    } else if (u.style < 1.5) {
-        col = bars(in.uv, u.resolution, u);
-    } else {
-        col = circleBars(p, u.resolution, u);
-    }
+    float3 col = nebula(p, u);
     // Dimmer while paused; a soft vignette; a little grain against banding.
     col *= 0.55 + 0.45 * u.energy;
     float2 vc = in.uv - 0.5;

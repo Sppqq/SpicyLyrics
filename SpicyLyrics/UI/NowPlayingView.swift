@@ -31,6 +31,12 @@ struct NowPlayingView: View {
     @State private var controlsHeight: CGFloat = 250
     @State private var landscapeControlsHeight: CGFloat = 150
     @State private var isLandscape = false
+    /// The bottom-left button put the big cover in place of the lyrics.
+    #if DEBUG
+    @State private var artworkMode = UserDefaults.standard.bool(forKey: "demoArtworkMode")
+    #else
+    @State private var artworkMode = false
+    #endif
 
     private static let chromeAnimation = Animation.easeInOut(duration: 0.45)
 
@@ -64,8 +70,7 @@ struct NowPlayingView: View {
                 // Experimental: a visualizer where the lyrics were hidden.
                 ZStack {
                     if showVisualizer {
-                        CoverVisualizerView(style: VisualizerStyle(rawValue: settings.visualizerStyle) ?? .nebula,
-                                            player: player, reduced: reduced)
+                        CoverVisualizerView(player: player, reduced: reduced, dim: settings.backgroundDim)
                             .allowsHitTesting(false)
                             .transition(.opacity)
                     }
@@ -292,7 +297,21 @@ struct NowPlayingView: View {
 
     /// The experimental visualizer fills in for lyrics hidden by the user's choice.
     private var showVisualizer: Bool {
-        settings.hiddenLyricsView == HiddenLyricsView.visualizer.rawValue && lyricsHidden && CoverVisualizer.isSupported
+        CoverVisualizer.isSupported
+            && (bigArtworkShown || (lyricsHidden && settings.hiddenLyricsView == HiddenLyricsView.visualizer.rawValue))
+    }
+
+    /// The big cover instead of the lyrics: chosen with the bottom-left button, or the setting
+    /// for songs whose lyrics are hidden.
+    private var bigArtworkShown: Bool {
+        artworkMode || (lyricsHidden && settings.hiddenLyricsView == HiddenLyricsView.artwork.rawValue)
+    }
+
+    /// Synced lyrics for the line under the big cover.
+    private var artworkLyrics: PreparedLyrics? {
+        guard settings.artworkLyricLine, case .loaded(let lyrics) = player.lyricsState,
+              lyrics.kind != .static, !lyrics.lines.isEmpty, !lyricsHidden else { return nil }
+        return lyrics
     }
 
     /// Landscape with hidden lyrics: the controls fade away too, leaving the background alone.
@@ -415,7 +434,7 @@ struct NowPlayingView: View {
     // MARK: Landscape
 
     private func landscapeLayout(_ size: CGSize) -> some View {
-        let lyricsOnly = settings.landscapeLyricsOnly || lyricsHidden
+        let lyricsOnly = settings.landscapeLyricsOnly || lyricsHidden || bigArtworkShown
         let showTitle = settings.landscapeTitle && !lyricsOnly
         let column = min(size.width * 0.4, 420)
         let blockWidth = column - 40
@@ -498,7 +517,11 @@ struct NowPlayingView: View {
     /// Small artwork and title. Tap to pick a track, swipe sideways to skip.
     private var trackInfo: some View {
         HStack(spacing: 12) {
-            artwork(side: 54, cornerRadius: 6)
+            // The big cover is on screen: no need for the small one.
+            if !bigArtworkShown {
+                artwork(side: 54, cornerRadius: 6)
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
+            }
             titleBlock
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -631,7 +654,10 @@ struct NowPlayingView: View {
         PlaybackBar(
             onInteraction: { showChrome() },
             onShowQueue: { showPicker = true },
-            onHideControls: { hideChrome() },
+            onToggleLyrics: {
+                withAnimation(.easeInOut(duration: 0.45)) { artworkMode.toggle() }
+            },
+            lyricsShown: !bigArtworkShown,
             isVisible: chromeVisible,
             compact: compact
         )
@@ -660,10 +686,10 @@ struct NowPlayingView: View {
 
     @ViewBuilder
     private func lyricsArea(topInset: CGFloat, bottomInset: CGFloat, horizontalPadding: CGFloat) -> some View {
-        if lyricsHidden {
+        if bigArtworkShown || lyricsHidden {
             ZStack {
                 Color.clear
-                if settings.hiddenLyricsView == HiddenLyricsView.artwork.rawValue {
+                if bigArtworkShown {
                     bigArtwork(topInset: topInset, bottomInset: bottomInset)
                         .transition(.opacity)
                 }
@@ -677,21 +703,34 @@ struct NowPlayingView: View {
         }
     }
 
-    /// A song without lyrics shown: its cover, as big as the free space allows, over the moving
-    /// background. It grows when the controls hide and sinks back a little on pause, like Apple
+    /// The cover, as big as the free space allows, over the nebula; optionally one synced line
+    /// under it. It grows when the controls hide and sinks back a little on pause, like Apple
     /// Music; a new song's cover fades in over the old one.
     private func bigArtwork(topInset: CGFloat, bottomInset: CGFloat) -> some View {
         GeometryReader { geometry in
             let margin: CGFloat = isLandscape ? 24 : 28
             let freeHeight = geometry.size.height - topInset - bottomInset
-            let side = max(0, min(geometry.size.width - margin * 2, freeHeight - margin * 2, 720))
-            ZStack {
-                artwork(side: side, cornerRadius: max(10, side * 0.035))
-                    .id(player.artworkID)
-                    .transition(.opacity)
+            let lyrics = artworkLyrics
+            let lineFont: CGFloat = isLandscape ? 20 : 24
+            // Room for two lines and a translation under the cover.
+            let lineHeight: CGFloat = lyrics == nil ? 0 : lineFont * 3.6
+            let gap: CGFloat = lyrics == nil ? 0 : 20
+            let side = max(0, min(geometry.size.width - margin * 2, freeHeight - margin * 2 - lineHeight - gap, 720))
+            VStack(spacing: gap) {
+                ZStack {
+                    artwork(side: side, cornerRadius: max(10, side * 0.035))
+                        .id(player.artworkID)
+                        .transition(.opacity)
+                }
+                .shadow(color: .black.opacity(0.4), radius: 30, y: 16)
+                .scaleEffect(player.isPlaying ? 1 : 0.88)
+                if let lyrics {
+                    ArtworkLyricLine(lyrics: lyrics, player: player, settings: settings, fontSize: lineFont)
+                        .id(player.lyricsRevision)
+                        .frame(width: side, height: lineHeight)
+                        .transition(.opacity)
+                }
             }
-            .shadow(color: .black.opacity(0.4), radius: 30, y: 16)
-            .scaleEffect(player.isPlaying ? 1 : 0.88)
             .position(x: geometry.size.width / 2, y: topInset + freeHeight / 2)
             .animation(.spring(response: 0.5, dampingFraction: 0.75), value: player.isPlaying)
             .animation(.easeInOut(duration: 0.6), value: player.artworkID)

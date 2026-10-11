@@ -2,58 +2,17 @@ import MetalKit
 import SwiftUI
 import UIKit
 
-/// Looks of the visualizer that can replace the empty screen of a song without lyrics.
-enum VisualizerStyle: String, CaseIterable, Identifiable {
-    case nebula, bars, circle
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .nebula: return String(localized: "Туманность")
-        case .bars: return String(localized: "Спектр")
-        case .circle: return String(localized: "Круг")
-        }
-    }
-
-    fileprivate var index: Float {
-        switch self {
-        case .nebula: return 0
-        case .bars: return 1
-        case .circle: return 2
-        }
-    }
-}
-
-/// The visualizer full screen; "Круг" puts the round cover in the middle of its ring of bars.
+/// The nebula full screen: behind the big cover, or alone where lyrics were hidden.
 struct CoverVisualizerView: View {
-    let style: VisualizerStyle
     let player: PlayerModel
     var reduced = false
+    /// The background's darkening, so white lines stay readable on bright covers.
+    var dim: Double = 0
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                CoverVisualizer(style: style, image: player.backgroundArtwork, imageID: player.artworkID,
-                                player: player, reduced: reduced)
-                if style == .circle, let artwork = player.artwork {
-                    // `circleRadius` in Shaders.metal: 27 % of the shorter side.
-                    let side = min(geometry.size.width, geometry.size.height) * 0.54
-                    Image(uiImage: artwork)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: side, height: side)
-                        .clipShape(Circle())
-                        .id(player.artworkID)
-                        .transition(.opacity)
-                        .scaleEffect(player.isPlaying ? 1 : 0.94)
-                        .animation(.spring(response: 0.5, dampingFraction: 0.75), value: player.isPlaying)
-                        .animation(.easeInOut(duration: 0.6), value: player.artworkID)
-                }
-            }
-            .frame(width: geometry.size.width, height: geometry.size.height)
-        }
-        .ignoresSafeArea()
+        CoverVisualizer(image: player.backgroundArtwork, imageID: player.artworkID, player: player, reduced: reduced)
+            .overlay(Color.black.opacity(dim))
+            .ignoresSafeArea()
     }
 }
 
@@ -61,7 +20,6 @@ struct CoverVisualizerView: View {
 /// app hear what Spotify plays, so it can't follow the sound itself; it follows the playback
 /// instead: it runs while the song plays and settles almost to a stop on pause.
 struct CoverVisualizer: UIViewRepresentable {
-    let style: VisualizerStyle
     let image: UIImage?
     let imageID: String
     let player: PlayerModel
@@ -82,7 +40,6 @@ struct CoverVisualizer: UIViewRepresentable {
     }
 
     func updateUIView(_ view: VisualizerSurface, context: Context) {
-        view.style = style
         view.playing = player.isPlaying
         view.reduced = reduced
         view.setImage(image, id: imageID)
@@ -103,10 +60,8 @@ final class VisualizerSurface: ShaderSurface {
         var time: Float
         var progress: Float
         var energy: Float
-        var style: Float
     }
 
-    var style: VisualizerStyle = .nebula
     var playing = false { didSet { updateRate() } }
     var reduced = false { didSet { updateRate() } }
     var progress: () -> Double = { 0 }
@@ -173,7 +128,7 @@ final class VisualizerSurface: ShaderSurface {
         var uniforms = Uniforms(deep: palette.deep, vivid: palette.vivid, accent: palette.accent,
                                 resolution: SIMD2(Float(drawableSize.width), Float(drawableSize.height)),
                                 time: Float(time.truncatingRemainder(dividingBy: 10_000)),
-                                progress: Float(progress()), energy: Float(energy), style: style.index)
+                                progress: Float(progress()), energy: Float(energy))
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
     }
 }

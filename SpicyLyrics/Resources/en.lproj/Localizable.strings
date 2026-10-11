@@ -199,7 +199,6 @@
 "Скопировать строку" = "Copy Line";
 "Скопируйте Client ID" = "Copy the Client ID";
 "Скорость движения" = "Motion speed";
-"Скрыть элементы управления" = "Hide Controls";
 "Слева от текста" = "Beside the Lyrics";
 "Следующий трек" = "Next Track";
 "Слушать" = "Play";
@@ -368,14 +367,8 @@
 "Пропущено: %@" = "Skipped: %@";
 "Пропускать песни" = "Skip Songs";
 "Песня, у которой нет синхронизации в Spicy Lyrics (текст не найден, есть только в LRCLIB или без таймингов), пропускается сама. Свои TTML считаются. Не пропускаются песни, выбранные вручную или возвращённые кнопкой «назад»; после %lld пропусков подряд пропуск встаёт на паузу." = "A song with no Spicy Lyrics sync (no lyrics, only LRCLIB's, or untimed) is skipped by itself. Your own TTML counts. Songs you picked or went back to are never skipped; after %lld skips in a row skipping pauses.";
-"Визуализатор" = "Visualizer";
-"Стиль" = "Style";
 "Большая обложка" = "Big Artwork";
 "Вместо текста" = "Instead of Lyrics";
-"Большая обложка — во весь экран поверх фона, как в Apple Music: становится больше, когда кнопки прячутся, и чуть уменьшается на паузе." = "Big artwork fills the screen over the background, like Apple Music: it grows when the controls hide and shrinks a little on pause.";
-"Спектр" = "Spectrum";
-"Круг" = "Circle";
-"Экспериментально: визуализатор в цветах обложки. iOS не даёт приложениям слышать звук Spotify, поэтому он следует за воспроизведением, а не за громкостью: двигается, пока песня играет, и почти замирает на паузе." = "Experimental: a visualizer in the cover's colours. iOS lets no app hear Spotify's sound, so it follows the playback rather than the volume: it moves while the song plays and nearly stops on pause.";
 "Пропущено песен без синхронизации: %lld" = "Skipped songs without sync: %lld";
 "Экран блокировки" = "Lock Screen";
 "Текст на экране блокировки" = "Lyrics on the Lock Screen";
@@ -384,3 +377,8 @@
 "Текущая строка на экране блокировки и в Dynamic Island (Live Activity). Пока она включена, приложение работает в фоне и следит за Spotify (играет беззвучный звук, который не мешает музыке), поэтому батарея тратится чуть быстрее. Если смахнуть её с экрана блокировки, она вернётся при следующем открытии приложения." = "The current line on the Lock Screen and in the Dynamic Island (Live Activity). While it is on, the app runs in the background and keeps following Spotify (it plays a silent sound that doesn't disturb the music), so the battery drains a little faster. Swipe it away on the Lock Screen and it comes back the next time you open the app.";
 "Следующая строка" = "Next Line";
 "Что показывать" = "Show";
+"Большая обложка — во весь экран поверх туманности в цветах обложки, как в Apple Music: становится больше, когда кнопки прячутся, и чуть уменьшается на паузе. Туманность течёт, пока песня играет, и почти замирает на паузе." = "Big artwork fills the screen over a nebula in the cover's colours, like Apple Music: it grows when the controls hide and shrinks a little on pause. The nebula flows while the song plays and nearly stops on pause.";
+"Строка текста под обложкой" = "Lyric Line Under the Artwork";
+"Кнопка с цитатой внизу слева переключает текст и большую обложку. Под обложкой — строка, которую поют, с теми же анимациями, что и в тексте." = "The quote button at the bottom left switches between the lyrics and the big artwork. Under the artwork is the line being sung, with the same animations as the lyrics.";
+"Показать обложку" = "Show Artwork";
+"Показать текст" = "Show Lyrics";

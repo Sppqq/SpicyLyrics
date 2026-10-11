@@ -377,6 +377,14 @@ private struct InterfaceSettings: View {
             }
 
             Section {
+                Toggle(String(localized: "Строка текста под обложкой"), isOn: $settings.artworkLyricLine)
+            } header: {
+                Text(String(localized: "Большая обложка"))
+            } footer: {
+                Text(String(localized: "Кнопка с цитатой внизу слева переключает текст и большую обложку. Под обложкой — строка, которую поют, с теми же анимациями, что и в тексте."))
+            }
+
+            Section {
                 Toggle(String(localized: "Полоска громкости"), isOn: $settings.showVolumeSlider)
                 Toggle(String(localized: "Не гасить экран"), isOn: $settings.keepScreenOn)
             }
@@ -735,17 +743,8 @@ private struct SourceSettings: View {
                             Text(view.title).tag(view.rawValue)
                         }
                     }
-                    if settings.hiddenLyricsView == HiddenLyricsView.visualizer.rawValue {
-                        Picker(String(localized: "Стиль"), selection: $settings.visualizerStyle) {
-                            ForEach(VisualizerStyle.allCases) { style in
-                                Text(style.title).tag(style.rawValue)
-                            }
-                        }
-                    }
                 } footer: {
-                    Text(settings.hiddenLyricsView == HiddenLyricsView.visualizer.rawValue
-                         ? String(localized: "Экспериментально: визуализатор в цветах обложки. iOS не даёт приложениям слышать звук Spotify, поэтому он следует за воспроизведением, а не за громкостью: двигается, пока песня играет, и почти замирает на паузе.")
-                         : String(localized: "Большая обложка — во весь экран поверх фона, как в Apple Music: становится больше, когда кнопки прячутся, и чуть уменьшается на паузе."))
+                    Text(String(localized: "Большая обложка — во весь экран поверх туманности в цветах обложки, как в Apple Music: становится больше, когда кнопки прячутся, и чуть уменьшается на паузе. Туманность течёт, пока песня играет, и почти замирает на паузе."))
                 }
             }
 
