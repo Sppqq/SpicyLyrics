@@ -49,6 +49,79 @@ Songs: Nemo — The Code, Bao The Whale &amp; Neuro-sama — Mesmerizer, KIDSCRY
 the app follows Spotify instead. On-device translation (iOS 18+) and
 Picture in Picture work on a phone only.</sub>
 
+## Install
+
+The app is not on the App Store: you sideload it with **AltStore** or **SideStore** and get
+updates from this repository's source, like from an App Store page.
+
+**You need:** an iPhone or iPad on **iOS 17** or newer, the Spotify app with **Premium**, and a
+computer for the first AltStore / SideStore setup (Windows or Mac; SideStore needs it only once).
+
+### 1. Install AltStore or SideStore
+
+- **AltStore** — [altstore.io](https://altstore.io): install AltServer on your computer and
+  follow its guide to put AltStore on the phone.
+- **SideStore** — [sidestore.io](https://sidestore.io): after the one-time setup it signs and
+  refreshes apps on the phone itself, no computer nearby.
+
+### 2. Add the Spicy Lyrics source
+
+| Channel | What you get | Source URL |
+| --- | --- | --- |
+| **Stable** (recommended) | Tested releases | `https://github.com/Sppqq/spicy-lyrics-ios/releases/latest/download/altstore-source.json` |
+| **Alpha & Beta** | Every build from `main`, the newest first (can be rough) | `https://github.com/Sppqq/spicy-lyrics-ios/releases/latest/download/altstore-source-testing.json` |
+
+Copy a URL, then in AltStore or SideStore open **Sources → +**, paste it and tap **Add**.
+Both channels install the same app, so add **one** of them.
+
+### 3. Install the app
+
+Open the source, tap **Spicy Lyrics → Free / Install** and wait for it to sign and install.
+
+### 4. First launch: connect Spotify
+
+Spotify lets every developer app sign in only 5 accounts, so the app uses **your own** free
+Spotify developer app. It walks you through it on first launch (about two minutes); the steps
+are also under [Who can sign in](#who-can-sign-in). For the exact timing from the Spotify app on
+the same phone (App Remote):
+
+1. In your app on [developer.spotify.com](https://developer.spotify.com/dashboard) →
+   **Settings**, tick **iOS** as well.
+2. Add the **Bundle ID** shown in Spicy Lyrics → *Settings → Sync → If it won't connect*
+   (AltStore and SideStore change it when they install) and the redirect URI
+   `spicylyrics-ios://callback`.
+3. Sign in once more in Spicy Lyrics if it says so.
+
+### Updates
+
+AltStore / SideStore check the source and show **Update** under **My Apps** when a new version
+is out (*Update All* updates everything at once). What's new is in each
+[release](https://github.com/Sppqq/spicy-lyrics-ios/releases). Your settings and sign-in stay.
+
+### Keep it running
+
+A free Apple ID signs apps for **7 days**. AltStore refreshes them in the background while
+AltServer runs on the same Wi-Fi; SideStore refreshes on the phone. If the app stops opening,
+open AltStore / SideStore → **My Apps → Refresh All**. A free Apple ID can also have only
+3 sideloaded apps at a time.
+
+### Without AltStore
+
+Every [release](https://github.com/Sppqq/spicy-lyrics-ios/releases) has an unsigned
+`SpicyLyrics-<version>-unsigned.ipa`; sign it with any sideloading tool (Sideloadly, a paid
+developer account, …). Or [build it yourself](#building).
+
+### Troubleshooting
+
+- **The app doesn't open after a week** — refresh it (see above).
+- **"INVALID_CLIENT" or a 403 when signing in** — the Client ID, redirect URI or User Management
+  entry in your Spotify developer app is off; see [Who can sign in](#who-can-sign-in).
+- **The sync badge says "SDK: sign in again"** — your login predates App Remote: sign in again.
+- **"SDK: no link"** — Spotify must be playing on this phone; check step 4, then tap the badge →
+  *Open Spotify and Connect*.
+- **Something else** — *Settings → Log → Share Log File*, and open an
+  [issue](https://github.com/Sppqq/spicy-lyrics-ios/issues) with it.
+
 ## Ported Features
 
 These features work, but still need testing and refinement.
@@ -132,21 +205,6 @@ cannot change it. A Spotify Client ID is never built in (see *Who can sign in*).
 XOR-masked, so it is not readable in `Info.plist` or the binary's strings. This only deters
 casual inspection: it is a public client key that the app sends over the network anyway.
 Never put a Spicy Lyrics secret key (`sl_sk_…`) there.
-
-## Installing with AltStore or SideStore
-
-Choose one update channel in AltStore or SideStore:
-
-| Channel | Source URL |
-| --- | --- |
-| Stable | https://github.com/Sppqq/spicy-lyrics-ios/releases/latest/download/altstore-source.json |
-| Alpha & Beta | https://github.com/Sppqq/spicy-lyrics-ios/releases/latest/download/altstore-source-testing.json |
-
-Both sources refresh after each published build. The testing source includes alpha,
-beta and stable releases, with the newest version first. Beta builds will appear when
-published; currently testing builds are alphas. Both channels install the same app,
-so choose one source for its updates rather than expecting two separate installations.
-The original stable source URL remains unchanged.
 
 ## Building
 
