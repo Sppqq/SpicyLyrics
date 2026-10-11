@@ -72,6 +72,9 @@ final class PlayerModel {
     @ObservationIgnored private var frozenReports = false
     /// Consecutive live reports far behind our clock (a seek back on another device).
     @ObservationIgnored private var behindStreak = 0
+    /// Quick follow-up polls left after the clock was set from a single report: one answer is
+    /// only as exact as half its round trip, a few more narrow it down.
+    @ObservationIgnored private var refineSamples = 0
     @ObservationIgnored private var holdUntil: CFTimeInterval = 0
     @ObservationIgnored private var backoffUntil: CFTimeInterval = 0
 
@@ -80,6 +83,9 @@ final class PlayerModel {
     private static let resyncThreshold: Double = 1.0
     /// Being behind by less than this is noise.
     private static let catchUpThreshold: Double = 0.12
+    /// While refining, smaller corrections count.
+    private static let refineThreshold: Double = 0.03
+    private static let refineCount = 3
     /// A live report this far behind us, twice in a row, is a seek back elsewhere.
     private static let seekBackThreshold: Double = 2.5
 
@@ -198,6 +204,7 @@ final class PlayerModel {
             // Play, pause, a new song or the first report after the background: Spotify's
             // position is exact at these moments.
             setClock(measured, at: now)
+            refineSamples = snapshot.isPlaying && !frozenReports ? Self.refineCount : 0
         } else if frozenReports {
             // Keep our own clock; the frozen value only says where the last change happened.
             if stampChanged, let stampEstimate {
@@ -215,9 +222,11 @@ final class PlayerModel {
             // report ahead of us means we are behind; one behind us is old news, unless it is far
             // behind twice in a row (a seek back on another device).
             let drift = measured - target
+            let refining = refineSamples > 0
+            refineSamples = max(0, refineSamples - 1)
             if drift > Self.resyncThreshold {
                 setClock(measured, at: now)
-            } else if drift > Self.catchUpThreshold {
+            } else if drift > (refining ? Self.refineThreshold : Self.catchUpThreshold) {
                 blend(to: measured, predicted: predicted, now: now)
                 behindStreak = 0
             } else if drift < -Self.seekBackThreshold {
@@ -294,6 +303,7 @@ final class PlayerModel {
     /// so the next song is picked up promptly.
     private func nextPollInterval() -> Double {
         guard isPlaying else { return 3 }
+        if refineSamples > 0 { return 0.35 }
         if let duration = track?.duration, duration > 0 {
             let remaining = duration - playbackPosition()
             if remaining > 0, remaining < 2 { return max(0.5, remaining + 0.3) }
