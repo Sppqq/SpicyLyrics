@@ -15,4 +15,9 @@ enum AudioRoute {
     static var outputLatency: Double {
         min(max(AVAudioSession.sharedInstance().outputLatency, 0), 0.5)
     }
+
+    /// Name of the current output ("iPhone Speaker", "AirPods Pro").
+    static var outputName: String {
+        AVAudioSession.sharedInstance().currentRoute.outputs.first?.portName ?? "?"
+    }
 }

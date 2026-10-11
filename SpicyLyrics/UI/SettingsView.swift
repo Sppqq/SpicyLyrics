@@ -473,6 +473,7 @@ private struct GestureSettings: View {
 
 private struct SyncSettings: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(PlayerModel.self) private var player
     @Environment(SpotifyAppRemote.self) private var appRemote
     @EnvironmentObject private var auth: SpotifyAuth
 
@@ -559,6 +560,10 @@ private struct SyncSettings: View {
 
             Section {
                 Toggle(String(localized: "Учитывать задержку наушников"), isOn: $settings.compensateOutputLatency)
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    LabeledContent(AudioRoute.outputName,
+                                   value: String(localized: "\(Int((player.appliedOutputLatency * 1000).rounded())) мс"))
+                }
             } footer: {
                 Text(String(localized: "Когда Spotify играет на этом iPhone, задержка Bluetooth-наушников вычитается автоматически."))
             }

@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import Observation
 import QuartzCore
 import UIKit
@@ -119,6 +120,18 @@ final class PlayerModel {
         self.lyrics = lyrics
         self.settings = settings
         self.localLyrics = localLyrics
+        outputLatency = AudioRoute.outputLatency
+        // Headphones connected or removed: the delay changes now, not at the next Web API poll
+        // (which App Remote slows to every 5 s).
+        routeObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.outputLatency = AudioRoute.outputLatency
+                SyncLog.shared.add("audio", "route \(AudioRoute.outputName), latency \(self.outputLatency.signedMs)")
+            }
+        }
     }
 
     // MARK: Clock
@@ -126,8 +139,7 @@ final class PlayerModel {
     /// Lyrics clock in seconds at media time `now`: playback position plus the user's offset,
     /// minus the audio output's delay when Spotify plays on this phone (Bluetooth headphones).
     func position(at now: CFTimeInterval = CACurrentMediaTime()) -> Double {
-        let latency = settings.compensateOutputLatency && playingOnThisPhone ? outputLatency : 0
-        return playbackPosition(at: now) + settings.timingOffsetMs / 1000 - latency
+        playbackPosition(at: now) + settings.timingOffsetMs / 1000 - appliedOutputLatency
     }
 
     /// True from (re)starting the poll until Spotify has answered: what is on screen may be an
@@ -137,6 +149,12 @@ final class PlayerModel {
     private(set) var translations: [String: String] = [:]
     @ObservationIgnored private var outputLatency: Double = 0
     @ObservationIgnored private var playingOnThisPhone = false
+    @ObservationIgnored private var routeObserver: NSObjectProtocol?
+
+    /// The headphone delay subtracted from the clock right now (0 when it does not apply).
+    var appliedOutputLatency: Double {
+        settings.compensateOutputLatency && playingOnThisPhone ? outputLatency : 0
+    }
 
     /// Spotify's playback position in seconds at media time `now`.
     func playbackPosition(at now: CFTimeInterval = CACurrentMediaTime()) -> Double {
