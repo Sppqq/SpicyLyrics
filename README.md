@@ -54,9 +54,8 @@ The app connects through the official **Spotify Web API**:
 Spotify keeps every developer app in **Development Mode** unless the developer is an
 organization with 250,000+ monthly users, and a Development Mode app accepts at most
 **5 allowlisted accounts**; the app owner also needs Premium. The same applies to the iOS SDK.
-So the Client ID built into releases covers its owner and up to four friends. Everyone else
-signs in with **their own Client ID**; the app walks them through it
-(*Onboarding → Подключить свой Client ID*, or *Settings → Spotify*):
+So the app ships **without a Client ID of its own**: everyone signs in with **their own Client
+ID**, and the app walks them through it on first launch (*Settings → Spotify* to change it):
 
 1. You need **Spotify Premium** (Spotify requires it from the owner of a developer app).
 2. Open the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), sign in with
@@ -67,9 +66,8 @@ signs in with **their own Client ID**; the app walks them through it
    (up to five people can share your Client ID this way).
 5. **Basic Information → Client ID**: copy it (not the client secret) and paste it into the app.
 
-If an account that isn't on the built-in allowlist signs in, Spotify answers 403; the app then
-explains the limit and offers the guide. A shared-quota 429 (`QUOTA_EXCEEDED`) is reported the
-same way.
+If an account that isn't in your app's User Management list signs in, Spotify answers 403; the
+app then explains how to add it. A quota 429 (`QUOTA_EXCEEDED`) is reported too.
 
 ## Lyrics Source: Spicy Lyrics Key
 
@@ -81,19 +79,19 @@ same way.
   The server may reject tokens from third-party apps. If that happens, the app prompts
   you to add a key and falls back to LRCLIB for line-synced lyrics.
 
-## Built-in Keys
+## Built-in Key
 
-The Spotify Client ID and the Spicy Lyrics client key (`sl_pk_…`) can be built into the app, so
-users skip the setup and cannot change them:
+The Spicy Lyrics client key (`sl_pk_…`) can be built into the app, so users skip that setup and
+cannot change it. A Spotify Client ID is never built in (see *Who can sign in*).
 
 - **Locally:** copy `Config/Secrets.example.xcconfig` to `Config/Secrets.xcconfig` (git-ignored)
   and fill it in.
-- **GitHub Actions:** add the repository secrets `SPOTIFY_CLIENT_ID` and `SPICY_LYRICS_KEY`.
+- **GitHub Actions:** add the repository secret `SPICY_LYRICS_KEY`.
 
-`scripts/generate-bundled-keys.sh` turns them into a git-ignored Swift file with the values
-XOR-masked, so they are not readable in `Info.plist` or the binary's strings. This only deters
-casual inspection: both are public client identifiers that the app sends over the network anyway.
-Never put a Spotify client secret or a Spicy Lyrics secret key (`sl_sk_…`) there.
+`scripts/generate-bundled-keys.sh` turns it into a git-ignored Swift file with the value
+XOR-masked, so it is not readable in `Info.plist` or the binary's strings. This only deters
+casual inspection: it is a public client key that the app sends over the network anyway.
+Never put a Spicy Lyrics secret key (`sl_sk_…`) there.
 
 ## Installing with AltStore or SideStore
 

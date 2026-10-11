@@ -62,6 +62,11 @@ final class SpotifyAuth: NSObject, ObservableObject {
             tokens = stored
             isLoggedIn = stored.refreshToken != nil || stored.isFresh
         }
+        // Sessions from the former built-in Client ID (or with none set) are dropped: the app
+        // only works through the user's own Spotify app now.
+        if tokens != nil, !settings.hasValidClientID || tokens?.clientID != settings.effectiveSpotifyClientID {
+            logOut()
+        }
     }
 
     // MARK: Login
@@ -123,7 +128,7 @@ final class SpotifyAuth: NSObject, ObservableObject {
 
     /// A usable access token, refreshing it first when it is about to expire.
     func accessToken(forceRefresh: Bool = false) async throws -> String {
-        if let issuedTo = tokens?.clientID, issuedTo != settings.effectiveSpotifyClientID {
+        if tokens != nil, tokens?.clientID != settings.effectiveSpotifyClientID || !settings.hasValidClientID {
             // The Client ID changed in settings: this session belongs to the old one.
             logOut()
             throw SpotifyAuthError.notLoggedIn

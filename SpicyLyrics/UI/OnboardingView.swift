@@ -1,15 +1,13 @@
 import SwiftUI
 
-/// First run: sign in with the built-in Client ID, or set up one's own (step-by-step guide).
+/// First run: set up one's own Spotify Client ID (step-by-step guide), then sign in with it.
 struct OnboardingView: View {
     @EnvironmentObject private var auth: SpotifyAuth
     @Environment(AppSettings.self) private var settings
     @State private var error: String?
     @State private var busy = false
 
-    private var canLogIn: Bool {
-        settings.usingBundledClientID || AppSettings.isValidClientID(settings.spotifyClientID)
-    }
+    private var canLogIn: Bool { settings.hasValidClientID }
 
     var body: some View {
         NavigationStack {
@@ -38,20 +36,13 @@ struct OnboardingView: View {
                     NavigationLink {
                         SpotifySetupGuideView()
                     } label: {
-                        Label(canLogIn ? "Подключить свой Client ID" : "Настроить доступ к Spotify (5 минут)",
+                        Label(canLogIn ? "Сменить Client ID" : "Настроить доступ к Spotify (5 минут)",
                               systemImage: "key.horizontal")
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
                             .background(.white.opacity(canLogIn ? 0.12 : 0.9), in: Capsule())
                             .foregroundStyle(canLogIn ? .white : .black)
-                    }
-
-                    if settings.bundledSpotifyClientID != nil, settings.useOwnClientID {
-                        Button("Вернуться к встроенному доступу") {
-                            settings.useOwnClientID = false
-                        }
-                        .font(.callout.weight(.semibold))
                     }
 
                     Text("Приложение не связано со Spotify AB и с авторами Spicy Lyrics. Это неофициальный порт расширения Spicy Lyrics под AGPL-3.0.")
@@ -87,16 +78,12 @@ struct OnboardingView: View {
 
     @ViewBuilder
     private var accessExplanation: some View {
-        if settings.usingBundledClientID {
-            Text("Встроенный доступ Spotify рассчитан только на 5 человек. Если после входа появится ошибка доступа, подключите свой Client ID: это бесплатно, нужен Spotify Premium.")
-                .font(.callout)
-                .foregroundStyle(.white.opacity(0.7))
-        } else if canLogIn {
+        if canLogIn {
             Text("Используется ваш Client ID …\(String(settings.spotifyClientID.suffix(4))).")
                 .font(.callout)
                 .foregroundStyle(.white.opacity(0.7))
         } else {
-            Text("Чтобы приложение видело, что играет в Spotify, нужен свой Client ID из бесплатного кабинета разработчика Spotify. Пошаговая инструкция — по кнопке ниже.")
+            Text("Чтобы приложение видело, что играет в Spotify, нужно своё приложение в бесплатном кабинете разработчика Spotify и его Client ID. Это обязательно и занимает около 5 минут (нужен Spotify Premium). Пошаговая инструкция — по кнопке ниже.")
                 .font(.callout)
                 .foregroundStyle(.white.opacity(0.7))
         }

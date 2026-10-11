@@ -1,9 +1,8 @@
-// Build-time keys. Leave empty here: this file is committed and the repository is public.
-// Put real values in Config/Secrets.xcconfig (git-ignored; see Secrets.example.xcconfig) or,
-// on CI, in the repository secrets SPOTIFY_CLIENT_ID / SPICY_LYRICS_KEY.
-// Both keys are public client identifiers, safe to ship inside the app. Never put a Spotify
-// client secret or a Spicy Lyrics secret key (sl_sk_…) here.
-SPOTIFY_CLIENT_ID =
+// Build-time key. Leave empty here: this file is committed and the repository is public.
+// Put the real value in Config/Secrets.xcconfig (git-ignored; see Secrets.example.xcconfig) or,
+// on CI, in the repository secret SPICY_LYRICS_KEY. It is a public client key, safe to ship.
+// Never put a Spicy Lyrics secret key (sl_sk_…) here. No Spotify Client ID is built in:
+// every user signs in with their own.
 SPICY_LYRICS_KEY =
 
 #include? "Secrets.xcconfig"

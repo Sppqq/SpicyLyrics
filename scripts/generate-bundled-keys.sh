@@ -1,10 +1,11 @@
 #!/bin/bash
-# Writes SpicyLyrics/Generated/BundledKeys+Generated.swift from the build-time keys, XOR-masked so they are
-# not readable as plain text in Info.plist or in the binary's strings.
+# Writes SpicyLyrics/Generated/BundledKeys+Generated.swift from the build-time Spicy Lyrics key,
+# XOR-masked so it is not readable as plain text in Info.plist or in the binary's strings.
+# No Spotify Client ID is ever built in: users bring their own.
 #
-# Keys come from the environment (Xcode exports build settings to script phases) or, failing
-# that, from Config/Secrets.xcconfig. Missing keys produce empty values; the app then asks for
-# them at runtime. Never prints the keys. The generated file is git-ignored.
+# The key comes from the environment (Xcode exports build settings to script phases) or, failing
+# that, from Config/Secrets.xcconfig. A missing key produces an empty value; the app then asks for
+# it at runtime. Never prints the key. The generated file is git-ignored.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -33,11 +34,10 @@ masked() {
     printf '(mask: [%s], data: [%s])' "${key%, }" "${data%, }"
 }
 
-spotify="$(setting SPOTIFY_CLIENT_ID)"
 spicy="$(setting SPICY_LYRICS_KEY)"
 
-# Regenerate only when the keys change, so builds don't recompile this file every time.
-fingerprint="$(printf '%s|%s' "$spotify" "$spicy" | shasum -a 256 | cut -c1-16)"
+# Regenerate only when the key changes, so builds don't recompile this file every time.
+fingerprint="$(printf 'v2|%s' "$spicy" | shasum -a 256 | cut -c1-16)"
 if [ -f "$out" ] && grep -q "fingerprint: $fingerprint" "$out"; then
     exit 0
 fi
@@ -48,7 +48,6 @@ cat > "$out" <<SWIFT
 // fingerprint: $fingerprint
 
 extension BundledKeys {
-    static let maskedSpotifyClientID: Masked = $(masked "$spotify")
     static let maskedSpicyLyricsKey: Masked = $(masked "$spicy")
 }
 SWIFT

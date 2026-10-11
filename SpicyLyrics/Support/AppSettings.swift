@@ -7,10 +7,8 @@ import Observation
 final class AppSettings {
     private let defaults: UserDefaults
 
-    /// The user's own Client ID (from their own Spotify developer app).
+    /// The user's own Client ID (from their own Spotify developer app). Required: none is built in.
     var spotifyClientID: String { didSet { defaults.set(spotifyClientID, forKey: Keys.clientID) } }
-    /// Use `spotifyClientID` instead of the built-in one (whose allowlist holds only five people).
-    var useOwnClientID: Bool { didSet { defaults.set(useOwnClientID, forKey: Keys.useOwnClientID) } }
     var spicyLyricsKey: String { didSet { defaults.set(spicyLyricsKey, forKey: Keys.spicyKey) } }
     /// Shifts lyrics against the playback clock, in milliseconds. Positive = lyrics earlier.
     var timingOffsetMs: Double { didSet { defaults.set(timingOffsetMs, forKey: Keys.offset) } }
@@ -73,7 +71,6 @@ final class AppSettings {
 
     /// Keys baked in at build time from `Config/Secrets.xcconfig` or CI secrets (may be empty).
     /// When present they are fixed: the app ignores anything typed in settings.
-    let bundledSpotifyClientID = BundledKeys.spotifyClientID
     let bundledSpicyLyricsKey = BundledKeys.spicyLyricsKey.flatMap(AppSettings.clientKey)
 
     init(defaults: UserDefaults = .standard) {
@@ -89,7 +86,6 @@ final class AppSettings {
             Keys.lrclib: true,
             Keys.keepScreenOn: true,
             Keys.autoHide: true,
-            Keys.useOwnClientID: false,
             Keys.landscapeArtwork: true,
             Keys.powerSaving: false,
             Keys.volumeSlider: true,
@@ -115,7 +111,6 @@ final class AppSettings {
         ])
         spotifyClientID = defaults.string(forKey: Keys.clientID) ?? ""
         spicyLyricsKey = defaults.string(forKey: Keys.spicyKey) ?? ""
-        useOwnClientID = defaults.bool(forKey: Keys.useOwnClientID)
         timingOffsetMs = defaults.double(forKey: Keys.offset)
         fontSize = defaults.double(forKey: Keys.fontSize)
         blurInactiveLines = defaults.bool(forKey: Keys.blur)
@@ -150,21 +145,18 @@ final class AppSettings {
         autoHideDelay = defaults.double(forKey: Keys.autoHideDelay)
     }
 
-    /// The built-in Client ID, unless the user switched to their own (or none is built in).
+    /// The Client ID to sign in with: always the user's own.
     var effectiveSpotifyClientID: String {
-        if usingBundledClientID, let bundled = bundledSpotifyClientID { return bundled }
-        return spotifyClientID.trimmingCharacters(in: .whitespacesAndNewlines)
+        spotifyClientID.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    var usingBundledClientID: Bool { bundledSpotifyClientID != nil && !useOwnClientID }
+    var hasValidClientID: Bool { Self.isValidClientID(spotifyClientID) }
 
     /// A Spotify Client ID is 32 hex characters.
     static func isValidClientID(_ raw: String) -> Bool {
         let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.count == 32 && value.allSatisfy(\.isHexDigit)
     }
-
-    var hasBundledSpotifyClientID: Bool { bundledSpotifyClientID != nil }
 
     /// The Spicy Lyrics client key built into the app, else the one typed in settings.
     var validSpicyKey: String? {
@@ -210,7 +202,6 @@ final class AppSettings {
 
     private enum Keys {
         static let clientID = "spotifyClientID"
-        static let useOwnClientID = "useOwnClientID"
         static let spicyKey = "spicyLyricsKey"
         static let offset = "timingOffsetMs"
         static let fontSize = "fontSize"

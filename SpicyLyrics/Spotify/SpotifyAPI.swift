@@ -58,7 +58,7 @@ enum SpotifyAPIError: LocalizedError {
     case rateLimited(retryAfter: Double)
     /// The shared quota of the Client ID ran out (HTTP 429 `QUOTA_EXCEEDED`).
     case quotaExceeded(retryAfter: Double)
-    /// The account isn't on the Client ID's allowlist (Development Mode allows five users).
+    /// The account isn't in the Client ID's User Management list (Development Mode).
     case userNotRegistered
     case missingScope
     case network(URLError)
@@ -70,9 +70,9 @@ enum SpotifyAPIError: LocalizedError {
         case .noActiveDevice: return "Нет активного устройства Spotify. Включите музыку в приложении Spotify."
         case .rateLimited: return "Spotify временно ограничил запросы, повторим позже."
         case .quotaExceeded:
-            return "У этого Client ID закончился лимит запросов Spotify. Подождите немного или подключите свой Client ID в настройках."
+            return "У вашего Client ID закончился лимит запросов Spotify. Подождите немного."
         case .userNotRegistered:
-            return "Этот аккаунт Spotify не добавлен во встроенный доступ: Spotify пускает в него только 5 человек. Подключите свой Client ID, это бесплатно и занимает 5 минут."
+            return "Этот аккаунт Spotify не добавлен в ваше приложение Spotify. В developer.spotify.com откройте приложение → Settings → User Management и добавьте e-mail этого аккаунта."
         case .missingScope: return "Нужно заново войти в Spotify, чтобы выдать приложению новое разрешение."
         case .network(let error):
             switch error.code {

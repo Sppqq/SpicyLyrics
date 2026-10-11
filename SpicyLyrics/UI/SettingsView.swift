@@ -42,7 +42,7 @@ struct SettingsView: View {
                     }
                     category("Источники текстов", "doc.text.fill", .brown) { SourceSettings() }
                     category("Spotify", "music.note", Color(red: 0.12, green: 0.84, blue: 0.38),
-                             value: settings.usingBundledClientID ? "Встроенный" : "Свой Client ID") { SpotifySettings() }
+                             value: settings.hasValidClientID ? "…" + String(settings.spotifyClientID.suffix(4)) : "Не настроен") { SpotifySettings() }
                 }
 
                 Section {
@@ -483,29 +483,20 @@ private struct SourceSettings: View {
 private struct SpotifySettings: View {
     @EnvironmentObject private var auth: SpotifyAuth
     @Environment(AppSettings.self) private var settings
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         Form {
             Section {
-                LabeledContent("Доступ", value: settings.usingBundledClientID
-                               ? "Встроенный"
-                               : "Свой Client ID …\(String(settings.spotifyClientID.suffix(4)))")
+                LabeledContent("Client ID", value: settings.hasValidClientID
+                               ? "…\(String(settings.spotifyClientID.suffix(4)))"
+                               : "Не настроен")
                 NavigationLink {
                     SpotifySetupGuideView()
                 } label: {
-                    Label(settings.usingBundledClientID ? "Подключить свой Client ID" : "Сменить Client ID",
-                          systemImage: "key.horizontal")
-                }
-                if settings.bundledSpotifyClientID != nil, settings.useOwnClientID {
-                    Button("Вернуться к встроенному доступу") {
-                        // The session belongs to the user's own Client ID: sign in again.
-                        settings.useOwnClientID = false
-                        auth.logOut()
-                    }
+                    Label("Сменить Client ID", systemImage: "key.horizontal")
                 }
             } footer: {
-                Text("Встроенный доступ Spotify — максимум на 5 человек. Со своим Client ID ограничение снимается (нужен Spotify Premium).")
+                Text("Приложение работает только через ваше собственное приложение Spotify. Друзей можно добавить в него через Settings → User Management в developer.spotify.com (до 5 человек).")
             }
 
             Section {

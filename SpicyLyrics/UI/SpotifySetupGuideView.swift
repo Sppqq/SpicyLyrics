@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Step-by-step guide to creating one's own Spotify developer app and signing in with its
-/// Client ID. Needed by everyone beyond the five people the built-in Client ID allows.
+/// Client ID. Required for everyone: the app has no Client ID of its own.
 struct SpotifySetupGuideView: View {
     @EnvironmentObject private var auth: SpotifyAuth
     @Environment(AppSettings.self) private var settings
@@ -21,7 +21,7 @@ struct SpotifySetupGuideView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Свой доступ к Spotify")
                         .font(.largeTitle.bold())
-                    Text("Spotify пускает во встроенный доступ только 5 человек. Свой Client ID снимает это ограничение для вас: это бесплатно и занимает около 5 минут.")
+                    Text("Приложению нужен ваш собственный Client ID: так Spotify разрешает ему видеть, что у вас играет. Это бесплатно и занимает около 5 минут.")
                         .foregroundStyle(.white.opacity(0.75))
                 }
 
@@ -228,14 +228,13 @@ struct SpotifySetupGuideView: View {
         error = nil
         defer { busy = false }
         // Switch over only if sign-in works: a cancelled attempt keeps the current session.
-        let previous = (settings.spotifyClientID, settings.useOwnClientID)
+        let previous = settings.spotifyClientID
         settings.spotifyClientID = clientID
-        if settings.bundledSpotifyClientID != nil { settings.useOwnClientID = true }
         do {
             try await auth.logIn()
             dismiss()
         } catch {
-            (settings.spotifyClientID, settings.useOwnClientID) = previous
+            settings.spotifyClientID = previous
             if case SpotifyAuthError.cancelled = error { return }
             self.error = error.localizedDescription
         }
