@@ -4,31 +4,62 @@ import UIKit
 
 /// Looks of the visualizer that can replace the empty screen of a song without lyrics.
 enum VisualizerStyle: String, CaseIterable, Identifiable {
-    case nebula, sunset, tunnel
+    case nebula, bars, circle
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .nebula: return String(localized: "Туманность")
-        case .sunset: return String(localized: "Закат")
-        case .tunnel: return String(localized: "Тоннель")
+        case .bars: return String(localized: "Спектр")
+        case .circle: return String(localized: "Круг")
         }
     }
 
     fileprivate var index: Float {
         switch self {
         case .nebula: return 0
-        case .sunset: return 1
-        case .tunnel: return 2
+        case .bars: return 1
+        case .circle: return 2
         }
+    }
+}
+
+/// The visualizer full screen; "Круг" puts the round cover in the middle of its ring of bars.
+struct CoverVisualizerView: View {
+    let style: VisualizerStyle
+    let player: PlayerModel
+    var reduced = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                CoverVisualizer(style: style, image: player.backgroundArtwork, imageID: player.artworkID,
+                                player: player, reduced: reduced)
+                if style == .circle, let artwork = player.artwork {
+                    // `circleRadius` in Shaders.metal: 27 % of the shorter side.
+                    let side = min(geometry.size.width, geometry.size.height) * 0.54
+                    Image(uiImage: artwork)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: side, height: side)
+                        .clipShape(Circle())
+                        .id(player.artworkID)
+                        .transition(.opacity)
+                        .scaleEffect(player.isPlaying ? 1 : 0.94)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.75), value: player.isPlaying)
+                        .animation(.easeInOut(duration: 0.6), value: player.artworkID)
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .ignoresSafeArea()
     }
 }
 
 /// Experimental: a visualizer in the colours of the cover, for songs without lyrics. iOS lets no
 /// app hear what Spotify plays, so it can't follow the sound itself; it follows the playback
-/// instead: it runs while the song plays and drifts almost to a stop on pause, and the song's
-/// progress moves it along (the sunset sets as the song ends).
+/// instead: it runs while the song plays and settles almost to a stop on pause.
 struct CoverVisualizer: UIViewRepresentable {
     let style: VisualizerStyle
     let image: UIImage?

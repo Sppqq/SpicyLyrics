@@ -118,6 +118,11 @@ final class PlayerModel {
     /// Until then the next new song counts as one the user went back to.
     @ObservationIgnored private var exemptNextSongUntil: CFTimeInterval = 0
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
+    /// Spotify IDs of the songs queued after the current one, as last fetched.
+    @ObservationIgnored private var upcomingIDs: [String] = []
+    /// Songs whose lyrics were looked up ahead of time, by Spotify ID.
+    @ObservationIgnored private var lookahead: [String: KnownLyrics] = [:]
+    @ObservationIgnored private var lookaheadTask: Task<Void, Never>?
     /// Shown for a moment over the player after a song was skipped.
     private(set) var autoSkipNotice: String?
     static let autoSkipLimit = 12
@@ -411,6 +416,7 @@ final class PlayerModel {
         if trackChanged {
             content = snapshot.content
             onContentChanged()
+            checkAutoSkip()
         }
     }
 
@@ -479,6 +485,7 @@ final class PlayerModel {
             lastRemoteQuery = nil
             remoteQueriesFrozen = false
             fetchTrackDetails(info)
+            checkAutoSkip()
             return
         }
         lastRemoteMismatch = nil
@@ -834,25 +841,48 @@ final class PlayerModel {
 
     // MARK: Auto-skip
 
-    /// Lyrics count as a Spicy Lyrics sync when they come from Spicy Lyrics (or the user's own
-    /// TTML) and are timed: by line, or by word when only word-by-word sync is wanted.
-    private static func hasSpicySync(_ lyrics: PreparedLyrics, wordByWord: Bool) -> Bool {
-        let source = lyrics.sourceName
-        guard source.hasPrefix("Spicy Lyrics") || source.hasPrefix(LocalLyricsStore.sourceName) else { return false }
-        return wordByWord ? lyrics.kind == .syllable : lyrics.kind != .static
+    /// What a song's lyrics turned out to be: enough to judge it before it plays.
+    @MainActor
+    private struct KnownLyrics {
+        /// From Spicy Lyrics or the user's own TTML.
+        var spicy: Bool
+        /// nil when there are none.
+        var kind: LyricsKind?
+
+        init(_ document: LyricsDocument?) {
+            let source = document?.sourceName ?? ""
+            spicy = source.hasPrefix("Spicy Lyrics") || source.hasPrefix(LocalLyricsStore.sourceName)
+            kind = document?.kind
+        }
+
+        init(_ lyrics: PreparedLyrics) {
+            let source = lyrics.sourceName
+            spicy = source.hasPrefix("Spicy Lyrics") || source.hasPrefix(LocalLyricsStore.sourceName)
+            kind = lyrics.kind
+        }
+
+        /// A Spicy Lyrics sync: timed by line, or by word when only word-by-word sync is wanted.
+        func qualifies(_ mode: AutoSkipMode) -> Bool {
+            guard spicy, let kind else { return false }
+            return mode == .wordByWord ? kind == .syllable : kind != .static
+        }
     }
 
     /// Skips the playing song when it has no Spicy Lyrics sync (and the setting asks for that).
-    /// Runs from the watchdog: twice a second while following Spotify.
+    /// Songs from the queue were looked up ahead of time (`lookAhead`), so those go the moment
+    /// they start, together with any known-unsynced songs queued right after them; others once
+    /// their lyrics are in. Runs on every song change and from the watchdog.
     private func checkAutoSkip() {
         guard let mode = AutoSkipMode(rawValue: settings.autoSkipMode), mode != .off,
               isPlaying, let track, skipCheckedURI != track.uri else { return }
         let qualifies: Bool
         switch lyricsState {
-        case .loaded(let lyrics): qualifies = Self.hasSpicySync(lyrics, wordByWord: mode == .wordByWord)
+        case .loaded(let lyrics): qualifies = KnownLyrics(lyrics).qualifies(mode)
         case .notFound: qualifies = false
-        // Still loading, or offline: no telling yet.
-        default: return
+        default:
+            // Still loading, or offline: only a lookup made ahead of time can tell.
+            guard let known = lookahead[track.id] else { return }
+            qualifies = known.qualifies(mode)
         }
         skipCheckedURI = track.uri
         if qualifies {
@@ -867,10 +897,61 @@ final class PlayerModel {
             }
             return
         }
-        autoSkipped += 1
-        SyncLog.shared.add("skip", "\"\(track.title.prefix(30))\": no Spicy Lyrics sync, skipping (\(autoSkipped))")
-        showNotice(String(localized: "Пропущено: \(track.title)"))
-        next()
+        // Songs queued right after this one that are known to be unsynced go too, in one go:
+        // none of them gets to play for a moment.
+        var count = 1
+        if let index = upcomingIDs.firstIndex(of: track.id) {
+            for id in upcomingIDs[(index + 1)...] {
+                guard let known = lookahead[id], !known.qualifies(mode),
+                      autoSkipped + count < Self.autoSkipLimit else { break }
+                count += 1
+            }
+        }
+        autoSkipped += count
+        SyncLog.shared.add("skip", "\"\(track.title.prefix(30))\": no Spicy Lyrics sync, skipping \(count) (\(autoSkipped))")
+        showNotice(count > 1 ? String(localized: "Пропущено песен без синхронизации: \(count)")
+                             : String(localized: "Пропущено: \(track.title)"))
+        skipAhead(count)
+    }
+
+    // MARK: Looking ahead
+
+    /// Looks up the lyrics of the next songs in the queue while this one plays: they are
+    /// cached, so they show at once when the song comes, and auto-skip knows in advance which
+    /// songs to jump over.
+    private func lookAhead() {
+        lookaheadTask?.cancel()
+        #if DEBUG
+        if DemoTrack.current != nil { return }
+        #endif
+        guard let current = track, pollTask != nil else { return }
+        let skipping = AutoSkipMode(rawValue: settings.autoSkipMode).map { $0 != .off } ?? false
+        let depth = skipping ? 6 : 2
+        lookaheadTask = Task { [weak self] in
+            // The playing song's own requests go first.
+            try? await Task.sleep(for: .seconds(1.5))
+            guard let self, !Task.isCancelled, self.track?.uri == current.uri,
+                  let queue = try? await self.api.queue() else { return }
+            let upcoming = queue.prefix(depth).compactMap(Self.trackInfo)
+            self.upcomingIDs = upcoming.map(\.id)
+            for info in upcoming where self.lookahead[info.id] == nil {
+                guard !Task.isCancelled else { return }
+                switch await self.lyrics.lyrics(for: info) {
+                case .found(let document): self.lookahead[info.id] = KnownLyrics(document)
+                case .notFound: self.lookahead[info.id] = KnownLyrics(nil)
+                case .failed: break
+                }
+            }
+            if self.lookahead.count > 300 { self.lookahead.removeAll() }
+            SyncLog.shared.add("queue", "looked ahead at \(upcoming.count) songs")
+        }
+    }
+
+    /// A queued song, as far as lyrics need it.
+    private static func trackInfo(_ summary: TrackSummary) -> TrackInfo? {
+        guard summary.uri.hasPrefix("spotify:track:"), let id = summary.uri.split(separator: ":").last else { return nil }
+        return TrackInfo(id: String(id), uri: summary.uri, title: summary.title, artists: summary.artists,
+                         album: "", duration: summary.duration, artworkURL: nil, isLocal: false)
     }
 
     private func showNotice(_ text: String) {
@@ -897,6 +978,7 @@ final class PlayerModel {
         switch content {
         case .track:
             loadLyrics(force: false)
+            lookAhead()
         case .episode:
             lyricsState = .unavailable(String(localized: "Для подкастов тексты недоступны"))
         case .ad:
@@ -927,9 +1009,11 @@ final class PlayerModel {
             case .found(let document):
                 SyncLog.shared.add("lyrics", "found: \(document.sourceName), \(document.kind.rawValue), \(document.lines.count) lines")
                 self.show(document)
+                self.checkAutoSkip()
             case .notFound:
                 SyncLog.shared.add("lyrics", "not found")
                 self.lyricsState = .notFound
+                self.checkAutoSkip()
             case .failed(let reason):
                 if reason != "cancelled" {
                     SyncLog.shared.add("lyrics", "failed: \(reason)")

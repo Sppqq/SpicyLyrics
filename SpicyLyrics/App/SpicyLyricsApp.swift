@@ -9,6 +9,7 @@ struct SpicyLyricsApp: App {
     @State private var performance = PerformanceMonitor()
     @State private var pip = LyricsPictureInPicture()
     @State private var appRemote: SpotifyAppRemote
+    @State private var liveActivity = LiveLyricsActivity()
 
     init() {
         AudioRoute.prepare()
@@ -32,6 +33,7 @@ struct SpicyLyricsApp: App {
                 .environment(performance)
                 .environment(pip)
                 .environment(appRemote)
+                .environment(liveActivity)
                 .environmentObject(auth)
                 .preferredColorScheme(.dark)
                 .tint(.white)
@@ -46,6 +48,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(LyricsPictureInPicture.self) private var pip
     @Environment(SpotifyAppRemote.self) private var appRemote
+    @Environment(LiveLyricsActivity.self) private var liveActivity
     /// Letting go of Spotify after the app went to the background, unless the floating window
     /// turns up meanwhile.
     @State private var stopTask: Task<Void, Never>?
@@ -61,8 +64,15 @@ struct RootView: View {
         .onChange(of: scenePhase, initial: true) { old, phase in
             updateActivity(phase)
             // Back in the app: the lyrics on screen were last drawn a while ago.
-            if phase == .active, old != .active { player.resync("app active") }
+            if phase == .active, old != .active {
+                player.resync("app active")
+                liveActivity.refresh()
+            }
         }
+        .onChange(of: liveActivity.keepsAppRunning) { _, _ in updateActivity(scenePhase) }
+        .onChange(of: settings.liveActivity) { _, _ in liveActivity.refresh() }
+        .onChange(of: player.track?.uri) { _, _ in liveActivity.refresh() }
+        .task { liveActivity.configure(player: player, settings: settings) }
         .onChange(of: auth.isLoggedIn) { _, _ in updateActivity(scenePhase) }
         .onChange(of: settings.keepScreenOn) { _, _ in updateActivity(scenePhase) }
         .onChange(of: pip.keepsAppRunning) { _, _ in updateActivity(scenePhase) }
@@ -87,7 +97,7 @@ struct RootView: View {
     /// Following Spotify is wanted: the app is on screen (Control Center or the app switcher
     /// over it count), or the floating window is up or on its way.
     private func wantsToFollow(_ phase: ScenePhase) -> Bool {
-        auth.isLoggedIn && (phase != .background || pip.keepsAppRunning)
+        auth.isLoggedIn && (phase != .background || pip.keepsAppRunning || liveActivity.keepsAppRunning)
     }
 
     private func updateActivity(_ phase: ScenePhase) {

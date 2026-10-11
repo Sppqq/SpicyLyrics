@@ -9,6 +9,7 @@ struct NowPlayingView: View {
     @EnvironmentObject private var auth: SpotifyAuth
     @Environment(PerformanceMonitor.self) private var performance
     @Environment(LyricsPictureInPicture.self) private var pip
+    @Environment(LiveLyricsActivity.self) private var liveActivity
     @State private var showSettings = false
     @State private var showPicker = false
     @State private var showSetupGuide = false
@@ -63,10 +64,8 @@ struct NowPlayingView: View {
                 // Experimental: a visualizer where the lyrics were hidden.
                 ZStack {
                     if showVisualizer {
-                        CoverVisualizer(style: VisualizerStyle(rawValue: settings.visualizerStyle) ?? .nebula,
-                                        image: player.backgroundArtwork, imageID: player.artworkID,
-                                        player: player, reduced: reduced)
-                            .ignoresSafeArea()
+                        CoverVisualizerView(style: VisualizerStyle(rawValue: settings.visualizerStyle) ?? .nebula,
+                                            player: player, reduced: reduced)
                             .allowsHitTesting(false)
                             .transition(.opacity)
                     }
@@ -138,6 +137,7 @@ struct NowPlayingView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
+                .environment(liveActivity)
                 .environment(settings)
                 .environment(player)
                 .environment(performance)
@@ -586,6 +586,13 @@ struct NowPlayingView: View {
             } label: {
                 Label(settings.translateLyrics ? String(localized: "Выключить перевод") : String(localized: "Включить перевод"),
                       systemImage: "character.bubble")
+            }
+            Button {
+                settings.liveActivity.toggle()
+            } label: {
+                Label(settings.liveActivity ? String(localized: "Убрать текст с экрана блокировки")
+                                            : String(localized: "Текст на экране блокировки"),
+                      systemImage: "lock.iphone")
             }
             if LyricsPictureInPicture.isSupported {
                 Button {

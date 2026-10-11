@@ -93,6 +93,10 @@ final class AppSettings {
     var hiddenLyricsView: String { didSet { defaults.set(hiddenLyricsView, forKey: Keys.hiddenLyricsView) } }
     /// `VisualizerStyle.rawValue`.
     var visualizerStyle: String { didSet { defaults.set(visualizerStyle, forKey: Keys.visualizerStyle) } }
+    /// The current line on the lock screen and in the Dynamic Island (Live Activity).
+    var liveActivity: Bool { didSet { defaults.set(liveActivity, forKey: Keys.liveActivity) } }
+    var liveActivityNextLine: Bool { didSet { defaults.set(liveActivityNextLine, forKey: Keys.liveActivityNextLine) } }
+    var liveActivityTranslation: Bool { didSet { defaults.set(liveActivityTranslation, forKey: Keys.liveActivityTranslation) } }
     /// `AutoSkipMode.rawValue`: skip songs without a Spicy Lyrics sync.
     var autoSkipMode: String { didSet { defaults.set(autoSkipMode, forKey: Keys.autoSkip) } }
 
@@ -172,6 +176,9 @@ final class AppSettings {
             Keys.hiddenLyricsView: HiddenLyricsView.background.rawValue,
             Keys.visualizerStyle: VisualizerStyle.nebula.rawValue,
             Keys.autoSkip: AutoSkipMode.off.rawValue,
+            Keys.liveActivity: false,
+            Keys.liveActivityNextLine: true,
+            Keys.liveActivityTranslation: true,
             Keys.blurStrength: 1.0,
             Keys.glowStrength: 1.0,
             Keys.inactiveBrightness: 1.0,
@@ -236,6 +243,9 @@ final class AppSettings {
         hiddenLyricsView = defaults.string(forKey: Keys.hiddenLyricsView) ?? HiddenLyricsView.background.rawValue
         visualizerStyle = defaults.string(forKey: Keys.visualizerStyle) ?? VisualizerStyle.nebula.rawValue
         autoSkipMode = defaults.string(forKey: Keys.autoSkip) ?? AutoSkipMode.off.rawValue
+        liveActivity = defaults.bool(forKey: Keys.liveActivity)
+        liveActivityNextLine = defaults.bool(forKey: Keys.liveActivityNextLine)
+        liveActivityTranslation = defaults.bool(forKey: Keys.liveActivityTranslation)
         blurStrength = defaults.double(forKey: Keys.blurStrength)
         glowStrength = defaults.double(forKey: Keys.glowStrength)
         inactiveBrightness = defaults.double(forKey: Keys.inactiveBrightness)
@@ -378,6 +388,9 @@ final class AppSettings {
         static let hiddenLyricsView = "hiddenLyricsView"
         static let visualizerStyle = "visualizerStyle"
         static let autoSkip = "autoSkipMode"
+        static let liveActivity = "liveActivity"
+        static let liveActivityNextLine = "liveActivityNextLine"
+        static let liveActivityTranslation = "liveActivityTranslation"
         static let blurStrength = "blurStrength"
         static let glowStrength = "glowStrength"
         static let inactiveBrightness = "inactiveBrightness"

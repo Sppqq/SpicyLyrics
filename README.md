@@ -130,8 +130,10 @@ These features work, but still need testing and refinement.
 | Instrumental breaks | Three animated dots during gaps of at least three seconds |
 | Line-synced and static lyrics | `Line` and `Static` lyric types |
 | Dynamic background | Port of the extension's Kawarp: the blurred cover warped like liquid by drifting noise, cross-fading from song to song and slowing down on pause. A Metal shader drawn at the original's 300×150 and stretched, so it stays light on battery |
-| Instead of hidden lyrics | When the "not found" notice or unsynced lyrics are hidden: the background, the cover as big as fits, or an experimental visualizer (Nebula, Sunset or Tunnel) in the cover's colours, following playback (iOS lets no app hear Spotify's audio) |
-| Skip songs without sync | Optionally skips songs that have no Spicy Lyrics sync (or no word-by-word sync); songs you pick or go back to are kept |
+| Instead of hidden lyrics | When the "not found" notice or unsynced lyrics are hidden: the background, the cover as big as fits, or an experimental visualizer (Nebula, Spectrum, or a ring of bars around the cover) in the cover's colours, following playback (iOS lets no app hear Spotify's audio) |
+| Skip songs without sync | Optionally skips songs that have no Spicy Lyrics sync (or no word-by-word sync). The next songs in the queue are looked up while the current one plays, so an unsynced song is skipped the moment it starts, together with any unsynced songs right after it; songs you pick or go back to are kept |
+| Lyrics ahead of time | The lyrics of the next songs in the queue are fetched while the current one plays, so they show the moment the song changes |
+| Lock Screen and Dynamic Island | Optional Live Activity with the current line, the next one, the translation and the song's progress; while it is on the app keeps following Spotify in the background |
 | Lyrics sources | Spicy Lyrics API with [LRCLIB](https://lrclib.net) as a fallback |
 | Romanization | Supported when returned by the API (`TransliteratedText`) |
 | Seeking | Tap a lyric line to seek to it; requires Spotify Premium |
@@ -260,7 +262,7 @@ SpicyLyrics/
 ## Current Limitations
 
 - **Still raw:** expect bugs and rough edges; features, UI, and integrations may change between versions.
-- Spotify is followed while the app is open or its Picture in Picture window is up; not in the background otherwise.
+- Spotify is followed while the app is open, its Picture in Picture window is up, or the Lock Screen lyrics are on; not in the background otherwise.
 - Playback controls require Spotify Premium.
 - Genius integration is not supported in this version.
 

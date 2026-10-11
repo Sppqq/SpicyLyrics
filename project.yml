@@ -38,6 +38,8 @@ targets:
       - path: SpicyLyrics
     dependencies:
       - package: SpotifyiOS
+      # The lyrics Live Activity (lock screen and Dynamic Island).
+      - target: SpicyLyricsWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.spicylyrics.unofficial.ios
@@ -85,3 +87,30 @@ targets:
         # Picture in Picture lyrics keep running while the app is in the background.
         UIBackgroundModes:
           - audio
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
+
+  # Draws the lyrics Live Activity; the app starts and updates it.
+  SpicyLyricsWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SpicyLyricsWidgets
+      - path: SpicyLyrics/LiveActivity/LyricsActivityAttributes.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.spicylyrics.unofficial.ios.LyricsActivity
+        PRODUCT_NAME: SpicyLyricsWidgets
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: K684596528
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+    info:
+      path: SpicyLyricsWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Spicy Lyrics
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension

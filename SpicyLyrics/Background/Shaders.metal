@@ -172,73 +172,85 @@ static float3 nebula(float2 p, constant VisualizerUniforms &u) {
     return col;
 }
 
-/// "Закат": a synthwave sunset. The sun goes down as the song goes on; the grid runs with
-/// the music and stops on pause.
-static float3 sunset(float2 p, constant VisualizerUniforms &u) {
-    float horizon = -0.08;
-    float3 col;
-    if (p.y > horizon) {
-        float h = (p.y - horizon) / 0.6;
-        col = mix(mix(u.accent, u.vivid, 0.4) * 0.9, u.deep * 0.25, smoothstep(0.0, 1.0, h));
-        col += stars(p, u.time, 46.0) * smoothstep(0.25, 0.8, h) * 0.8;
+/// One bar of a made-up spectrum: more in the lows, a hump in the mids, each bar wandering on
+/// its own noise (iOS gives no app Spotify's sound, so there is nothing real to measure).
+static float barLevel(float i, float count, float t, float energy) {
+    float x = i / count;
+    float shape = 0.5 * exp(-x * 2.4) + 0.28 * exp(-pow((x - 0.42) * 4.0, 2.0)) + 0.14;
+    float slow = valueNoise(float2(i * 0.37, t * 1.7));
+    float fast = valueNoise(float2(i * 0.13 + 17.0, t * 4.6));
+    float level = shape * (0.3 + 0.95 * slow) + 0.3 * shape * fast;
+    return clamp(level, 0.0, 1.0) * (0.2 + 0.8 * energy);
+}
 
-        float sunY = mix(0.26, horizon - 0.06, u.progress);
-        float radius = 0.2;
-        float2 d = p - float2(0.0, sunY);
-        float dist = length(d);
-        // Warm at the top whatever the cover: a sunset should glow like one.
-        float3 sunColor = mix(u.vivid * 1.15, mix(u.accent, float3(1.0, 0.82, 0.45), 0.7) * 1.25,
-                              smoothstep(-radius, radius, d.y));
-        // Bands cut out of the lower half, drifting down.
-        float below = clamp(-d.y / radius, 0.0, 1.0);
-        float band = fract(d.y * 16.0 + u.time * 0.35);
-        float cut = step(band, below * 0.55) * step(d.y, 0.0);
-        float disc = smoothstep(radius, radius - 0.006, dist) * (1.0 - cut);
-        col = mix(col, sunColor, disc);
-        col += sunColor * exp(-max(dist - radius, 0.0) * 9.0) * 0.35;
+/// "Спектр": an equalizer along the bottom, mirrored in a dark floor.
+static float3 bars(float2 uv, float2 res, constant VisualizerUniforms &u) {
+    const float count = 40.0;
+    float margin = 0.06;
+    float x = (uv.x - margin) / (1.0 - 2.0 * margin);
+    float base = 0.32;
+    float3 col = mix(u.deep * 0.05, u.deep * 0.22, smoothstep(0.0, 1.0, uv.y));
+    // A soft glow behind the bars, brighter the louder they "play".
+    float avg = barLevel(5.0, count, u.time, u.energy);
+    col += u.vivid * 0.18 * avg * exp(-abs(uv.y - base - 0.15) * 4.0);
+    if (x < 0.0 || x > 1.0) return col;
 
-        // Mountains in front of the sun.
-        float ridge = horizon + 0.035 + 0.07 * fbm(float2(p.x * 2.4 + 3.0, 1.0)) * (0.6 + 0.4 * abs(p.x) * 2.0);
-        float mountain = smoothstep(ridge + 0.004, ridge, p.y);
-        float3 rock = u.deep * 0.18 + u.vivid * 0.06;
-        col = mix(col, rock, mountain);
-        col += u.vivid * smoothstep(0.012, 0.0, abs(p.y - ridge)) * 0.35 * mountain;
+    float index = floor(x * count);
+    float local = fract(x * count);
+    float level = barLevel(index, count, u.time, u.energy);
+    // A slowly falling cap above each bar, like the classic analysers.
+    float peak = max(level, max(barLevel(index, count, u.time - 0.2, u.energy) * 0.97,
+                                barLevel(index, count, u.time - 0.4, u.energy) * 0.92));
+    float height = 0.5 * level;
+    float aspect = res.x / res.y;
+    float gap = smoothstep(0.12, 0.2, local) * smoothstep(0.88, 0.8, local);
+    float3 tint = mix(u.vivid, u.accent, smoothstep(0.0, 0.5, uv.y - base));
+
+    float above = uv.y - base;
+    if (above >= 0.0) {
+        float bar = step(above, height) * gap;
+        col = mix(col, tint * (0.75 + 0.5 * above / max(height, 0.01)), bar);
+        float capY = 0.5 * peak + 0.012;
+        float cap = smoothstep(0.006, 0.0, abs(above - capY)) * gap;
+        col += mix(u.accent, float3(1.0), 0.4) * cap * 0.9;
+        col += tint * 0.25 * gap * exp(-max(above - height, 0.0) * 30.0 / max(aspect, 0.4)) * step(height, above);
     } else {
-        float z = horizon - p.y;
-        float depth = 0.32 / max(z, 0.002);
-        float2 g = float2(p.x * depth, depth + u.time * 1.4);
-        float2 fw = fwidth(g);
-        float2 lines = abs(fract(g) - 0.5) / max(fw, 1e-4);
-        float grid = 1.0 - min(min(lines.x, lines.y) * 0.6, 1.0);
-        float fade = exp(-depth * 0.045);
-        col = u.deep * 0.08 + mix(u.vivid, u.accent, 0.35) * grid * fade * 1.4;
-        // The sun's reflection.
-        col += mix(u.accent, u.vivid, 0.5) * exp(-abs(p.x) * 7.0) * exp(-z * 6.0) * 0.35;
+        // The floor reflection, fading with depth.
+        float below = -above;
+        float bar = step(below, height * 0.6) * gap;
+        col = mix(col, tint * 0.35 * (1.0 - below / 0.25), bar * smoothstep(0.25, 0.0, below));
     }
-    col += mix(u.vivid, u.accent, 0.5) * exp(-abs(p.y - horizon) * 40.0) * 0.45;
+    col += u.vivid * exp(-abs(above) * 220.0) * 0.5;
     return col;
 }
 
-/// "Тоннель": flying down a tunnel of light; it speeds up as the song goes on.
-static float3 tunnel(float2 p, constant VisualizerUniforms &u) {
-    float r = max(length(p), 1e-3);
-    float a = atan2(p.y, p.x);
-    float twist = sin(u.time * 0.21) * 0.6;
-    float depth = 0.32 / r + u.time * (0.9 + u.progress * 0.8);
-    float around = a / (2.0 * M_PI_F) * 12.0 + twist / r * 0.15;
-    // Rings along the tunnel, ribs around it: thin glowing lines, wider far away.
-    float2 g = float2(depth * 4.0, around);
-    float2 fw = fwidth(g);
-    float2 lines = abs(fract(g) - 0.5) / max(fw * 1.6, 1e-4);
-    float ring = 1.0 - min(lines.x, 1.0);
-    float rib = 1.0 - min(lines.y, 1.0);
-    float swirl = fbm(float2(depth * 0.6, around * 0.25));
-    float3 wall = mix(u.vivid, u.accent, 0.5 + 0.5 * sin(depth * 0.7));
-    float fade = smoothstep(0.0, 0.35, r);
-    float3 col = u.deep * 0.1 + wall * swirl * 0.35 * fade;
-    col += wall * (ring * 0.9 + rib * 0.35) * fade * smoothstep(0.02, 0.2, r);
-    // The light at the end.
-    col += mix(u.accent, float3(1.0), 0.6) * exp(-r * 9.0) * 1.2;
+/// Radius of the cover in "Круг", in the shader's units (fraction of the height); the app puts
+/// the round cover exactly there.
+static float circleRadius(float2 res) {
+    return 0.27 * min(res.x, res.y) / res.y;
+}
+
+/// "Круг": bars all around the cover, mirrored left and right.
+static float3 circleBars(float2 p, float2 res, constant VisualizerUniforms &u) {
+    const float count = 36.0;
+    float radius = circleRadius(res);
+    float r = length(p);
+    float3 col = mix(u.deep * 0.25, u.deep * 0.04, smoothstep(0.0, 0.9, r));
+    // From the top, the same on both sides.
+    float angle = abs(atan2(p.x, p.y)) / M_PI_F;
+    float index = floor(angle * count);
+    float local = fract(angle * count);
+    float level = barLevel(index, count, u.time, u.energy);
+    float inner = radius * 1.06;
+    float length_ = radius * (0.08 + 0.55 * level);
+    float gap = smoothstep(0.15, 0.25, local) * smoothstep(0.85, 0.75, local);
+    float t = (r - inner) / max(length_, 1e-3);
+    float3 tint = mix(u.vivid, u.accent, clamp(t, 0.0, 1.0));
+    float bar = step(inner, r) * step(r, inner + length_) * gap;
+    col = mix(col, tint, bar);
+    // The cover's halo, breathing with the "music".
+    float halo = exp(-max(r - radius, 0.0) * 18.0) * step(radius, r);
+    col += u.vivid * halo * (0.25 + 0.5 * level * u.energy);
     return col;
 }
 
@@ -249,9 +261,9 @@ fragment half4 visualizerFragment(SurfaceVertex in [[stage_in]], constant Visual
     if (u.style < 0.5) {
         col = nebula(p, u);
     } else if (u.style < 1.5) {
-        col = sunset(p, u);
+        col = bars(in.uv, u.resolution, u);
     } else {
-        col = tunnel(p, u);
+        col = circleBars(p, u.resolution, u);
     }
     // Dimmer while paused; a soft vignette; a little grain against banding.
     col *= 0.55 + 0.45 * u.energy;

@@ -361,8 +361,6 @@
 "DeepL переводит лучше всех, но нужен свой ключ API: бесплатного тарифа (500 000 символов в месяц) хватает с запасом. Ключ хранится в связке ключей iOS." = "DeepL translates best but needs your own API key: the free plan (500,000 characters a month) is plenty. The key is kept in the iOS Keychain.";
 "Широкое окно показывает одну-две строки, вертикальное — больше строк, как в плеере. Анимированный фон — плавающая обложка, как в приложении. На слабых устройствах выключите его; в режиме экономии он и так неподвижен." = "A wide window shows a line or two, a portrait one shows more, like the player. The animated background is the drifting cover, as in the app. Turn it off on slower devices; in battery saving it is still anyway.";
 "Туманность" = "Nebula";
-"Закат" = "Sunset";
-"Тоннель" = "Tunnel";
 "Не пропускать" = "Don't Skip";
 "Без синхронизации" = "Without Sync";
 "Без пословной синхронизации" = "Without Word-by-Word Sync";
@@ -374,5 +372,15 @@
 "Стиль" = "Style";
 "Большая обложка" = "Big Artwork";
 "Вместо текста" = "Instead of Lyrics";
-"Экспериментально: визуализатор в цветах обложки. iOS не даёт приложениям слышать звук Spotify, поэтому он следует за воспроизведением, а не за громкостью: течёт, пока песня играет, почти замирает на паузе, а «Закат» садится к концу песни." = "Experimental: a visualizer in the cover's colours. iOS lets no app hear Spotify's sound, so it follows the playback rather than the volume: it flows while the song plays, nearly stops on pause, and the Sunset sets as the song ends.";
 "Большая обложка — во весь экран поверх фона, как в Apple Music: становится больше, когда кнопки прячутся, и чуть уменьшается на паузе." = "Big artwork fills the screen over the background, like Apple Music: it grows when the controls hide and shrinks a little on pause.";
+"Спектр" = "Spectrum";
+"Круг" = "Circle";
+"Экспериментально: визуализатор в цветах обложки. iOS не даёт приложениям слышать звук Spotify, поэтому он следует за воспроизведением, а не за громкостью: двигается, пока песня играет, и почти замирает на паузе." = "Experimental: a visualizer in the cover's colours. iOS lets no app hear Spotify's sound, so it follows the playback rather than the volume: it moves while the song plays and nearly stops on pause.";
+"Пропущено песен без синхронизации: %lld" = "Skipped songs without sync: %lld";
+"Экран блокировки" = "Lock Screen";
+"Текст на экране блокировки" = "Lyrics on the Lock Screen";
+"Убрать текст с экрана блокировки" = "Remove Lyrics from the Lock Screen";
+"Live Activities выключены для Spicy Lyrics в настройках iOS." = "Live Activities are off for Spicy Lyrics in iOS Settings.";
+"Текущая строка на экране блокировки и в Dynamic Island (Live Activity). Пока она включена, приложение работает в фоне и следит за Spotify (играет беззвучный звук, который не мешает музыке), поэтому батарея тратится чуть быстрее. Если смахнуть её с экрана блокировки, она вернётся при следующем открытии приложения." = "The current line on the Lock Screen and in the Dynamic Island (Live Activity). While it is on, the app runs in the background and keeps following Spotify (it plays a silent sound that doesn't disturb the music), so the battery drains a little faster. Swipe it away on the Lock Screen and it comes back the next time you open the app.";
+"Следующая строка" = "Next Line";
+"Что показывать" = "Show";
