@@ -49,6 +49,7 @@ final class SpotifyAppRemote: NSObject {
     /// Starts following the Spotify app (while the app follows Spotify at all).
     func start(player: PlayerModel) {
         self.player = player
+        player.onRemoteStale = { [weak self] in self?.reconnect() }
         wanted = true
         if remote?.isConnected != true { Task { await connect() } }
     }
@@ -137,6 +138,18 @@ final class SpotifyAppRemote: NSObject {
         status = .connecting
         SyncLog.shared.add("remote", "connecting")
         remote.connect()
+    }
+
+    /// The connection looks alive but Spotify stopped answering truthfully: start over.
+    private func reconnect() {
+        guard wanted else { return }
+        queryTask?.cancel()
+        queryTask = nil
+        player?.setRemoteConnected(false)
+        status = .connecting
+        SyncLog.shared.add("remote", "stale, reconnecting")
+        remote?.disconnect()
+        scheduleRetry(after: 2)
     }
 
     private func scheduleRetry(after seconds: Double) {

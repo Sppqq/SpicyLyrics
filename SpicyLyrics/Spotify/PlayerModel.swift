@@ -81,6 +81,10 @@ final class PlayerModel {
     @ObservationIgnored private var remoteURI: String?
     /// Its queried positions stopped moving while playing: only trust its events.
     @ObservationIgnored private var remoteQueriesFrozen = false
+    /// Web API reports in a row that contradict App Remote (play state or song).
+    @ObservationIgnored private var remoteDisagreements = 0
+    /// Asks App Remote to drop its connection and reconnect (set by `SpotifyAppRemote`).
+    @ObservationIgnored var onRemoteStale: (() -> Void)?
     @ObservationIgnored private var lastRemoteQuery: (position: Double, at: CFTimeInterval)?
     @ObservationIgnored private var lastRemoteMismatch: String?
     @ObservationIgnored private var holdUntil: CFTimeInterval = 0
@@ -193,6 +197,33 @@ final class PlayerModel {
         // The Spotify app on this phone knows better, and the cloud copy goes stale whenever the
         // phone is offline: while App Remote is connected the Web API only fills in details.
         if remoteAuthority {
+            // After Spotify sits in the background for a long time iOS can suspend its side of
+            // App Remote: the connection looks alive but goes quiet or reports a stale pause.
+            // Two Web API reports in a row that disagree mean App Remote is stale: take the Web
+            // API's word and reconnect.
+            var webURI: String?
+            if case .track(let info) = snapshot.content { webURI = info.uri }
+            let remoteSong = trackChanged && webURI != remoteURI
+            if now >= holdUntil, snapshot.isPlaying != isPlaying || remoteSong {
+                remoteDisagreements += 1
+                guard remoteDisagreements >= 2 else {
+                    log.add("web", "\(summary) → disagrees with App Remote (1)")
+                    return
+                }
+                remoteDisagreements = 0
+                let measured = snapshot.progress + (snapshot.isPlaying ? now - snapshot.measuredAt : 0)
+                log.add("web", "\(summary) → App Remote is stale: set \(measured.s3), reconnecting")
+                if trackChanged {
+                    content = snapshot.content
+                    onContentChanged()
+                }
+                setClock(measured, at: now)
+                isPlaying = snapshot.isPlaying
+                lastSample = (snapshot.progress, snapshot.measuredAt, snapshot.stateChangedAt)
+                onRemoteStale?()
+                return
+            }
+            remoteDisagreements = 0
             if trackChanged, case .track(let info) = snapshot.content, info.uri == remoteURI {
                 log.add("web", "\(summary) → track details for the App Remote track")
                 content = snapshot.content
@@ -304,6 +335,7 @@ final class PlayerModel {
         guard remoteConnected != connected else { return }
         remoteConnected = connected
         remoteQueriesFrozen = false
+        remoteDisagreements = 0
         lastRemoteQuery = nil
         // Back to the Web API: take its next answer as it is.
         if !connected, content != nil { isResyncing = true }
