@@ -225,6 +225,8 @@ struct PiPSnapshot: @unchecked Sendable {
     var animatedRuns: [AnimatedRun] = []
     /// Backing vocals under the current line (one row per group, so two in a row both show).
     var backgrounds: [[(text: String, lit: Double)]] = []
+    /// The same rows with the animator's per-syllable / per-letter visuals.
+    var backgroundRuns: [[AnimatedRun]] = []
     /// Translation of the current line ("Под строкой" mode), and of each backing vocal row.
     var translation: String?
     var backgroundTranslations: [String?] = []
@@ -299,7 +301,7 @@ struct PiPSnapshot: @unchecked Sendable {
                                           text: rows[previous].plainText, offset: -1))
             }
             for (offset, entry) in rows.enumerated().dropFirst(index + 1)
-                .filter({ !$0.element.isInterlude }).prefix(2).enumerated() {
+                .filter({ !$0.element.isInterlude }).prefix(3).enumerated() {
                 neighbors.append(Neighbor(id: "\(entry.offset):\(entry.element.start)",
                                           text: entry.element.plainText, offset: offset + 1))
             }
@@ -313,26 +315,16 @@ struct PiPSnapshot: @unchecked Sendable {
             case .syllable(let lead, _):
                 current = Self.runs(lead, at: time)
                 let backingLines = lyrics.lines.filter { $0.isBackground && $0.leadID == row.id }
-                backgrounds = backingLines.compactMap { line in
-                    guard case .syllable(let words, _) = line.kind else { return nil }
-                    return Self.runs(words, at: time)
+                for line in backingLines {
+                    guard case .syllable(let words, _) = line.kind else { continue }
+                    backgrounds.append(Self.runs(words, at: time))
+                    let lineVisual = lyrics.lines.firstIndex(where: { $0.id == line.id }).flatMap { animator?.visuals[$0] }
+                    backgroundRuns.append(Self.animated(words, lineVisual?.lead))
                 }
                 if showsTranslation {
                     backgroundTranslations = backingLines.map { player.translations[$0.sourceText] }
                 }
-                for (w, word) in lead.enumerated() {
-                    if w > 0 { animatedRuns.append(AnimatedRun(text: " ", visual: GlyphVisual(gradient: 1))) }
-                    for (s, syllable) in word.syllables.enumerated() {
-                        let value = visual?.lead[w][s] ?? SyllableVisual()
-                        if let letters = syllable.letters, letters.count == value.letters.count {
-                            animatedRuns += zip(letters, value.letters).map {
-                                AnimatedRun(text: $0.0.text, visual: $0.1)
-                            }
-                        } else {
-                            animatedRuns.append(AnimatedRun(text: syllable.text, visual: value.glyph))
-                        }
-                    }
-                }
+                animatedRuns = Self.animated(lead, visual?.lead)
             case .line(let text):
                 let lit = time >= row.end ? 1 : min(1, max(0, (time - row.start) / max(row.end - row.start, 0.01)))
                 current = [(text, 0.3 + 0.7 * lit)]
@@ -355,6 +347,24 @@ struct PiPSnapshot: @unchecked Sendable {
 }
 
 extension PiPSnapshot {
+    /// Words as runs carrying the animator's visuals (letters for emphasized syllables).
+    static func animated(_ words: [PreparedWord], _ visuals: [[SyllableVisual]]?) -> [AnimatedRun] {
+        var runs: [AnimatedRun] = []
+        for (w, word) in words.enumerated() {
+            if w > 0 { runs.append(AnimatedRun(text: " ", visual: GlyphVisual(gradient: 1))) }
+            for (s, syllable) in word.syllables.enumerated() {
+                let value = visuals.flatMap { $0.indices.contains(w) && $0[w].indices.contains(s) ? $0[w][s] : nil }
+                    ?? SyllableVisual()
+                if let letters = syllable.letters, letters.count == value.letters.count {
+                    runs += zip(letters, value.letters).map { AnimatedRun(text: $0.0.text, visual: $0.1) }
+                } else {
+                    runs.append(AnimatedRun(text: syllable.text, visual: value.glyph))
+                }
+            }
+        }
+        return runs
+    }
+
     /// Small rows under the active line: its translation, backing vocals and their translations.
     var underRows: Int {
         (translation == nil ? 0 : 1) + backgrounds.count + backgroundTranslations.compactMap { $0 }.count
@@ -402,7 +412,9 @@ final class PiPFrameRenderer {
         let container: NSTextContainer
         let ranges: [NSRange]
     }
-    private var textLayout: TextLayout?
+    /// One cached layout per slot ("lead", "bg0", "bg1"…).
+    private var textLayouts: [String: TextLayout] = [:]
+    private var measuredHeights: [String: CGFloat] = [:]
     /// Font sizes that make a line fit its box, by text, size and box.
     private var fittedSizes: [String: CGFloat] = [:]
 
@@ -549,13 +561,24 @@ final class PiPFrameRenderer {
         // The active line gives up at most 60 pt (it keeps room for two rows of text).
         func extra(_ value: PiPSnapshot) -> CGFloat { CGFloat(value.underRows) * Self.backgroundRowHeight }
         func shrink(_ value: PiPSnapshot) -> CGFloat { min(extra(value) / 2, 60) }
+        // The rows below start right under what the active line really takes (its text and the
+        // small rows), instead of at a fixed place sized for a three-row line.
+        func activeBlock(_ value: PiPSnapshot) -> CGFloat {
+            let maxHeight = 116 - shrink(value)
+            var text: CGFloat = 60
+            let line = value.current.map(\.text).joined()
+            if !value.interlude, !line.isEmpty {
+                let size = fittedSize(line, preferred: 44, weight: .bold, design: value.fontDesign,
+                                      box: CGSize(width: width, height: maxHeight))
+                text = min(maxHeight, measuredHeight(line, size: size, design: value.fontDesign, width: width))
+            }
+            return text + (value.underRows > 0 ? 4 + extra(value) : 0)
+        }
         func y(_ offset: Int, _ value: PiPSnapshot) -> CGFloat {
-            let push = extra(value) - shrink(value)
             switch offset {
             case ..<0: return 34
             case 0: return 104
-            case 1: return 232 + push
-            default: return 286 + push
+            default: return 104 + activeBlock(value) + 22 + CGFloat(offset - 1) * 54
             }
         }
         let activeHeight = 116 - shrink(snapshot)
@@ -596,7 +619,7 @@ final class PiPFrameRenderer {
                     drawTranslation(translation, at: top, size: 24, alpha: 0.6, snapshot: snapshot, inset: inset, width: width)
                     top += Self.backgroundRowHeight
                 }
-                drawBackgroundVocals(snapshot, below: top, inset: inset, width: width)
+                drawBackgroundVocals(snapshot, below: top, inset: inset, width: width, context: context)
             } else {
                 let opacity: CGFloat = 0.28 + 0.65 * active
                 NSAttributedString(string: row.text, attributes: [
@@ -611,20 +634,31 @@ final class PiPFrameRenderer {
     @discardableResult
     private func drawSyllables(_ snapshot: PiPSnapshot, font textFont: UIFont,
                                in box: CGRect, context: CGContext) -> CGFloat {
-        // Lay out once, then apply the main player's spring-driven transforms to each
-        // syllable or emphasized letter without letting animation change wrapping.
         let runs = snapshot.animatedRuns.isEmpty
             ? snapshot.current.map { PiPSnapshot.AnimatedRun(text: $0.text, visual: GlyphVisual(gradient: $0.lit)) }
             : snapshot.animatedRuns
+        return drawRuns(runs, slot: "lead", simple: snapshot.simple, font: textFont, in: box,
+                        dim: 0.32, lit: 1, glowStrength: 1, context: context)
+    }
+
+    /// Lays the runs out once, then applies the main player's spring-driven transforms to each
+    /// syllable or emphasized letter without letting animation change wrapping. Returns the
+    /// height the text takes.
+    @discardableResult
+    private func drawRuns(_ runs: [PiPSnapshot.AnimatedRun], slot: String, simple: Bool, font textFont: UIFont,
+                          in box: CGRect, dim: CGFloat, lit: CGFloat, glowStrength: CGFloat,
+                          context: CGContext) -> CGFloat {
+        let dimColor = UIColor.white.withAlphaComponent(dim)
+        let litColor = UIColor.white.withAlphaComponent(lit)
         // Text layout is the expensive part: build it once per line (and size), not per frame.
         let key = runs.map(\.text).joined(separator: "\u{1}") + "|\(textFont.fontName)|\(textFont.pointSize)|\(box.size)"
-        if textLayout?.key != key {
+        if textLayouts[slot]?.key != key {
             let text = NSMutableAttributedString()
             var ranges: [NSRange] = []
             for run in runs {
                 ranges.append(NSRange(location: text.length, length: (run.text as NSString).length))
                 text.append(NSAttributedString(string: run.text, attributes: [
-                    .font: textFont, .ligature: 0, .foregroundColor: UIColor.white.withAlphaComponent(0.32),
+                    .font: textFont, .ligature: 0, .foregroundColor: dimColor,
                 ]))
             }
             let storage = NSTextStorage(attributedString: text)
@@ -636,9 +670,9 @@ final class PiPFrameRenderer {
             storage.addLayoutManager(layout)
             layout.addTextContainer(container)
             layout.ensureLayout(for: container)
-            textLayout = TextLayout(key: key, storage: storage, layout: layout, container: container, ranges: ranges)
+            textLayouts[slot] = TextLayout(key: key, storage: storage, layout: layout, container: container, ranges: ranges)
         }
-        guard let cached = textLayout else { return 0 }
+        guard let cached = textLayouts[slot] else { return 0 }
         let storage = cached.storage, layout = cached.layout, container = cached.container, ranges = cached.ranges
         let usedHeight = layout.usedRect(for: container).height
         let reduceMotion = UIAccessibility.isReduceMotionEnabled
@@ -652,9 +686,9 @@ final class PiPFrameRenderer {
             let value = run.visual
             let scale = reduceMotion ? CGFloat(1) : CGFloat(value.scale)
             let lift = reduceMotion ? CGFloat.zero : CGFloat(value.yOffset) * textFont.pointSize
-            let glow = reduceMotion ? CGFloat.zero : CGFloat(max(0, value.glow))
+            let glow = reduceMotion ? CGFloat.zero : CGFloat(max(0, value.glow)) * glowStrength
             let edge = CGFloat(value.gradient) * totalWidth
-            let feather = totalWidth * (snapshot.simple ? 0.5 : 0.2)
+            let feather = totalWidth * (simple ? 0.5 : 0.2)
             var advance: CGFloat = 0
             for fragment in fragments {
                 let frame = fragment.offsetBy(dx: box.minX, dy: box.minY)
@@ -666,7 +700,7 @@ final class PiPFrameRenderer {
                 context.clip(to: frame.insetBy(dx: -2, dy: -6))
                 layout.drawGlyphs(forGlyphRange: glyphs, at: box.origin)
                 if edge + feather > advance {
-                    storage.addAttribute(.foregroundColor, value: UIColor.white, range: characters)
+                    storage.addAttribute(.foregroundColor, value: litColor, range: characters)
                     context.saveGState()
                     // Composite the fill mask inside a layer, so the gradient cannot
                     // erase the dim glyph underneath or the lyrics background.
@@ -682,7 +716,7 @@ final class PiPFrameRenderer {
                                                options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
                     context.endTransparencyLayer()
                     context.restoreGState()
-                    storage.addAttribute(.foregroundColor, value: UIColor.white.withAlphaComponent(0.32), range: characters)
+                    storage.addAttribute(.foregroundColor, value: dimColor, range: characters)
                 }
                 context.restoreGState()
                 advance += fragment.width
@@ -694,23 +728,21 @@ final class PiPFrameRenderer {
     private static let backgroundRowHeight: CGFloat = 32
 
     /// Backing vocals under the active line, smaller and dimmer (`.bg-line` is 0.75× the lead
-    /// size at a lower alpha), lit syllable by syllable.
-    private func drawBackgroundVocals(_ snapshot: PiPSnapshot, below top: CGFloat, inset: CGFloat, width: CGFloat) {
+    /// size, `--gradient-alpha` 0.6 / 0.3), animated like the lead: fill, lift, scale and glow.
+    private func drawBackgroundVocals(_ snapshot: PiPSnapshot, below top: CGFloat, inset: CGFloat, width: CGFloat,
+                                      context: CGContext) {
         var top = top
-        for (index, runs) in snapshot.backgrounds.enumerated() {
+        for (index, plain) in snapshot.backgrounds.enumerated() {
+            let animated = snapshot.backgroundRuns.indices.contains(index) ? snapshot.backgroundRuns[index] : []
+            let runs = animated.isEmpty
+                ? plain.map { PiPSnapshot.AnimatedRun(text: $0.text, visual: GlyphVisual(gradient: $0.lit)) }
+                : animated
             let text = runs.map(\.text).joined()
-            let size = fittedSize(text, preferred: 26, weight: .semibold, design: snapshot.fontDesign,
+            let size = fittedSize(text, preferred: 26, weight: .bold, design: snapshot.fontDesign,
                                   box: CGSize(width: width, height: Self.backgroundRowHeight))
-            let font = font(size, .semibold, snapshot.fontDesign)
-            let line = NSMutableAttributedString()
-            for run in runs {
-                line.append(NSAttributedString(string: run.text, attributes: [
-                    .font: font,
-                    .foregroundColor: UIColor.white.withAlphaComponent(0.3 + 0.4 * CGFloat(run.lit)),
-                ]))
-            }
-            line.draw(with: CGRect(x: inset, y: top, width: width, height: Self.backgroundRowHeight),
-                      options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
+            drawRuns(runs, slot: "bg\(index)", simple: snapshot.simple, font: font(size, .bold, snapshot.fontDesign),
+                     in: CGRect(x: inset, y: top, width: width, height: Self.backgroundRowHeight),
+                     dim: 0.3, lit: 0.75, glowStrength: 0.6, context: context)
             top += Self.backgroundRowHeight
             if snapshot.backgroundTranslations.indices.contains(index),
                let translation = snapshot.backgroundTranslations[index] {
@@ -775,6 +807,19 @@ final class PiPFrameRenderer {
         size = max(size, minimum)
         fittedSizes[key] = size
         return size
+    }
+
+    /// Height of `text` in the bold active-line font at `size`, wrapped to `width`.
+    private func measuredHeight(_ text: String, size: CGFloat, design: UIFontDescriptor.SystemDesign,
+                                width: CGFloat) -> CGFloat {
+        let key = "\(text)|\(size)|\(design.rawValue)|\(width)"
+        if let cached = measuredHeights[key] { return cached }
+        if measuredHeights.count > 64 { measuredHeights.removeAll() }
+        let height = ceil(NSAttributedString(string: text, attributes: [.font: font(size, .bold, design)])
+            .boundingRect(with: CGSize(width: width, height: .greatestFiniteMagnitude),
+                          options: [.usesLineFragmentOrigin], context: nil).height)
+        measuredHeights[key] = height
+        return height
     }
 
     private func font(_ size: CGFloat, _ weight: UIFont.Weight, _ design: UIFontDescriptor.SystemDesign) -> UIFont {
