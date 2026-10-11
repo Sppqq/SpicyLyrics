@@ -53,6 +53,10 @@ final class PlayerModel {
     @ObservationIgnored private var rawLyrics: LyricsDocument?
     @ObservationIgnored private var preparedRomanized = false
     @ObservationIgnored private var preparedSimple = false
+    /// Translations the shown lyrics were built with (replace mode), to rebuild only on change.
+    @ObservationIgnored private var preparedReplacements: [String: String] = [:]
+    /// Changes only when different lyrics arrive; translations belong to one revision of these.
+    private(set) var documentRevision = 0
     @ObservationIgnored private var lastArtworkURL: URL?
 
     // Clock anchor: position `anchorPosition` was correct at `anchorTime`. `slew` is a small
@@ -424,11 +428,7 @@ final class PlayerModel {
             self.lyricsTask = nil
             switch result {
             case .found(let document):
-                self.rawLyrics = document
-                self.preparedRomanized = self.settings.showRomanization
-                self.preparedSimple = self.settings.simpleLyricsMode
-                self.lyricsRevision += 1
-                self.lyricsState = .loaded(PreparedLyrics(document: document, romanized: self.settings.showRomanization, simple: self.settings.simpleLyricsMode))
+                self.show(document)
             case .notFound:
                 self.lyricsState = .notFound
             case .failed(let reason):
@@ -438,8 +438,14 @@ final class PlayerModel {
     }
 
     func setTranslations(_ result: [String: String], revision: Int) {
-        guard revision == lyricsRevision else { return }
+        guard revision == documentRevision, result != translations else { return }
         translations = result
+        settingsChanged()
+    }
+
+    /// What replaces the original lines right now (translation in replace mode).
+    private var replacements: [String: String] {
+        settings.translateLyrics && settings.translationReplaces ? translations : [:]
     }
 
     func clearLyricsCache() {
@@ -488,21 +494,27 @@ final class PlayerModel {
         lyricsTask?.cancel()
         lyricsTask = nil
         rawLyrics = document
-        preparedRomanized = settings.showRomanization
-        preparedSimple = settings.simpleLyricsMode
-        lyricsRevision += 1
-        lyricsState = .loaded(PreparedLyrics(document: document, romanized: settings.showRomanization, simple: settings.simpleLyricsMode))
+        translations = [:]
+        documentRevision += 1
+        prepare(document)
     }
 
-    /// Re-prepares the current lyrics after a display setting changed.
+    private func prepare(_ document: LyricsDocument) {
+        preparedRomanized = settings.showRomanization
+        preparedSimple = settings.simpleLyricsMode
+        preparedReplacements = replacements
+        lyricsRevision += 1
+        lyricsState = .loaded(PreparedLyrics(document: document, romanized: preparedRomanized,
+                                             simple: preparedSimple, replacements: preparedReplacements))
+    }
+
+    /// Re-prepares the current lyrics after a display setting (or a replacing translation) changed.
     func settingsChanged() {
         guard let rawLyrics,
               preparedRomanized != settings.showRomanization || preparedSimple != settings.simpleLyricsMode
+                || preparedReplacements != replacements
         else { return }
-        preparedRomanized = settings.showRomanization
-        preparedSimple = settings.simpleLyricsMode
-        lyricsRevision += 1
-        lyricsState = .loaded(PreparedLyrics(document: rawLyrics, romanized: settings.showRomanization, simple: settings.simpleLyricsMode))
+        prepare(rawLyrics)
     }
 
     private func loadArtwork() {

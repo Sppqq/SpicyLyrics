@@ -34,7 +34,7 @@ private struct TranslationDriver: ViewModifier {
 
     /// Changes whenever there is something new to translate.
     private var key: String {
-        "\(settings.translateLyrics)|\(settings.translationLanguage)|\(player.lyricsRevision)"
+        "\(settings.translateLyrics)|\(settings.translationReplaces)|\(settings.translationLanguage)|\(player.documentRevision)"
     }
 
     func body(content: Content) -> some View {
@@ -53,7 +53,8 @@ private struct TranslationDriver: ViewModifier {
     private func pendingTexts() -> [String] {
         guard settings.translateLyrics, case .loaded(let lyrics) = player.lyricsState else { return [] }
         let texts = Set(lyrics.lines
-            .filter { !$0.isInterlude && !$0.isBackground }
+            // Replacing translates the backing vocals too, so the whole song is in one language.
+            .filter { !$0.isInterlude && (settings.translationReplaces || !$0.isBackground) }
             .map(\.sourceText)
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
         let code = targetCode
@@ -86,7 +87,7 @@ private struct TranslationDriver: ViewModifier {
         let source = sourceLanguage(of: texts)
         // A song already in the target language needs no translation; drop any left from before.
         if texts.isEmpty || source.map({ $0.rawValue.hasPrefix(targetCode) }) == true {
-            if !player.translations.isEmpty { player.setTranslations([:], revision: player.lyricsRevision) }
+            if !player.translations.isEmpty { player.setTranslations([:], revision: player.documentRevision) }
             return
         }
         let sourceLanguage = source.map { Locale.Language(identifier: $0.rawValue) }
@@ -100,7 +101,7 @@ private struct TranslationDriver: ViewModifier {
     private func translate(with session: TranslationSession) async {
         let texts = pendingTexts()
         guard !texts.isEmpty else { return }
-        let revision = player.lyricsRevision
+        let revision = player.documentRevision
         let requests = texts.map { TranslationSession.Request(sourceText: $0, clientIdentifier: $0) }
         do {
             var result: [String: String] = [:]

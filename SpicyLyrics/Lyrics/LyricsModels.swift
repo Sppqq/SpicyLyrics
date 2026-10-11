@@ -151,7 +151,9 @@ struct PreparedLyrics: Hashable {
     /// Emphasized letters end early so the last one gets to breathe (Spicy's `Emphasize`).
     static let emphasisEndSubtraction: Double = 0.25
 
-    init(document: LyricsDocument, romanized: Bool, simple: Bool = false) {
+    /// `replacements` maps a line's original text to what to show instead (a translation); the
+    /// new words are re-timed over the original line's syllables.
+    init(document: LyricsDocument, romanized: Bool, simple: Bool = false, replacements: [String: String] = [:]) {
         kind = document.kind
         songwriters = document.songwriters
         sourceName = document.sourceName
@@ -174,7 +176,8 @@ struct PreparedLyrics: Hashable {
         switch document.kind {
         case .static:
             for line in source {
-                append(0, 0, line.oppositeAligned, .static(text: roman(line.text, line.romanizedText)), source: line.text)
+                append(0, 0, line.oppositeAligned,
+                       .static(text: replacements[line.text] ?? roman(line.text, line.romanizedText)), source: line.text)
             }
         case .line, .syllable:
             if let first = source.first, first.start >= Self.interludeThreshold {
@@ -189,14 +192,17 @@ struct PreparedLyrics: Hashable {
                     // The lead and each background group become rows of their own, timed by their
                     // own syllables (`Applyer/Synced/Syllable.ts`).
                     var leadID: Int?
-                    let lead = Self.words(from: line.lead, simple: simple) { roman($0.text, $0.romanized) }
+                    let leadText = Self.plain(line.lead)
+                    let lead = replacements[leadText].map { Self.retimed($0, over: line.lead, simple: simple) }
+                        ?? Self.words(from: line.lead, simple: simple) { roman($0.text, $0.romanized) }
                     if !lead.isEmpty {
                         leadID = result.count
                         append(line.lead.map(\.start).min() ?? line.start, line.lead.map(\.end).max() ?? line.end,
-                               line.oppositeAligned, .syllable(lead: lead, background: []), source: Self.plain(line.lead))
+                               line.oppositeAligned, .syllable(lead: lead, background: []), source: leadText)
                     }
                     for group in line.backgroundVocals {
-                        let words = Self.words(from: group, simple: simple) { roman($0.text, $0.romanized) }
+                        let words = replacements[Self.plain(group)].map { Self.retimed($0, over: group, simple: simple) }
+                            ?? Self.words(from: group, simple: simple) { roman($0.text, $0.romanized) }
                         guard !words.isEmpty, let start = group.map(\.start).min(), let end = group.map(\.end).max() else { continue }
                         result.append(PreparedLine(id: result.count, start: start, end: end,
                                                    oppositeAligned: line.oppositeAligned,
@@ -204,7 +210,8 @@ struct PreparedLyrics: Hashable {
                                                    isBackground: true, leadID: leadID, sourceText: Self.plain(group)))
                     }
                 } else {
-                    append(line.start, line.end, line.oppositeAligned, .line(text: roman(line.text, line.romanizedText)),
+                    append(line.start, line.end, line.oppositeAligned,
+                           .line(text: replacements[line.text] ?? roman(line.text, line.romanizedText)),
                            source: line.text)
                 }
                 if index + 1 < source.count {
@@ -263,6 +270,58 @@ struct PreparedLyrics: Hashable {
             }
         }
         if !current.isEmpty { words.append(PreparedWord(syllables: current)) }
+        return words
+    }
+
+    /// Words of `text` timed over the original syllables. Each word takes the share of the line
+    /// its length is of the whole, measured along the original syllables by their length too:
+    /// so the words follow the singer's pace and the pauses between the original syllables.
+    static func retimed(_ text: String, over syllables: [LyricSyllable], simple: Bool) -> [PreparedWord] {
+        func weight(_ string: String) -> Double {
+            Double(max(1, string.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.count))
+        }
+        let segments = syllables
+            .filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .map { (start: $0.start, end: max($0.end, $0.start), weight: weight($0.text)) }
+        let tokens = text.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !segments.isEmpty, !tokens.isEmpty else { return [] }
+        let segmentTotal = segments.reduce(0) { $0 + $1.weight }
+
+        /// The time at `fraction` of the original line. At a boundary between two syllables a
+        /// word start takes the later one, so it does not light up during the pause.
+        func time(at fraction: Double, starting: Bool) -> Double {
+            var target = min(max(fraction, 0), 1) * segmentTotal
+            for (index, segment) in segments.enumerated() {
+                let isLast = index == segments.count - 1
+                if target < segment.weight || (target == segment.weight && (!starting || isLast)) {
+                    return segment.start + (segment.end - segment.start) * (target / segment.weight)
+                }
+                target -= segment.weight
+            }
+            return segments[segments.count - 1].end
+        }
+
+        let weights = tokens.map(weight)
+        let tokenTotal = weights.reduce(0, +)
+        var words: [PreparedWord] = []
+        var covered = 0.0
+        var earliest = -Double.infinity
+        // Pauses in the original (between syllables) that a new word should not be sung across.
+        let pauses = zip(segments, segments.dropFirst())
+            .map { (start: $0.0.end, end: $0.1.start) }
+            .filter { $0.end - $0.start >= 0.3 }
+        for (token, w) in zip(tokens, weights) {
+            var start = max(time(at: covered / tokenTotal, starting: true), earliest)
+            covered += w
+            var end = time(at: covered / tokenTotal, starting: false)
+            // A word straddling a pause keeps to the side where most of it falls.
+            for pause in pauses where pause.start > start && pause.end < end {
+                if pause.start - start >= end - pause.end { end = pause.start } else { start = pause.end }
+            }
+            end = max(end, start + 0.05)
+            earliest = start
+            words.append(PreparedWord(syllables: [prepare(text: token, start: start, end: end, simple: simple)]))
+        }
         return words
     }
 

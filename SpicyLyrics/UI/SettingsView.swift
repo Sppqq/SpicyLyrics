@@ -258,10 +258,18 @@ private struct LanguageSettings: View {
                             Text(language.name).tag(language.id)
                         }
                     }
-                    SliderRow(title: "Размер перевода", value: $settings.translationScale, range: 0.6...1.6)
+                    Picker("Показывать", selection: $settings.translationReplaces) {
+                        Text("Под строкой").tag(false)
+                        Text("Вместо строки").tag(true)
+                    }
+                    if !settings.translationReplaces {
+                        SliderRow(title: "Размер перевода", value: $settings.translationScale, range: 0.6...1.6)
+                    }
                 }
             } footer: {
-                Text("Перевод Apple на устройстве (iOS 18 и новее). Строки, которые уже на выбранном языке, не переводятся. При первом использовании iOS предложит скачать языковую модель.")
+                Text(settings.translateLyrics && settings.translationReplaces
+                     ? "Перевод заменяет оригинал, а слова подсвечиваются по ритму исходной строки: время каждой строки делится между новыми словами по их длине. Перевод Apple на устройстве (iOS 18 и новее)."
+                     : "Перевод Apple на устройстве (iOS 18 и новее). Строки, которые уже на выбранном языке, не переводятся. При первом использовании iOS предложит скачать языковую модель.")
             }
         }
     }

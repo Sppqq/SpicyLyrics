@@ -118,6 +118,8 @@ struct NowPlayingView: View {
         }
         .onChange(of: settings.showRomanization) { _, _ in player.settingsChanged() }
         .onChange(of: settings.simpleLyricsMode) { _, _ in player.settingsChanged() }
+        .onChange(of: settings.translationReplaces) { _, _ in player.settingsChanged() }
+        .onChange(of: settings.translateLyrics) { _, _ in player.settingsChanged() }
         .modifier(LyricsTranslation(player: player, settings: settings))
         .task { pip.configure(player: player, settings: settings, performance: performance) }
         .onChange(of: settings.autoPictureInPicture) { _, enabled in pip.setAutomaticStart(enabled) }

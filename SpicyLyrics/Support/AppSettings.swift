@@ -27,6 +27,8 @@ final class AppSettings {
     /// Translate the lyrics on the device and show the translation under each line.
     var translateLyrics: Bool { didSet { defaults.set(translateLyrics, forKey: Keys.translate) } }
     var translationLanguage: String { didSet { defaults.set(translationLanguage, forKey: Keys.translationLanguage) } }
+    /// Show the translation instead of the original line (re-timed), not under it.
+    var translationReplaces: Bool { didSet { defaults.set(translationReplaces, forKey: Keys.translationReplaces) } }
     /// Open the floating lyrics window when leaving the app.
     var autoPictureInPicture: Bool { didSet { defaults.set(autoPictureInPicture, forKey: Keys.autoPiP) } }
     /// PiP: drifting cover background like the app (off = still cover, for weaker phones).
@@ -98,6 +100,7 @@ final class AppSettings {
             Keys.simpleMode: false,
             Keys.autoPiP: false,
             Keys.translate: false,
+            Keys.translationReplaces: false,
             Keys.translationLanguage: Locale.current.language.languageCode?.identifier ?? "en",
             Keys.centerLyrics: false,
             Keys.lyricsFont: LyricsFont.standard.rawValue,
@@ -134,6 +137,7 @@ final class AppSettings {
         pipShowTitle = defaults.bool(forKey: Keys.pipShowTitle)
         translateLyrics = defaults.bool(forKey: Keys.translate)
         translationLanguage = defaults.string(forKey: Keys.translationLanguage) ?? "en"
+        translationReplaces = defaults.bool(forKey: Keys.translationReplaces)
         centerLyrics = defaults.bool(forKey: Keys.centerLyrics)
         lyricsFont = defaults.string(forKey: Keys.lyricsFont) ?? LyricsFont.standard.rawValue
         landscapeArtwork = defaults.bool(forKey: Keys.landscapeArtwork)
@@ -230,6 +234,7 @@ final class AppSettings {
         static let pipShowTitle = "pipShowTitle"
         static let translate = "translateLyrics"
         static let translationLanguage = "translationLanguage"
+        static let translationReplaces = "translationReplaces"
         static let centerLyrics = "centerLyrics"
         static let lyricsFont = "lyricsFont"
         static let landscapeArtwork = "landscapeArtwork"
