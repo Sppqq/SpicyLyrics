@@ -20,10 +20,14 @@ struct MarqueeText: View {
     private var overflows: Bool { boxWidth > 0 && textWidth > boxWidth + 1 }
 
     var body: some View {
-        // The hidden copy gives the line its height and takes the width it is offered.
-        label
+        // The hidden copy gives the line its height and takes the width it is offered. It must not
+        // be fixed-size: a frame with only a max width grows to its child, so a long title made
+        // the header (and with it the whole screen) wider than the display.
+        Text(text)
+            .font(font)
+            .lineLimit(1)
             .hidden()
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { boxWidth = $0 }
             .overlay(alignment: .leading) {
                 HStack(spacing: Self.gap) {

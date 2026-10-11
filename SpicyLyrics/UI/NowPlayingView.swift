@@ -287,6 +287,9 @@ struct NowPlayingView: View {
                 }
             }
         }
+        // Nothing that overflows (a long title, say) may widen the screen and push the lyrics
+        // and controls past its edge.
+        .frame(width: size.width, height: size.height)
     }
 
     /// Invisible area that shows the controls on tap.
