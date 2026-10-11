@@ -340,3 +340,6 @@
 "Авторы" = "Credits";
 "Автор" = "Author";
 "Тестер" = "Tester";
+"Скрывать «Текст не найден»" = "Hide \"Lyrics Not Found\"";
+"Скрывать несинхронный текст" = "Hide Unsynced Lyrics";
+"Вместо сообщения или статичного текста остаётся только фон. В горизонтальном режиме кнопки тоже прячутся; касание возвращает их." = "Instead of the notice or static lyrics, only the background stays. In landscape the controls hide too; a tap brings them back.";

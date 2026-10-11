@@ -648,6 +648,13 @@ private struct SourceSettings: View {
             }
 
             Section {
+                Toggle(String(localized: "Скрывать «Текст не найден»"), isOn: $settings.hideNotFoundNotice)
+                Toggle(String(localized: "Скрывать несинхронный текст"), isOn: $settings.hideStaticLyrics)
+            } footer: {
+                Text(String(localized: "Вместо сообщения или статичного текста остаётся только фон. В горизонтальном режиме кнопки тоже прячутся; касание возвращает их."))
+            }
+
+            Section {
                 Button(String(localized: "Свои тексты (TTML)")) { showOwnLyrics = true }
                 Button(String(localized: "Перезагрузить текст")) { player.loadLyrics(force: true) }
                 Button(cacheCleared ? String(localized: "Кэш очищен") : String(localized: "Очистить кэш текстов")) {

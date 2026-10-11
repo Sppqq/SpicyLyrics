@@ -196,9 +196,21 @@ struct NowPlayingView: View {
     /// Landscape with "Только текст": the controls only show up for a moment after a tap.
     private var lyricsOnly: Bool { isLandscape && settings.landscapeLyricsOnly }
 
+    /// No lyrics to show by the user's choice (not found / unsynced): just the background.
+    private var lyricsHidden: Bool {
+        switch player.lyricsState {
+        case .notFound: return settings.hideNotFoundNotice
+        case .loaded(let lyrics): return settings.hideStaticLyrics && lyrics.kind == .static
+        default: return false
+        }
+    }
+
+    /// Landscape with hidden lyrics: the controls fade away too, leaving the background alone.
+    private var backgroundOnly: Bool { isLandscape && lyricsHidden }
+
     private var canAutoHide: Bool {
         guard chromeVisible, !showSettings, !showPicker, !showSetupGuide, !showOwnLyrics else { return false }
-        return lyricsOnly || (settings.autoHideControls && player.isPlaying && lyricsLoaded)
+        return lyricsOnly || backgroundOnly || (settings.autoHideControls && player.isPlaying && lyricsLoaded)
     }
 
     private func showChrome() {
@@ -305,7 +317,7 @@ struct NowPlayingView: View {
     // MARK: Landscape
 
     private func landscapeLayout(_ size: CGSize) -> some View {
-        let lyricsOnly = settings.landscapeLyricsOnly
+        let lyricsOnly = settings.landscapeLyricsOnly || lyricsHidden
         let showTitle = settings.landscapeTitle && !lyricsOnly
         let column = min(size.width * 0.4, 420)
         let blockWidth = column - 40
@@ -543,7 +555,20 @@ struct NowPlayingView: View {
 
     // MARK: Lyrics
 
+    @ViewBuilder
     private func lyricsArea(topInset: CGFloat, bottomInset: CGFloat, horizontalPadding: CGFloat) -> some View {
+        if lyricsHidden {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { toggleChrome() }
+                .trackSwipes(enabled: settings.gesturesEnabled && player.track != nil,
+                             onNext: { skip(.next) }, onPrevious: { skip(.previous) })
+        } else {
+            visibleLyricsArea(topInset: topInset, bottomInset: bottomInset, horizontalPadding: horizontalPadding)
+        }
+    }
+
+    private func visibleLyricsArea(topInset: CGFloat, bottomInset: CGFloat, horizontalPadding: CGFloat) -> some View {
         lyricsContent(topInset: topInset, bottomInset: bottomInset, horizontalPadding: horizontalPadding)
             // Until Spotify confirms what is playing, the lyrics on screen may be stale.
             .opacity(player.isResyncing ? 0.3 : 1)

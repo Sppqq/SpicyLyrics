@@ -74,6 +74,10 @@ final class AppSettings {
     var landscapeTitle: Bool { didSet { defaults.set(landscapeTitle, forKey: Keys.landscapeTitle) } }
     /// Landscape: nothing but the lyrics; a tap brings the controls back for a few seconds.
     var landscapeLyricsOnly: Bool { didSet { defaults.set(landscapeLyricsOnly, forKey: Keys.landscapeLyricsOnly) } }
+    /// Show just the background instead of the "lyrics not found" notice.
+    var hideNotFoundNotice: Bool { didSet { defaults.set(hideNotFoundNotice, forKey: Keys.hideNotFound) } }
+    /// Show just the background instead of unsynced (static) lyrics.
+    var hideStaticLyrics: Bool { didSet { defaults.set(hideStaticLyrics, forKey: Keys.hideStatic) } }
 
     // Look & feel (multipliers are 1 at the original's values).
     /// Strength of the blur on lines away from the active one.
@@ -146,6 +150,8 @@ final class AppSettings {
             Keys.lyricsFont: LyricsFont.standard.rawValue,
             Keys.landscapeTitle: true,
             Keys.landscapeLyricsOnly: false,
+            Keys.hideNotFound: false,
+            Keys.hideStatic: false,
             Keys.blurStrength: 1.0,
             Keys.glowStrength: 1.0,
             Keys.inactiveBrightness: 1.0,
@@ -203,6 +209,8 @@ final class AppSettings {
         landscapeArtwork = defaults.bool(forKey: Keys.landscapeArtwork)
         landscapeTitle = defaults.bool(forKey: Keys.landscapeTitle)
         landscapeLyricsOnly = defaults.bool(forKey: Keys.landscapeLyricsOnly)
+        hideNotFoundNotice = defaults.bool(forKey: Keys.hideNotFound)
+        hideStaticLyrics = defaults.bool(forKey: Keys.hideStatic)
         blurStrength = defaults.double(forKey: Keys.blurStrength)
         glowStrength = defaults.double(forKey: Keys.glowStrength)
         inactiveBrightness = defaults.double(forKey: Keys.inactiveBrightness)
@@ -333,6 +341,8 @@ final class AppSettings {
         static let landscapeArtwork = "landscapeArtwork"
         static let landscapeTitle = "landscapeTitle"
         static let landscapeLyricsOnly = "landscapeLyricsOnly"
+        static let hideNotFound = "hideNotFoundNotice"
+        static let hideStatic = "hideStaticLyrics"
         static let blurStrength = "blurStrength"
         static let glowStrength = "glowStrength"
         static let inactiveBrightness = "inactiveBrightness"
