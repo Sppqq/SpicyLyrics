@@ -219,10 +219,20 @@ private struct WordFlowView: View {
     let alignment: HorizontalAlignment
 
     /// Syllables in reading order, each knowing whether it is glued to the next (same word).
+    /// Letter-animated syllables are laid out letter by letter (still glued), so a very long
+    /// word can break between letters instead of running off the screen.
     private var items: [FlowItem] {
-        words.indices.flatMap { w in
-            words[w].syllables.indices.map { s in
-                FlowItem(id: w * 10_000 + s, w: w, s: s, gluedToNext: s < words[w].syllables.count - 1)
+        words.indices.flatMap { w -> [FlowItem] in
+            let syllables = words[w].syllables
+            return syllables.indices.flatMap { s -> [FlowItem] in
+                let lastSyllable = s == syllables.count - 1
+                guard let letters = syllables[s].letters, !letters.isEmpty else {
+                    return [FlowItem(id: w * 1_000_000 + s * 1_000, w: w, s: s, letter: nil, gluedToNext: !lastSyllable)]
+                }
+                return letters.indices.map { l in
+                    FlowItem(id: w * 1_000_000 + s * 1_000 + l + 1, w: w, s: s, letter: l,
+                             gluedToNext: !(lastSyllable && l == letters.count - 1))
+                }
             }
         }
     }
@@ -231,48 +241,34 @@ private struct WordFlowView: View {
         let id: Int
         let w: Int
         let s: Int
+        /// Index of the letter in an emphasized syllable, nil for a whole syllable.
+        let letter: Int?
         let gluedToNext: Bool
+    }
+
+    private func visual(_ item: FlowItem) -> SyllableVisual {
+        visuals.indices.contains(item.w) && visuals[item.w].indices.contains(item.s)
+            ? visuals[item.w][item.s] : SyllableVisual()
     }
 
     var body: some View {
         FlowLayout(alignment: alignment, spacing: typography.wordGap(fontSize), rowSpacing: 0) {
             ForEach(items) { item in
-                SyllableView(
-                    fade: typography.fillFade,
-                    syllable: words[item.w].syllables[item.s],
-                    visual: visuals.indices.contains(item.w) && visuals[item.w].indices.contains(item.s)
-                        ? visuals[item.w][item.s] : SyllableVisual(),
-                    fontSize: fontSize,
-                    font: font,
-                    alpha: alpha,
-                    glowScale: typography.glowScale
-                )
+                Group {
+                    if let l = item.letter, let letters = words[item.w].syllables[item.s].letters {
+                        let letterVisuals = visual(item).letters
+                        GlyphView(text: letters[l].text,
+                                  visual: letterVisuals.indices.contains(l) ? letterVisuals[l] : GlyphVisual(),
+                                  fontSize: fontSize, font: font, alpha: alpha, fade: typography.fillFade,
+                                  glowKind: .letter, glowScale: typography.glowScale)
+                    } else {
+                        GlyphView(text: words[item.w].syllables[item.s].text, visual: visual(item).glyph,
+                                  fontSize: fontSize, font: font, alpha: alpha, fade: typography.fillFade,
+                                  glowKind: .syllable, glowScale: typography.glowScale)
+                    }
+                }
                 .layoutValue(key: GluedToNext.self, value: item.gluedToNext)
             }
-        }
-    }
-}
-
-private struct SyllableView: View {
-    let fade: Double
-    let syllable: PreparedSyllable
-    let visual: SyllableVisual
-    let fontSize: CGFloat
-    let font: Font
-    let alpha: GradientAlpha
-    let glowScale: Double
-
-    var body: some View {
-        if let letters = syllable.letters, visual.letters.count == letters.count {
-            HStack(spacing: 0) {
-                ForEach(letters.indices, id: \.self) { i in
-                    GlyphView(text: letters[i].text, visual: visual.letters[i], fontSize: fontSize,
-                              font: font, alpha: alpha, fade: fade, glowKind: .letter, glowScale: glowScale)
-                }
-            }
-        } else {
-            GlyphView(text: syllable.text, visual: visual.glyph, fontSize: fontSize,
-                      font: font, alpha: alpha, fade: fade, glowKind: .syllable, glowScale: glowScale)
         }
     }
 }
