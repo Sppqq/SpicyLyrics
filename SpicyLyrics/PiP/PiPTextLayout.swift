@@ -49,6 +49,8 @@ final class PiPTextLayout {
         var line: CTLine
         var origin: CGPoint
         var gray: CGFloat
+        /// Part of the first block (the lyric itself) rather than a translation or backing vocal.
+        var isFirst: Bool
     }
     private let placed: [Placed]
 
@@ -107,7 +109,7 @@ final class PiPTextLayout {
                 let full = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
                 let used = full - CGFloat(CTLineGetTrailingWhitespaceWidth(line))
                 let x = max(0, (width - used) * block.alignment)
-                placed.append(Placed(line: line, origin: CGPoint(x: x, y: y + ascent), gray: block.gray))
+                placed.append(Placed(line: line, origin: CGPoint(x: x, y: y + ascent), gray: block.gray, isFirst: b == 0))
                 let box = CGRect(x: x, y: y, width: used, height: lineHeight)
                 if b == 0 { first = first.union(box) } else { rest = rest.union(box) }
 
@@ -160,7 +162,7 @@ final class PiPTextLayout {
     /// The text as laid out.
     var sharp: Masks {
         if let sharpMasks { return sharpMasks }
-        let masks = masks(from: render(blur: 0))
+        let masks = masks(blur: 0)
         sharpMasks = masks
         return masks
     }
@@ -168,7 +170,7 @@ final class PiPTextLayout {
     /// A soft copy, for distance blur and glow.
     var soft: Masks {
         if let softMasks { return softMasks }
-        let masks = masks(from: render(blur: 6))
+        let masks = masks(blur: 6)
         softMasks = masks
         return masks
     }
@@ -182,16 +184,20 @@ final class PiPTextLayout {
         softMasks = nil
     }
 
-    private func masks(from image: CGImage?) -> Masks {
-        Masks(pieces: pieces.map { crop(image, $0.rect) }, first: crop(image, firstRect),
-              rest: restRect.flatMap { crop(image, $0) })
+    /// The first block and the rest are rendered apart: their padded crops overlap, and from
+    /// one shared image the lyric's descenders (p, g, y) were filled again with the translation.
+    private func masks(blur: Int) -> Masks {
+        let first = render(blur: blur, first: true)
+        let rest = restRect == nil ? nil : render(blur: blur, first: false)
+        return Masks(pieces: pieces.map { crop(first, $0.rect) }, first: crop(first, firstRect),
+                     rest: restRect.flatMap { crop(rest, $0) })
     }
 
     private func crop(_ image: CGImage?, _ rect: CGRect) -> CGImage? {
         image?.cropping(to: rect.offsetBy(dx: Self.pad, dy: Self.pad))
     }
 
-    private func render(blur radius: Int) -> CGImage? {
+    private func render(blur radius: Int, first: Bool) -> CGImage? {
         let width = Int(ceil(size.width + Self.pad * 2))
         let height = Int(ceil(size.height + Self.pad * 2))
         guard width > 0, height > 0,
@@ -203,7 +209,7 @@ final class PiPTextLayout {
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         context.setShouldSmoothFonts(false)
         context.textMatrix = .identity
-        for item in placed {
+        for item in placed where item.isFirst == first {
             context.setFillColor(gray: item.gray, alpha: 1)
             context.textPosition = CGPoint(x: Self.pad + item.origin.x, y: CGFloat(height) - Self.pad - item.origin.y)
             CTLineDraw(item.line, context)
