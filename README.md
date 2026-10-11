@@ -10,6 +10,9 @@ on Spotify. It ports the [Spicy Lyrics](https://github.com/Spikerko/spicy-lyrics
 Spicetify extension, taking inspiration from the Android app
 [spicylyrics/mobile](https://github.com/spicylyrics/mobile).
 
+Made by **[sppq](https://spicylyrics.org/sppq)** ([GitHub](https://github.com/Sppqq)), tested by
+**[nie4ick](https://spicylyrics.org/nie4ick)**.
+
 ## Ported Features
 
 These features work, but still need testing and refinement.
@@ -171,6 +174,10 @@ SpicyLyrics/
 - Lyric translations, Genius integration, and local TTML files are not supported in this version.
 
 ## License and Credits
+
+- Author: [sppq](https://spicylyrics.org/sppq) · [github.com/Sppqq](https://github.com/Sppqq)
+- Tester: [nie4ick](https://spicylyrics.org/nie4ick)
+- Original extension: [Spicy Lyrics](https://github.com/Spikerko/spicy-lyrics) by Spikerko
 
 Licensed under **AGPL-3.0**, following the original projects. See [LICENSE](LICENSE).
 This is an unofficial project and is not affiliated with Spotify AB or the creators of Spicy Lyrics.

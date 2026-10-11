@@ -696,6 +696,11 @@ private struct AboutSettings: View {
             Section {
                 LabeledContent(String(localized: "Версия"), value: AppVersion.display)
             }
+            Section(String(localized: "Авторы")) {
+                creditLink(String(localized: "Автор"), name: "sppq", url: "https://spicylyrics.org/sppq")
+                creditLink("GitHub", name: "Sppqq", url: "https://github.com/Sppqq")
+                creditLink(String(localized: "Тестер"), name: "nie4ick", url: "https://spicylyrics.org/nie4ick")
+            }
             Section {
                 Link(String(localized: "Spicy Lyrics (оригинал)"), destination: URL(string: "https://github.com/Spikerko/spicy-lyrics")!)
                 Link("Spicy Lyrics Mobile (Android)", destination: URL(string: "https://github.com/spicylyrics/mobile")!)
@@ -705,5 +710,17 @@ private struct AboutSettings: View {
                 Text(String(localized: "Неофициальный iOS-порт. Распространяется по лицензии AGPL-3.0, как и оригинал. Не связан со Spotify AB."))
             }
         }
+    }
+
+    private func creditLink(_ role: String, name: String, url: String) -> some View {
+        Link(destination: URL(string: url)!) {
+            LabeledContent(role) {
+                HStack(spacing: 4) {
+                    Text(name)
+                    Image(systemName: "arrow.up.right").font(.caption)
+                }
+            }
+        }
+        .foregroundStyle(.primary)
     }
 }
