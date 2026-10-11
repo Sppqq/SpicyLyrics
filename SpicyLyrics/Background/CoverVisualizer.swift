@@ -197,27 +197,42 @@ struct CoverPalette {
             pixels.append(SIMD3<Float>(r, g, b))
         }
 
-        // k-means with k = 5, seeded along brightness.
-        let sorted = pixels.sorted { luma($0) < luma($1) }
+        // Colours come from the most colourful pixels only (the top sixth by chroma), so a few
+        // bright flowers count for more than a large beige wall: averaging everything gave mud.
+        func chroma(_ color: SIMD3<Float>) -> Float {
+            let (_, s, v) = hsv(color)
+            return s * v
+        }
+        let byChroma = pixels.sorted { chroma($0) > chroma($1) }
+        let colourful = Array(byChroma.prefix(max(24, pixels.count / 6)))
+
+        // A grey or black-and-white cover: moonlight, a cool silver blue with a violet edge.
+        guard let best = colourful.first, chroma(best) >= 0.15 else {
+            return CoverPalette(deep: rgb(h: 0.64, s: 0.55, v: 0.1), vivid: rgb(h: 0.6, s: 0.32, v: 0.95),
+                                accent: rgb(h: 0.72, s: 0.38, v: 1))
+        }
+
+        // k-means (k = 4) over those, seeded around the colour wheel.
+        let byHue = colourful.sorted { hsv($0).h < hsv($1).h }
         var centers: [SIMD3<Float>] = []
-        for k in 0..<5 {
-            let index: Int = min(sorted.count - 1, (k * 2 + 1) * sorted.count / 10)
-            centers.append(sorted[index])
+        for k in 0..<4 {
+            let index: Int = min(byHue.count - 1, (k * 2 + 1) * byHue.count / 8)
+            centers.append(byHue[index])
         }
         var counts = [Int](repeating: 0, count: centers.count)
-        for _ in 0..<8 {
+        for _ in 0..<10 {
             var sums = [SIMD3<Float>](repeating: .zero, count: centers.count)
             counts = [Int](repeating: 0, count: centers.count)
-            for pixel in pixels {
-                var best = 0
-                var bestDistance = Float.infinity
+            for pixel in colourful {
+                var nearest = 0
+                var nearestDistance = Float.infinity
                 for (index, center) in centers.enumerated() {
                     let d: SIMD3<Float> = pixel - center
                     let distance: Float = d.x * d.x + d.y * d.y + d.z * d.z
-                    if distance < bestDistance { bestDistance = distance; best = index }
+                    if distance < nearestDistance { nearestDistance = distance; nearest = index }
                 }
-                sums[best] += pixel
-                counts[best] += 1
+                sums[nearest] += pixel
+                counts[nearest] += 1
             }
             for index in centers.indices where counts[index] > 0 {
                 centers[index] = sums[index] / Float(counts[index])
@@ -225,29 +240,28 @@ struct CoverPalette {
         }
         var clusters: [(color: SIMD3<Float>, share: Float)] = []
         for index in centers.indices where counts[index] > 0 {
-            let share = Float(counts[index]) / Float(pixels.count)
+            let share = Float(counts[index]) / Float(colourful.count)
             clusters.append((color: centers[index], share: share))
         }
-        guard !clusters.isEmpty else { return fallback }
-
-        func vividness(_ cluster: (color: SIMD3<Float>, share: Float)) -> Float {
-            let (_, s, v) = hsv(cluster.color)
-            return sqrt(cluster.share) * (0.25 + s) * (0.3 + v)
+        func score(_ cluster: (color: SIMD3<Float>, share: Float)) -> Float {
+            chroma(cluster.color) * (0.3 + sqrt(cluster.share))
         }
-        let byVividness = clusters.sorted { vividness($0) > vividness($1) }
-        let vivid = byVividness[0].color
-        let vividHue = hsv(vivid).h
-        let accentCluster = byVividness.dropFirst().first { cluster in
-            let difference = abs(hsv(cluster.color).h - vividHue)
-            return min(difference, 1 - difference) > 0.08 && hsv(cluster.color).s > 0.15
+        let ranked = clusters.sorted { score($0) > score($1) }
+        let lead = ranked.first?.color ?? best
+        let leadHue = hsv(lead).h
+        let second = ranked.dropFirst().first { cluster in
+            let difference = abs(hsv(cluster.color).h - leadHue)
+            return min(difference, 1 - difference) > 0.07 && chroma(cluster.color) > 0.15
         }
-        // A cover of one colour: the accent is that colour turned a little around the wheel.
-        let accent = accentCluster?.color ?? rgb(h: fract(vividHue + 0.12), s: hsv(vivid).s, v: hsv(vivid).v)
-        let deep = clusters.min { luma($0.color) < luma($1.color) }!.color
+        // One colour only: its neighbour on the wheel, so the nebula still shimmers.
+        let accent = second?.color ?? rgb(h: fract(leadHue + 0.09), s: hsv(lead).s, v: 1)
 
-        return CoverPalette(deep: lift(deep, saturation: 0.35, value: 0.08, maxValue: 0.35),
-                            vivid: lift(vivid, saturation: 0.55, value: 0.8, maxValue: 1),
-                            accent: lift(accent, saturation: 0.5, value: 0.9, maxValue: 1))
+        // Dark orange and dark yellow read as brown: their shadows lean towards crimson instead.
+        let warm = leadHue > 0.02 && leadHue < 0.17
+        let deepHue = warm ? fract(leadHue - 0.07) : leadHue
+        return CoverPalette(deep: rgb(h: deepHue, s: 0.85, v: 0.16),
+                            vivid: lift(lead, saturation: 0.72, value: 0.95, maxValue: 1),
+                            accent: lift(accent, saturation: 0.62, value: 1, maxValue: 1))
     }
 
     private static func luma(_ c: SIMD3<Float>) -> Float { 0.299 * c.x + 0.587 * c.y + 0.114 * c.z }

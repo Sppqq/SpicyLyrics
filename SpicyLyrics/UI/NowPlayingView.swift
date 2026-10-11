@@ -69,7 +69,8 @@ struct NowPlayingView: View {
                 // Experimental: a visualizer where the lyrics were hidden.
                 ZStack {
                     if showVisualizer {
-                        CoverVisualizerView(player: player, reduced: reduced, dim: settings.backgroundDim,
+                        // Half the background's darkening: the nebula should glow, the lines still read.
+                        CoverVisualizerView(player: player, reduced: reduced, dim: settings.backgroundDim * 0.5,
                                             randomColors: settings.nebulaColors == NebulaColors.random.rawValue)
                             .allowsHitTesting(false)
                             .transition(.opacity)
@@ -715,7 +716,8 @@ struct NowPlayingView: View {
             let lineHeight: CGFloat = lyrics == nil ? 0 : lineFont * 4.4
             let gap: CGFloat = lyrics == nil ? 0 : 20
             let side = max(0, min(geometry.size.width - margin * 2, freeHeight - margin * 2 - lineHeight - gap, 720))
-            VStack(spacing: gap) {
+            let blockTop = topInset + freeHeight / 2 - (side + gap + lineHeight) / 2
+            ZStack(alignment: .topLeading) {
                 ZStack {
                     artwork(side: side, cornerRadius: max(10, side * 0.035))
                         .id(player.artworkID)
@@ -723,18 +725,20 @@ struct NowPlayingView: View {
                 }
                 .shadow(color: .black.opacity(0.4), radius: 30, y: 16)
                 .scaleEffect(player.isPlaying ? 1 : 0.88)
+                .position(x: geometry.size.width / 2, y: blockTop + side / 2)
+                .animation(.spring(response: 0.5, dampingFraction: 0.75), value: player.isPlaying)
+                .animation(.easeInOut(duration: 0.6), value: player.artworkID)
+                .animation(Self.chromeAnimation, value: topInset)
+                .animation(Self.chromeAnimation, value: bottomInset)
+                // Moves itself along with the cover (see `ArtworkLyricLine`).
                 if let lyrics {
-                    ArtworkLyricLine(lyrics: lyrics, player: player, settings: settings, fontSize: lineFont)
+                    ArtworkLyricLine(lyrics: lyrics, player: player, settings: settings, fontSize: lineFont,
+                                     frame: CGRect(x: (geometry.size.width - side) / 2, y: blockTop + side + gap,
+                                                   width: side, height: lineHeight))
                         .id(player.lyricsRevision)
-                        .frame(width: side, height: lineHeight)
                         .transition(.opacity)
                 }
             }
-            .position(x: geometry.size.width / 2, y: topInset + freeHeight / 2)
-            .animation(.spring(response: 0.5, dampingFraction: 0.75), value: player.isPlaying)
-            .animation(.easeInOut(duration: 0.6), value: player.artworkID)
-            .animation(Self.chromeAnimation, value: topInset)
-            .animation(Self.chromeAnimation, value: bottomInset)
         }
         .accessibilityHidden(true)
     }

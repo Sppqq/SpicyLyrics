@@ -5,56 +5,64 @@ import SwiftUI
 /// vocals, word by word with the same fill, lift and glow as the full lyrics. The sung line
 /// leaves upwards as the next one rises in; after the last line it fades away.
 ///
-/// The swap is drawn frame by frame from the clock, not with a SwiftUI animation: an animated
-/// transaction also animated the words' own lift and scale, so a word jumped as lines changed.
+/// Everything here moves frame by frame from the clock, not with SwiftUI animations: the words
+/// being sung update every frame, which cuts any animation of theirs short. An animated swap made
+/// the last lit word jump; an animated move (the controls showing or hiding) left the animating
+/// words behind while the rest of the line moved. So the line glides to `frame` itself, on the
+/// same curve and time as the cover above it.
 struct ArtworkLyricLine: View {
     let player: PlayerModel
     let settings: AppSettings
     var fontSize: CGFloat = 24
+    /// Where the line sits, in the coordinates of the area this view fills.
+    var frame: CGRect
 
     @State private var animator: LyricsAnimator
     @State private var switcher = LineSwitcher()
+    @State private var glide = FrameGlide()
 
-    init(lyrics: PreparedLyrics, player: PlayerModel, settings: AppSettings, fontSize: CGFloat = 24) {
+    init(lyrics: PreparedLyrics, player: PlayerModel, settings: AppSettings, fontSize: CGFloat = 24, frame: CGRect) {
         self.player = player
         self.settings = settings
         self.fontSize = fontSize
+        self.frame = frame
         _animator = State(initialValue: LyricsAnimator(lyrics: lyrics, simple: settings.simpleLyricsMode))
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            TimelineView(.animation(minimumInterval: player.isPlaying ? 1.0 / 30 : 1.0 / 10)) { _ in
-                let now = MediaClock.now()
-                let position = player.position(at: now)
-                let _ = animator.step(position: position, now: now, blurEnabled: false)
-                let _ = switcher.show(Self.shownLine(animator.lyrics.lines, focus: animator.focusIndex, at: position),
-                                      now: now, instantly: animator.snapped)
-                let progress = switcher.progress(at: now)
-                let rise = geometry.size.height * 0.35
-                let typography = typography(width: geometry.size.width)
-                ZStack(alignment: .topLeading) {
-                    if let previous = switcher.previous, progress < 1 {
-                        block(previous, typography)
-                            .offset(y: -rise * progress)
-                            .opacity(1 - progress)
-                    }
-                    if let current = switcher.current {
-                        block(current, typography)
-                            .offset(y: rise * (1 - progress))
-                            .opacity(progress)
-                    }
+        TimelineView(.animation(minimumInterval: player.isPlaying ? 1.0 / 30 : 1.0 / 10)) { _ in
+            let box = glide.value(toward: frame, now: CACurrentMediaTime())
+            let now = MediaClock.now()
+            let position = player.position(at: now)
+            let _ = animator.step(position: position, now: now, blurEnabled: false)
+            let _ = switcher.show(Self.shownLine(animator.lyrics.lines, focus: animator.focusIndex, at: position),
+                                  now: now, instantly: animator.snapped)
+            let progress = switcher.progress(at: now)
+            let rise = box.height * 0.35
+            let typography = typography(width: box.width)
+            ZStack(alignment: .topLeading) {
+                if let previous = switcher.previous, progress < 1 {
+                    block(previous, typography)
+                        .offset(y: -rise * progress)
+                        .opacity(1 - progress)
                 }
-                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
-                // Lines leaving upwards must not run over the cover, but the words' glow and the
-                // interlude dots' pulse spill past the edges a little: room around them.
-                .mask {
-                    Rectangle()
-                        .padding(.horizontal, -32)
-                        .padding(.top, -12)
-                        .padding(.bottom, -32)
+                if let current = switcher.current {
+                    block(current, typography)
+                        .offset(y: rise * (1 - progress))
+                        .opacity(progress)
                 }
             }
+            .frame(width: box.width, height: box.height, alignment: .topLeading)
+            // Lines leaving upwards must not run over the cover, but the words' glow and the
+            // interlude dots' pulse spill past the edges a little: room around them.
+            .mask {
+                Rectangle()
+                    .padding(.horizontal, -32)
+                    .padding(.top, -12)
+                    .padding(.bottom, -32)
+            }
+            .offset(x: box.minX, y: box.minY)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .allowsHitTesting(false)
     }
@@ -124,6 +132,35 @@ struct ArtworkLyricLine: View {
         var line = line
         line.oppositeAligned = false
         return line
+    }
+}
+
+/// Glides a frame to its new place like the controls' `easeInOut(duration: 0.45)`.
+private final class FrameGlide {
+    private var from = CGRect.null
+    private var to = CGRect.null
+    private var start: CFTimeInterval = 0
+    private static let duration: Double = 0.45
+    private static let curve = Easing.cubicBezier(0.42, 0, 0.58, 1)
+
+    func value(toward target: CGRect, now: CFTimeInterval) -> CGRect {
+        if to.isNull {
+            from = target
+            to = target
+        } else if target != to {
+            from = value(at: now)
+            to = target
+            start = now
+        }
+        return value(at: now)
+    }
+
+    private func value(at now: CFTimeInterval) -> CGRect {
+        let t = CGFloat(Self.curve.value(at: (now - start) / Self.duration))
+        return CGRect(x: from.minX + (to.minX - from.minX) * t,
+                      y: from.minY + (to.minY - from.minY) * t,
+                      width: from.width + (to.width - from.width) * t,
+                      height: from.height + (to.height - from.height) * t)
     }
 }
 

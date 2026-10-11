@@ -160,13 +160,13 @@ static float3 nebula(float2 p, constant VisualizerUniforms &u) {
                       fbm(r + 3.5 * q + float2(8.3, 2.8) - t * 0.5));
     float f = fbm(r + 3.0 * w);
     // Layered like light, not mixed like paint: two colours mixed half and half turn to mud.
-    float body = pow(smoothstep(0.36, 0.86, f), 1.25);
+    float body = smoothstep(0.32, 0.82, f);
     float rim = smoothstep(0.6, 1.15, length(w)) * smoothstep(0.35, 0.7, f);
     float core = pow(smoothstep(0.7, 1.0, f), 3.0);
-    float3 col = u.deep * 0.12;
-    col += u.vivid * body * 0.95;
-    col += u.accent * rim * 0.7;
-    col += mix(u.vivid, float3(1.0), 0.5) * core * 0.7;
+    float3 col = u.deep * 0.35;
+    col += u.vivid * body * 1.1;
+    col += u.accent * rim * 0.9;
+    col += mix(u.vivid, float3(1.0), 0.25) * core * 0.6;
     col += stars(p + float2(t * 0.05, 0.0), u.time, 38.0) * (1.0 - body);
     return col;
 }
