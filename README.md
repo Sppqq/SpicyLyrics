@@ -34,10 +34,11 @@ Made by **[sppq](https://spicylyrics.org/sppq)** ([GitHub](https://github.com/Sp
 <p align="center"><sub>Make it yours: font, weight, size, alignment, blur, glow, background · romanization (Cyrillic, Japanese, Korean, Chinese, Greek)</sub></p>
 
 <p align="center">
+  <img src="docs/media/artwork.webp" width="250" alt="Big artwork over a flowing nebula with the line being sung under it">
   <img src="docs/media/simple.webp" width="250" alt="Simple Lyrics Mode">
   <img src="docs/media/settings.png" width="250" alt="Settings">
 </p>
-<p align="center"><sub>Simple Lyrics Mode · plenty of settings</sub></p>
+<p align="center"><sub>Big artwork with the line under it · Simple Lyrics Mode · plenty of settings</sub></p>
 
 <sub>Recorded in the iOS Simulator with the Debug-only demo mode (`SpicyLyrics/Support/DemoMode.swift`).
 Songs: Nemo — The Code, Bao The Whale &amp; Neuro-sama — Mesmerizer, KIDSCRY2DAY — sleep mode. On a phone
