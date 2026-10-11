@@ -831,9 +831,9 @@ final class PiPFrameRenderer {
             // Glow first, so it sits behind the letters like a shadow.
             let glow = reduceMotion ? 0 : kind.opacity(glyph.glow * style.glow)
             if glow > 0.004 {
-                if glows == nil { glows = layout.soft.pieces }
+                if glows == nil { glows = layout.glows }
                 if let glows, glows.indices.contains(p), let soft = glows[p] {
-                    context.fill(mask: soft, in: piece.rect, white: CGFloat(glow) * 1.6)
+                    context.fill(mask: soft, in: layout.glowRect(piece), white: CGFloat(glow) * 1.6)
                 }
             }
             let edge = glyphRect.minX + CGFloat(glyph.gradient) * runWidth - piece.advance - piece.rect.minX
@@ -878,7 +878,7 @@ final class PiPFrameRenderer {
             let (glyph, kind) = drawn
             let glow = kind.opacity(glyph.glow * style.glow)
             guard glow > 0.004 else { continue }
-            if glows == nil { glows = layout.soft.pieces }
+            if glows == nil { glows = layout.glows }
             guard let glows, glows.indices.contains(p), let soft = glows[p] else { continue }
             let rect = piece.glyphRect
             context.saveGState()
@@ -886,7 +886,7 @@ final class PiPFrameRenderer {
             context.translateBy(x: rect.midX, y: rect.midY + CGFloat(glyph.yOffset) * row.fontSize)
             context.scaleBy(x: CGFloat(glyph.scale), y: CGFloat(glyph.scale))
             context.translateBy(x: -rect.midX, y: -rect.midY)
-            context.fill(mask: soft, in: piece.rect, white: CGFloat(glow) * 1.6)
+            context.fill(mask: soft, in: layout.glowRect(piece), white: CGFloat(glow) * 1.6)
             context.restoreGState()
         }
     }

@@ -158,6 +158,7 @@ final class PiPTextLayout {
     }
     private var sharpMasks: Masks?
     private var softMasks: Masks?
+    private var glowMasks: [CGImage?]?
 
     /// The text as laid out.
     var sharp: Masks {
@@ -175,13 +176,29 @@ final class PiPTextLayout {
         return masks
     }
 
+    /// One glow per piece: only that piece's glyphs, blurred on their own with room all round.
+    /// Cropping the soft copy of the whole line instead cut a syllable's halo off at its tight
+    /// edges inside a word and brought the neighbours' blur along: a lit box around the letter.
+    var glows: [CGImage?] {
+        if let glowMasks { return glowMasks }
+        let masks = pieces.map(renderGlow)
+        glowMasks = masks
+        return masks
+    }
+
+    /// Where a piece's glow mask goes.
+    func glowRect(_ piece: Piece) -> CGRect {
+        piece.glyphRect.insetBy(dx: -Self.pad, dy: -Self.pad).integral
+    }
+
     /// Whether any bitmap is held, so the owner knows what to drop.
-    var isRasterized: Bool { sharpMasks != nil || softMasks != nil }
+    var isRasterized: Bool { sharpMasks != nil || softMasks != nil || glowMasks != nil }
 
     /// Drops the bitmaps (they come back on demand); the layout stays.
     func purge() {
         sharpMasks = nil
         softMasks = nil
+        glowMasks = nil
     }
 
     /// The first block and the rest are rendered apart: their padded crops overlap, and from
@@ -214,7 +231,37 @@ final class PiPTextLayout {
             context.textPosition = CGPoint(x: Self.pad + item.origin.x, y: CGFloat(height) - Self.pad - item.origin.y)
             CTLineDraw(item.line, context)
         }
-        guard radius > 0, let data = context.data else { return context.makeImage() }
+        guard radius > 0 else { return context.makeImage() }
+        return Self.blurred(context, width: width, height: height, radius: radius)
+    }
+
+    private func renderGlow(_ piece: Piece) -> CGImage? {
+        let rect = glowRect(piece)
+        let width = Int(rect.width), height = Int(rect.height)
+        guard width > 0, height > 0,
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpaceCreateDeviceGray(),
+                                      bitmapInfo: CGImageAlphaInfo.none.rawValue)
+        else { return nil }
+        context.setFillColor(gray: 0, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.setShouldSmoothFonts(false)
+        context.textMatrix = .identity
+        // Layout (top-left origin) → this bitmap (bottom-left origin).
+        let glyph = piece.glyphRect.insetBy(dx: -1, dy: 0)
+        context.clip(to: CGRect(x: glyph.minX - rect.minX, y: CGFloat(height) - (glyph.maxY - rect.minY),
+                                width: glyph.width, height: glyph.height))
+        for item in placed where item.isFirst {
+            context.setFillColor(gray: item.gray, alpha: 1)
+            context.textPosition = CGPoint(x: item.origin.x - rect.minX, y: CGFloat(height) - (item.origin.y - rect.minY))
+            CTLineDraw(item.line, context)
+        }
+        context.resetClip()
+        return Self.blurred(context, width: width, height: height, radius: 6)
+    }
+
+    private static func blurred(_ context: CGContext, width: Int, height: Int, radius: Int) -> CGImage? {
+        guard let data = context.data else { return context.makeImage() }
         var source = vImage_Buffer(data: data, height: vImagePixelCount(height), width: vImagePixelCount(width),
                                    rowBytes: context.bytesPerRow)
         guard let output = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
