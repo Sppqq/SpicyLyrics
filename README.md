@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/media/banner.png" alt="Spicy Lyrics for iOS: word-by-word lyrics for whatever you play on Spotify"></p>
+
 # Spicy Lyrics for iOS
 
 **Word-by-word lyrics for whatever you're playing on Spotify**, in an Apple Music style
