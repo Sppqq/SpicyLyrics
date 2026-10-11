@@ -1,276 +1,170 @@
-# Spicy Lyrics for iOS (Unofficial Port)
+# Spicy Lyrics for iOS
 
-> **Usable, but still rough.**
-> Past the first prototype: the app installs, follows Spotify, and shows word-synced lyrics
-> day to day. It is still raw, though. Expect bugs, rough edges, missing polish and settings
-> that change between versions. Please report what breaks.
+**Word-by-word lyrics for whatever you're playing on Spotify**, in an Apple Music style
+player on your iPhone or iPad.
 
-A standalone iOS app that displays **word-by-word synchronized lyrics** for songs playing
-on Spotify. It ports the [Spicy Lyrics](https://github.com/Spikerko/spicy-lyrics)
-Spicetify extension, taking inspiration from the Android app
-[spicylyrics/mobile](https://github.com/spicylyrics/mobile).
-
-Made by **[sppq](https://spicylyrics.org/sppq)** ([GitHub](https://github.com/Sppqq)), tested by
+It's an unofficial iOS version of [Spicy Lyrics](https://github.com/Spikerko/spicy-lyrics),
+the popular Spicetify extension for Spotify on desktop. Made by
+**[sppq](https://spicylyrics.org/sppq)** ([GitHub](https://github.com/Sppqq)), tested by
 **[nie4ick](https://spicylyrics.org/nie4ick)**.
 
-## In Action
+> **Heads up: it works, but it's still early.** You can use it every day, but expect some bugs
+> and settings that change between versions. If something breaks, please
+> [tell us](https://github.com/Sppqq/spicy-lyrics-ios/issues).
 
 <p align="center">
   <img src="docs/media/code.webp" width="250" alt="Word-by-word lyrics over the flowing cover">
   <img src="docs/media/duets.webp" width="250" alt="A fast duet: the second voice's lines sit on the right">
   <img src="docs/media/player.webp" width="250" alt="The player with its controls">
 </p>
-<p align="center"><sub>Word by word over the cover · duets, each voice on its own side · an Apple Music style player</sub></p>
+<p align="center"><sub>Lyrics light up word by word · duets, each singer on their own side · the player</sub></p>
 
 <p align="center">
   <img src="docs/media/landscape.webp" width="770" alt="Landscape: artwork and controls next to the lyrics">
 </p>
-<p align="center"><sub>Landscape</sub></p>
+<p align="center"><sub>Turn your phone sideways</sub></p>
 
 <p align="center">
-  <img src="docs/media/styles.webp" width="250" alt="The same song in three looks: centred and rounded, New York black, small semibold">
-  <img src="docs/media/romanization.webp" width="250" alt="Russian lyrics romanized on the device">
+  <img src="docs/media/styles.webp" width="250" alt="The same song in three looks">
+  <img src="docs/media/romanization.webp" width="250" alt="Russian lyrics written in Latin letters">
+  <img src="docs/media/artwork.webp" width="250" alt="Big artwork with the line being sung under it">
 </p>
-<p align="center"><sub>Make it yours: font, weight, size, alignment, blur, glow, background · romanization (Cyrillic, Japanese, Korean, Chinese, Greek)</sub></p>
+<p align="center"><sub>Your own look · lyrics in Latin letters · big artwork mode</sub></p>
 
 <p align="center">
-  <img src="docs/media/artwork.webp" width="250" alt="Big artwork over a flowing nebula with the line being sung under it">
   <img src="docs/media/simple.webp" width="250" alt="Simple Lyrics Mode">
   <img src="docs/media/settings.png" width="250" alt="Settings">
 </p>
-<p align="center"><sub>Big artwork with the line under it · Simple Lyrics Mode · plenty of settings</sub></p>
+<p align="center"><sub>Simple Lyrics Mode · lots of settings</sub></p>
 
-<sub>Recorded in the iOS Simulator with the Debug-only demo mode (`SpicyLyrics/Support/DemoMode.swift`).
-Songs: Nemo — The Code, Bao The Whale &amp; Neuro-sama — Mesmerizer, KIDSCRY2DAY — sleep mode. On a phone
-the app follows Spotify instead. On-device translation (iOS 18+) and
-Picture in Picture work on a phone only.</sub>
+## What it can do
 
-## Install
+- **Lyrics that follow the singer word by word**, with the same smooth animations as the desktop
+  extension. In duets each singer gets their own side, backing vocals sit under the main line,
+  and instrumental breaks show three bouncing dots.
+- **Tap a line to jump to it.** Swipe sideways to change songs, pinch to make the text bigger,
+  long-press a line to copy or share it.
+- **A background made from the album cover** that slowly flows like liquid.
+- **Big artwork mode**: the quote button at the bottom left swaps the lyrics for a large cover
+  with the current line under it.
+- **Floating lyrics (Picture in Picture)**: keep the current line on screen over other apps.
+- **Lyrics in other languages**: Japanese, Chinese, Korean, Russian and Greek can be shown in
+  Latin letters, and any song can be translated line by line.
+- **Make it yours**: font, size, boldness, alignment, glow, blur and background, all in Settings.
+- **Pick what plays next** from your queue or history, or search for a song.
+- **Skip songs without synced lyrics**, if you want.
+- **Your own lyrics**: add a TTML file for a song that has none.
+- **iPad**, upright and sideways, with keyboard shortcuts.
+- In **English and Russian**.
 
-The app is not on the App Store: you sideload it with **AltStore** or **SideStore** and get
-updates from this repository's source, like from an App Store page.
+## What you need
 
-**You need:** an iPhone or iPad on **iOS 17** or newer, the Spotify app with **Premium**, and a
-computer for the first AltStore / SideStore setup (Windows or Mac; SideStore needs it only once).
+- An **iPhone or iPad** on **iOS 17** or newer.
+- **Spotify Premium**: Spotify requires it for the sign-in the app uses.
+- A **Windows PC or Mac**, once, to set up AltStore or SideStore (see below).
 
-### 1. Install AltStore or SideStore
+## How to install
 
-- **AltStore** — [altstore.io](https://altstore.io): install AltServer on your computer and
-  follow its guide to put AltStore on the phone.
-- **SideStore** — [sidestore.io](https://sidestore.io): after the one-time setup it signs and
-  refreshes apps on the phone itself, no computer nearby.
+The app isn't on the App Store, so you install it with **AltStore** or **SideStore**. These are
+free apps that install apps from outside the App Store using your own Apple ID.
 
-### 2. Add the Spicy Lyrics source
+**1. Get AltStore or SideStore on your phone.** Pick one and follow its guide:
+- [AltStore](https://altstore.io): uses a small helper program on your computer.
+- [SideStore](https://sidestore.io): after the first setup, works on the phone alone.
 
-| Channel | What you get | Source URL |
-| --- | --- | --- |
-| **Stable** (recommended) | Tested releases | `https://github.com/Sppqq/spicy-lyrics-ios/releases/latest/download/altstore-source.json` |
-| **Alpha & Beta** | Every build from `main`, the newest first (can be rough) | `https://github.com/Sppqq/spicy-lyrics-ios/releases/latest/download/altstore-source-testing.json` |
+**2. Add Spicy Lyrics to it.** Copy this link:
 
-Copy a URL, then in AltStore or SideStore open **Sources → +**, paste it and tap **Add**.
-Both channels install the same app, so add **one** of them.
+```
+https://github.com/Sppqq/spicy-lyrics-ios/releases/latest/download/altstore-source.json
+```
 
-### 3. Install the app
+In AltStore or SideStore go to **Sources → +**, paste the link and tap **Add**.
 
-Open the source, tap **Spicy Lyrics → Free / Install** and wait for it to sign and install.
+<details>
+<summary>Want new features first? Use the test channel instead</summary>
 
-### 4. First launch: connect Spotify
+```
+https://github.com/Sppqq/spicy-lyrics-ios/releases/latest/download/altstore-source-testing.json
+```
 
-Spotify lets every developer app sign in only 5 accounts, so the app uses **your own** free
-Spotify developer app. It walks you through it on first launch (about two minutes); the steps
-are also under [Who can sign in](#who-can-sign-in). For the exact timing from the Spotify app on
-the same phone (App Remote):
+You get every new build as soon as it's made, so it can be buggier. Add only **one** of the two
+links: they install the same app.
+</details>
 
-1. In your app on [developer.spotify.com](https://developer.spotify.com/dashboard) →
-   **Settings**, tick **iOS** as well.
-2. Add the **Bundle ID** shown in Spicy Lyrics → *Settings → Sync → If it won't connect*
-   (AltStore and SideStore change it when they install) and the redirect URI
-   `spicylyrics-ios://callback`.
-3. Sign in once more in Spicy Lyrics if it says so.
+**3. Install it.** Open the source, tap **Spicy Lyrics → Install** and wait a moment.
 
-### Updates
+**4. Connect Spotify.** Open the app and follow its guide. It takes about two minutes;
+[here's why it's needed](#why-do-i-have-to-create-a-spotify-app).
 
-AltStore / SideStore check the source and show **Update** under **My Apps** when a new version
-is out (*Update All* updates everything at once). What's new is in each
-[release](https://github.com/Sppqq/spicy-lyrics-ios/releases). Your settings and sign-in stay.
+**Updates** show up in AltStore or SideStore under **My Apps**. Your settings stay when you update.
 
-### Keep it running
+## Questions and problems
 
-A free Apple ID signs apps for **7 days**. AltStore refreshes them in the background while
-AltServer runs on the same Wi-Fi; SideStore refreshes on the phone. If the app stops opening,
-open AltStore / SideStore → **My Apps → Refresh All**. A free Apple ID can also have only
-3 sideloaded apps at a time.
+### Why do I have to create a Spotify app?
 
-### Without AltStore
+Spotify lets each developer app be used by only **5 people**. So instead of sharing one app,
+everybody makes their own. It's free and takes a couple of minutes. The app walks you
+through it, and here are the same steps:
 
-Every [release](https://github.com/Sppqq/spicy-lyrics-ios/releases) has an unsigned
-`SpicyLyrics-<version>-unsigned.ipa`; sign it with any sideloading tool (Sideloadly, a paid
-developer account, …). Or [build it yourself](#building).
-
-### Troubleshooting
-
-- **The app doesn't open after a week** — refresh it (see above).
-- **"INVALID_CLIENT" or a 403 when signing in** — the Client ID, redirect URI or User Management
-  entry in your Spotify developer app is off; see [Who can sign in](#who-can-sign-in).
-- **The sync badge says "SDK: sign in again"** — your login predates App Remote: sign in again.
-- **"SDK: no link"** — Spotify must be playing on this phone; check step 4, then tap the badge →
-  *Open Spotify and Connect*.
-- **Something else** — *Settings → Log → Share Log File*, and open an
-  [issue](https://github.com/Sppqq/spicy-lyrics-ios/issues) with it.
-
-## Ported Features
-
-These features work, but still need testing and refinement.
-
-| Feature | iOS implementation |
-| --- | --- |
-| Word-by-word highlighting | Port of `LyricsAnimator.ts`: NotSung/Active/Sung states, syllable gradients, cubic splines for scale/y-offset/glow, and [spr](https://github.com/Fraktality/spr) springs |
-| Per-letter animation | Syllables longer than one second are split into letters with a proximity effect, following `Emphasize.ts` |
-| Line blur | Blur increases with distance from the active line (`BlurMultiplier = 1.25`) |
-| Duets and backing vocals | Right-aligned `OppositeAligned` lines; each backing-vocal group is its own smaller row under the main line (`bg-line`), so two can follow each other |
-| Instrumental breaks | Three animated dots during gaps of at least three seconds |
-| Line-synced and static lyrics | `Line` and `Static` lyric types |
-| Dynamic background | Port of the extension's Kawarp: the blurred cover warped like liquid by drifting noise, cross-fading from song to song and slowing down on pause. A Metal shader drawn at the original's 300×150 and stretched, so it stays light on battery |
-| Big artwork | The quote button at the bottom left swaps the lyrics for the cover, as big as fits, over a flowing nebula in the cover's colours, with the line being sung under it (word by word, like the lyrics). Songs whose lyrics are hidden can show it too, or the nebula alone |
-| Skip songs without sync | Optionally skips songs that have no Spicy Lyrics sync (or no word-by-word sync). The next songs in the queue are looked up while the current one plays, so an unsynced song is skipped the moment it starts, together with any unsynced songs right after it; songs you pick or go back to are kept |
-| Lyrics ahead of time | The lyrics of the next songs in the queue are fetched while the current one plays, so they show the moment the song changes |
-| Lyrics sources | Spicy Lyrics API with [LRCLIB](https://lrclib.net) as a fallback |
-| Romanization | Supported when returned by the API (`TransliteratedText`) |
-| Seeking | Tap a lyric line to seek to it; requires Spotify Premium |
-| Track picker | Tap the track header (or the list button) to jump ahead in the queue, replay something from your history, or search; swipe the header sideways to skip. Requires Spotify Premium |
-| Own TTML files | Like the extension's Lyrics Manager: pick a `.ttml` file or paste TTML, apply it just once or save it to a library that wins over online sources (*••• → Свой текст (TTML)*) |
-| Apple Music style player | Controls fade away while a song plays; landscape and iPad put artwork and controls beside the lyrics |
-| Gestures | Swipe the lyrics sideways to change tracks, pinch to resize, long-press a line to seek / copy / share (iOS 18+) |
-| iPad | Side-by-side layout in both orientations, larger lyrics, pointer hover, keyboard shortcuts (space, ⌘← / ⌘→) |
-| Floating lyrics (Picture in Picture) | The current line, word by word, in a PiP window over any app; wide, square, portrait or tall; opens out of the lyrics and closes back onto them; starts from *•••* or when leaving the app; play/pause and ±15 s from the window |
-| Romanization and translation | On-device: Japanese (with kanji readings), Chinese pinyin, Korean, Cyrillic, Greek; translation under or instead of each line, by Apple Translation on the device (iOS 18+), Google, Yandex or DeepL (your own key) |
-| Interface language | English and Russian; follows the phone's language (English otherwise), or pick one in *Settings → Interface* |
-| Display modes | Spicy Lyrics' Simple Lyrics Mode, centred lyrics, SF Pro / Rounded / New York |
-
-## Spotify Connection
-
-The app connects through the official **Spotify Web API**:
-
-- OAuth sign-in using Authorization Code + PKCE, without a client secret.
-- Requests to `/me/player` every 2 seconds while playing (sooner near the end of a track and
-  right after a button press). Between requests, playback position is estimated locally; small
-  differences are blended in gradually (median of recent polls) so words never jump backwards,
-  and a position that stops moving is treated as paused even if Spotify still reports `is_playing`.
-- Transient connection failures (TLS handshake errors, dropped VPN connections) are retried
-  on a fresh connection.
-- Play/pause, next/previous, and seeking through the Web API; these controls require
-  **Spotify Premium**.
-
-### Who can sign in
-
-Spotify keeps every developer app in **Development Mode** unless the developer is an
-organization with 250,000+ monthly users, and a Development Mode app accepts at most
-**5 allowlisted accounts**; the app owner also needs Premium. The same applies to the iOS SDK.
-So the app ships **without a Client ID of its own**: everyone signs in with **their own Client
-ID**, and the app walks them through it on first launch (*Settings → Spotify* to change it):
-
-1. You need **Spotify Premium** (Spotify requires it from the owner of a developer app).
-2. Open the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), sign in with
+1. Open the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), sign in with
    your Spotify account and accept the terms.
-3. **Create app**: any name and description, website empty, redirect URI
-   `spicylyrics-ios://callback` (press **Add**), tick **Web API**, accept, **Save**.
-4. **Settings → User Management → Add new user** with your Spotify account's email
-   (up to five people can share your Client ID this way).
-5. **Basic Information → Client ID**: copy it (not the client secret) and paste it into the app.
+2. Tap **Create app**. Give it any name and description. Under **Redirect URIs** type
+   `spicylyrics-ios://callback` and press **Add**. Tick **Web API**, accept, and **Save**.
+3. Open **Settings → User Management** and add the email of your Spotify account.
+   You can add up to 5 people there, so friends can use your app too.
+4. Copy the **Client ID** from **Basic Information** and paste it into Spicy Lyrics.
 
-If an account that isn't in your app's User Management list signs in, Spotify answers 403; the
-app then explains how to add it. A quota 429 (`QUOTA_EXCEEDED`) is reported too.
+### The lyrics are a bit behind or ahead
 
-## Lyrics Source: Spicy Lyrics Key
+For the most exact timing, let Spicy Lyrics talk to the Spotify app on the same phone:
 
-- **With a key (recommended):** obtain a client key (`sl_pk_…`) from
-  [Spicy Lyrics Developers](https://developers.spicylyrics.org) and enter it under
-  *Settings → Lyrics Sources*. The app uses `GET /v1/lyrics/{trackId}`, as the Android app does.
-- **Without a key:** the app sends a `POST /query` request using your Spotify token,
-  following the Spicetify extension. SLObjPack responses are decoded on the device.
-  The server may reject tokens from third-party apps. If that happens, the app prompts
-  you to add a key and falls back to LRCLIB for line-synced lyrics.
+1. In your app on the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard),
+   open **Settings** and tick **iOS** as well.
+2. Add the **Bundle ID** shown in Spicy Lyrics under *Settings → Sync → If it won't connect*,
+   and the redirect URI `spicylyrics-ios://callback`.
+3. Sign in again in Spicy Lyrics if it asks.
 
-## Built-in Key
+### The app stopped opening after a week
 
-The Spicy Lyrics client key (`sl_pk_…`) can be built into the app, so users skip that setup and
-cannot change it. A Spotify Client ID is never built in (see *Who can sign in*).
+With a free Apple ID, apps you install yourself work for **7 days** and then need a refresh.
+AltStore refreshes them on its own when your computer with AltServer is on the same Wi-Fi;
+SideStore does it on the phone. To refresh by hand: **My Apps → Refresh All**.
+A free Apple ID can have only 3 such apps at a time.
 
-- **Locally:** copy `Config/Secrets.example.xcconfig` to `Config/Secrets.xcconfig` (git-ignored)
-  and fill it in.
-- **GitHub Actions:** add the repository secret `SPICY_LYRICS_KEY`.
+### Other problems
 
-`scripts/generate-bundled-keys.sh` turns it into a git-ignored Swift file with the value
-XOR-masked, so it is not readable in `Info.plist` or the binary's strings. This only deters
-casual inspection: it is a public client key that the app sends over the network anyway.
-Never put a Spicy Lyrics secret key (`sl_sk_…`) there.
+- **"INVALID_CLIENT" or error 403 when signing in**: something in your Spotify app is off.
+  Check the Client ID, the redirect URI, and that your email is under User Management.
+- **The sync badge says "SDK: sign in again"**: sign in again in the app.
+- **"SDK: no link"**: Spotify has to be playing on this phone. Tap the badge →
+  *Open Spotify and Connect*.
+- **Anything else**: go to *Settings → Log → Share Log File* and
+  [open an issue](https://github.com/Sppqq/spicy-lyrics-ios/issues) with the file attached.
 
-## Building
+### Good to know
 
-Requires a Mac with Xcode 16+ targeting iOS 17+, **or** GitHub Actions.
-Build and installation paths are experimental at this stage.
+- Lyrics follow Spotify while the app is open or the floating lyrics window is on screen.
+- Play, pause, skip and jumping to a line need Spotify Premium.
+- Lyrics come from Spicy Lyrics, and from [LRCLIB](https://lrclib.net) when Spicy Lyrics has none.
 
-### On a Mac
+### Can I install it without AltStore?
 
-```bash
-brew install xcodegen
-xcodegen generate
-open SpicyLyrics.xcodeproj
-```
+Yes. Every [release](https://github.com/Sppqq/spicy-lyrics-ios/releases) has an `.ipa` file that
+you can sign with another tool, such as [Sideloadly](https://sideloadly.io).
 
-Select your development team in Xcode under **Signing & Capabilities**. If the bundle
-identifier is unavailable, change `PRODUCT_BUNDLE_IDENTIFIER` in `project.yml`.
-Then build and run the app on your iPhone.
+## For developers
 
-### Without a Mac: GitHub Actions and Sideloading
+How it works inside, how to build it, and how releases are made: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
-The workflow in `.github/workflows/ios-build.yml` builds an **unsigned** IPA on a macOS
-runner. What it publishes depends on how it runs:
+<sub>The clips above were recorded in the iOS Simulator with the app's demo mode. Songs: Nemo — The Code,
+Bao The Whale &amp; Neuro-sama — Mesmerizer, KIDSCRY2DAY — sleep mode.</sub>
 
-| Trigger | Channel | Result |
-| --- | --- | --- |
-| Pull request | `pr` | Compile check; IPA only as a run artifact |
-| Push or merge to `main` | `alpha` | Pre-release `vX.Y.Z-alpha.N` under *Releases* (the last 10 are kept) |
-| *Actions → Build iOS app → Run workflow* on `main` | `release` | Stable release `vX.Y.Z` under *Releases* |
-
-Versioning:
-
-- Stable versions are git tags `vX.Y.Z`. A manual run raises the latest one by the chosen
-  part (`patch` by default, or `minor` / `major`), or uses the exact version you type in.
-- Alphas carry the version of the next patch release plus the run number, e.g. `v0.1.1-alpha.57`.
-- `MARKETING_VERSION` in `project.yml` is the floor: with no tags yet the first release uses it,
-  and raising it (say to `1.0.0`) moves every following build to that line.
-- The build number (`CFBundleVersion`) is the workflow run number, so it always grows.
-- The app shows its version and channel under *Settings → About*.
-
-To install, download the IPA from the release (or the run's artifacts) and sign it with
-[Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) using your Apple ID.
-With a free account, the installation has to be refreshed every seven days.
-
-## Project Structure
-
-```text
-SpicyLyrics/
-  App/          Entry point and lifecycle; polling while the app is open
-  Spotify/      OAuth PKCE, Web API, player model, and playback clock
-  Lyrics/       Models, parsers (Spicy JSON, LRC), SLObjPack, service, and disk cache
-  Rendering/    Springs, splines, animator, lyric line rendering, and scrolling
-  Background/   Kawarp background and visualizer (Metal)
-  UI/           Onboarding, now playing screen, playback controls, and settings
-```
-
-## Current Limitations
-
-- **Still raw:** expect bugs and rough edges; features, UI, and integrations may change between versions.
-- Spotify is followed while the app is open or its Picture in Picture window is up; not in the background otherwise.
-- Playback controls require Spotify Premium.
-- Genius integration is not supported in this version.
-
-## License and Credits
+## License and credits
 
 - Author: [sppq](https://spicylyrics.org/sppq) · [github.com/Sppqq](https://github.com/Sppqq)
 - Tester: [nie4ick](https://spicylyrics.org/nie4ick)
 - Original extension: [Spicy Lyrics](https://github.com/Spikerko/spicy-lyrics) by Spikerko
+- Inspired by the Android app [spicylyrics/mobile](https://github.com/spicylyrics/mobile)
 
-Licensed under **AGPL-3.0**, following the original projects. See [LICENSE](LICENSE).
-This is an unofficial project and is not affiliated with Spotify AB or the creators of Spicy Lyrics.
+Licensed under **AGPL-3.0**, like the original projects. See [LICENSE](LICENSE).
+This is an unofficial project, not affiliated with Spotify or the creators of Spicy Lyrics.
