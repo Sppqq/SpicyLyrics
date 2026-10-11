@@ -30,9 +30,8 @@ Made by **[sppq](https://spicylyrics.org/sppq)** ([GitHub](https://github.com/Sp
 <p align="center">
   <img src="docs/media/styles.webp" width="250" alt="The same song in three looks: centred and rounded, New York black, small semibold">
   <img src="docs/media/romanization.webp" width="250" alt="Russian lyrics romanized on the device">
-  <img src="docs/media/pip.webp" width="250" alt="Lyrics in the floating Picture in Picture window">
 </p>
-<p align="center"><sub>Make it yours: font, weight, size, alignment, blur, glow, background · romanization (Cyrillic, Japanese, Korean, Chinese, Greek) · Picture in Picture over other apps*</sub></p>
+<p align="center"><sub>Make it yours: font, weight, size, alignment, blur, glow, background · romanization (Cyrillic, Japanese, Korean, Chinese, Greek)</sub></p>
 
 <p align="center">
   <img src="docs/media/ipad.webp" width="500" alt="iPad: artwork and controls beside the lyrics">
@@ -47,8 +46,8 @@ Made by **[sppq](https://spicylyrics.org/sppq)** ([GitHub](https://github.com/Sp
 
 <sub>Recorded in the iOS Simulator with the Debug-only demo mode (`SpicyLyrics/Support/DemoMode.swift`).
 Songs: Nemo — The Code, Bao The Whale &amp; Neuro-sama — Mesmerizer, KIDSCRY2DAY — sleep mode. On a phone
-the app follows Spotify instead. \*The Simulator has no Picture in Picture, so the PiP clip shows the
-window's real frames over a stand-in home screen. On-device translation (iOS 18+) works on a phone only.</sub>
+the app follows Spotify instead. On-device translation (iOS 18+) and
+Picture in Picture work on a phone only.</sub>
 
 ## Ported Features
 
