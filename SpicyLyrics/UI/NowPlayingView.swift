@@ -295,10 +295,19 @@ struct NowPlayingView: View {
         }
     }
 
+    /// The song has lyrics to switch to: the lyrics button is greyed out otherwise.
+    private var lyricsAvailable: Bool {
+        switch player.lyricsState {
+        case .loaded, .loading: return !lyricsHidden
+        default: return false
+        }
+    }
+
     /// The experimental visualizer fills in for lyrics hidden by the user's choice.
     private var showVisualizer: Bool {
         CoverVisualizer.isSupported
-            && (bigArtworkShown || (lyricsHidden && settings.hiddenLyricsView == HiddenLyricsView.visualizer.rawValue))
+            && ((bigArtworkShown && settings.artworkBackground == ArtworkBackground.nebula.rawValue)
+                || (lyricsHidden && settings.hiddenLyricsView == HiddenLyricsView.visualizer.rawValue))
     }
 
     /// The big cover instead of the lyrics: chosen with the bottom-left button, or the setting
@@ -658,6 +667,7 @@ struct NowPlayingView: View {
                 withAnimation(.easeInOut(duration: 0.45)) { artworkMode.toggle() }
             },
             lyricsShown: !bigArtworkShown,
+            lyricsAvailable: lyricsAvailable,
             isVisible: chromeVisible,
             compact: compact
         )

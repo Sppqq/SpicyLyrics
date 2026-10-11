@@ -376,15 +376,22 @@ private struct InterfaceSettings: View {
 
             Section {
                 Toggle(String(localized: "Строка текста под обложкой"), isOn: $settings.artworkLyricLine)
-                Picker(String(localized: "Цвета туманности"), selection: $settings.nebulaColors) {
-                    ForEach(NebulaColors.allCases) { colors in
-                        Text(colors.title).tag(colors.rawValue)
+                Picker(String(localized: "Фон за обложкой"), selection: $settings.artworkBackground) {
+                    ForEach(ArtworkBackground.allCases) { background in
+                        Text(background.title).tag(background.rawValue)
+                    }
+                }
+                if settings.artworkBackground == ArtworkBackground.nebula.rawValue {
+                    Picker(String(localized: "Цвета туманности"), selection: $settings.nebulaColors) {
+                        ForEach(NebulaColors.allCases) { colors in
+                            Text(colors.title).tag(colors.rawValue)
+                        }
                     }
                 }
             } header: {
                 Text(String(localized: "Большая обложка"))
             } footer: {
-                Text(String(localized: "Кнопка с цитатой внизу слева переключает текст и большую обложку. Под обложкой — строка, которую поют, с бэк-вокалом и теми же анимациями, что и в тексте. За обложкой течёт туманность: в цветах обложки или в случайных, своих для каждой песни."))
+                Text(String(localized: "Кнопка с цитатой внизу слева переключает текст и большую обложку. Под обложкой — строка, которую поют, с бэк-вокалом и теми же анимациями, что и в тексте. За обложкой течёт туманность (в цветах обложки или в случайных, своих для каждой песни) или тот же фон, что и за текстом."))
             }
 
             Section {

@@ -373,7 +373,9 @@
 "Цвета туманности" = "Nebula Colours";
 "Из обложки" = "From the Artwork";
 "Случайные" = "Random";
-"Кнопка с цитатой внизу слева переключает текст и большую обложку. Под обложкой — строка, которую поют, с бэк-вокалом и теми же анимациями, что и в тексте. За обложкой течёт туманность: в цветах обложки или в случайных, своих для каждой песни." = "The quote button at the bottom left switches between the lyrics and the big artwork. Under the artwork is the line being sung, with its backing vocals and the same animations as the lyrics. Behind the artwork flows a nebula, in the artwork's colours or in random ones, its own for every song.";
+"Кнопка с цитатой внизу слева переключает текст и большую обложку. Под обложкой — строка, которую поют, с бэк-вокалом и теми же анимациями, что и в тексте. За обложкой течёт туманность (в цветах обложки или в случайных, своих для каждой песни) или тот же фон, что и за текстом." = "The quote button at the bottom left switches between the lyrics and the big artwork. Under the artwork is the line being sung, with its backing vocals and the same animations as the lyrics. Behind the artwork flows a nebula (in the artwork's colours or in random ones, its own for every song) or the same background as behind the lyrics.";
+"Фон за обложкой" = "Background Behind the Artwork";
+"Как у текста" = "Same as Lyrics";
 "Трек" = "Track";
 "Без перевода" = "No Translation";
 "Поверх" = "Float";

@@ -14,6 +14,8 @@ struct PlaybackBar: View {
     var onToggleLyrics: () -> Void = {}
     /// Lyrics are on screen (the button is lit), not the big cover.
     var lyricsShown = true
+    /// False when the song has no lyrics: the button is greyed out and does nothing.
+    var lyricsAvailable = true
     /// False while the controls are faded out: the scrubber stops ticking.
     var isVisible = true
     /// Landscape: tighter spacing and no bottom icon row (it does not fit beside the lyrics).
@@ -51,6 +53,8 @@ struct PlaybackBar: View {
         }
     }
 
+    private var lit: Bool { lyricsShown && lyricsAvailable }
+
     /// Lyrics toggle, AirPlay and the track list under the volume (portrait only).
     private var accessoryRow: some View {
         HStack {
@@ -61,10 +65,11 @@ struct PlaybackBar: View {
                 // Lit while the lyrics show, like Apple Music's lyrics button.
                 Image(systemName: "quote.bubble.fill")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(lyricsShown ? .black.opacity(0.75) : .white.opacity(0.6))
+                    .foregroundStyle(lit ? .black.opacity(0.75) : .white.opacity(lyricsAvailable ? 0.6 : 0.25))
                     .frame(width: 34, height: 30)
-                    .background(.white.opacity(lyricsShown ? 0.85 : 0), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(.white.opacity(lit ? 0.85 : 0), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
+            .disabled(!lyricsAvailable)
             .accessibilityLabel(lyricsShown ? String(localized: "Показать обложку") : String(localized: "Показать текст"))
             Spacer()
             AirPlayButton()
