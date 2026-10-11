@@ -46,7 +46,14 @@ struct ArtworkLyricLine: View {
                     }
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
-                .clipped()
+                // Lines leaving upwards must not run over the cover, but the words' glow and the
+                // interlude dots' pulse spill past the edges a little: room around them.
+                .mask {
+                    Rectangle()
+                        .padding(.horizontal, -32)
+                        .padding(.top, -12)
+                        .padding(.bottom, -32)
+                }
             }
         }
         .allowsHitTesting(false)
