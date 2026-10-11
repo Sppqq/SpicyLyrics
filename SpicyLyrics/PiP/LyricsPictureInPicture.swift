@@ -749,6 +749,9 @@ final class PiPFrameRenderer {
             default: lit = visual.state == .sung
             }
             let value: CGFloat = isStatic(line) ? 1 : CGFloat(lit ? alpha.lit : alpha.unlit)
+            // A line that just ended is blurred at once, but its glow is still dying down (it peaks
+            // on the last words, which a spring brings up late): keep drawing it, as the app does.
+            if animated { drawGlows(row, visual: visual, opacity: opacity, style: style, context: context) }
             fillMixed(layout.sharp.first, layout.soft.first, soft: soft, rect: layout.firstRect,
                       alpha: value * opacity, context: context)
         }
@@ -781,32 +784,9 @@ final class PiPFrameRenderer {
         let gradient = fillGradient(alpha)
         var glows: [CGImage?]?
         for (p, piece) in layout.pieces.enumerated() {
-            guard masks.pieces.indices.contains(p), let mask = masks.pieces[p] else { continue }
-            let glyph: GlyphVisual
-            let kind: GlowKind
-            switch row.runs[piece.run] {
-            case .space:
-                continue
-            case .syllable(let w, let s):
-                glyph = Self.syllable(visual.lead, w, s)?.glyph ?? GlyphVisual()
-                kind = .syllable
-            case .letter(let w, let s, let l):
-                let syllable = Self.syllable(visual.lead, w, s)
-                if let syllable, syllable.letters.indices.contains(l) {
-                    // The letter rides its word's own scale and lift.
-                    var letter = syllable.letters[l]
-                    letter.scale *= syllable.glyph.scale
-                    letter.yOffset += syllable.glyph.yOffset
-                    glyph = letter
-                    kind = .letter
-                } else {
-                    glyph = syllable?.glyph ?? GlyphVisual()
-                    kind = .syllable
-                }
-            case .line:
-                glyph = visual.line
-                kind = .line
-            }
+            guard masks.pieces.indices.contains(p), let mask = masks.pieces[p],
+                  let drawn = Self.glyph(row.runs[piece.run], visual) else { continue }
+            let (glyph, kind) = drawn
             let runWidth = layout.runWidths[piece.run]
             let scale = reduceMotion ? 1 : CGFloat(glyph.scale)
             let lift = reduceMotion ? 0 : CGFloat(glyph.yOffset) * row.fontSize
@@ -832,6 +812,51 @@ final class PiPFrameRenderer {
                 context.drawLinearGradient(gradient, start: CGPoint(x: edge, y: 0), end: CGPoint(x: edge + feather, y: 0),
                                            options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
             }
+            context.restoreGState()
+        }
+    }
+
+    /// What a run draws with: its animator visual and glow kind (nil for spaces).
+    private static func glyph(_ run: RunRef, _ visual: LineVisual) -> (GlyphVisual, GlowKind)? {
+        switch run {
+        case .space:
+            return nil
+        case .syllable(let w, let s):
+            return (syllable(visual.lead, w, s)?.glyph ?? GlyphVisual(), .syllable)
+        case .letter(let w, let s, let l):
+            let syllable = syllable(visual.lead, w, s)
+            if let syllable, syllable.letters.indices.contains(l) {
+                // The letter rides its word's own scale and lift.
+                var letter = syllable.letters[l]
+                letter.scale *= syllable.glyph.scale
+                letter.yOffset += syllable.glyph.yOffset
+                return (letter, .letter)
+            }
+            return (syllable?.glyph ?? GlyphVisual(), .syllable)
+        case .line:
+            return (visual.line, .line)
+        }
+    }
+
+    /// Only the glow of each piece, where `drawPieces` would put it.
+    private func drawGlows(_ row: Row, visual: LineVisual, opacity: CGFloat, style: PiPStyle, context: CGContext) {
+        guard !UIAccessibility.isReduceMotionEnabled else { return }
+        let layout = row.layout
+        var glows: [CGImage?]?
+        for (p, piece) in layout.pieces.enumerated() {
+            guard let drawn = Self.glyph(row.runs[piece.run], visual) else { continue }
+            let (glyph, kind) = drawn
+            let glow = kind.opacity(glyph.glow * style.glow)
+            guard glow > 0.004 else { continue }
+            if glows == nil { glows = layout.soft.pieces }
+            guard let glows, glows.indices.contains(p), let soft = glows[p] else { continue }
+            let rect = piece.glyphRect
+            context.saveGState()
+            context.setAlpha(opacity * CGFloat(glyph.opacity))
+            context.translateBy(x: rect.midX, y: rect.midY + CGFloat(glyph.yOffset) * row.fontSize)
+            context.scaleBy(x: CGFloat(glyph.scale), y: CGFloat(glyph.scale))
+            context.translateBy(x: -rect.midX, y: -rect.midY)
+            context.fill(mask: soft, in: piece.rect, white: CGFloat(glow) * 1.6)
             context.restoreGState()
         }
     }
