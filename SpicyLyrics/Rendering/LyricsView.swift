@@ -102,7 +102,7 @@ struct LyricsView: View {
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     TimelineView(.animation(minimumInterval: frameInterval)) { _ in
-                        let now = CACurrentMediaTime()
+                        let now = MediaClock.now()
                         let _ = settings.showLyricsFPS ? frameCounter.tick(now) : ()
                         let _ = animator.step(position: player.position(at: now), now: now,
                                               blurEnabled: settings.blurInactiveLines && !userScrolling && !reduced)

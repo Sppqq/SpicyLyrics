@@ -8,7 +8,7 @@ import Foundation
 ///     -demoArtwork <cover URL> -demoStart <seconds> -demoDuration <seconds>
 ///
 /// `-demoLandscape YES` turns the screen sideways, `-demoSettings YES` opens Settings,
-/// `-demoPiP YES` opens the floating window. App
+/// `-demoPiP YES` opens the floating window, `-demoHideChrome YES` starts with only the lyrics. App
 /// settings can be set the same way (`-simpleLyricsMode YES`): launch arguments override
 /// UserDefaults.
 struct DemoTrack {

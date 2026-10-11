@@ -63,7 +63,7 @@ final class PlayerModel {
     // Clock anchor: position `anchorPosition` was correct at `anchorTime`. `slew` is a small
     // correction blended in over `slewDuration`, so the clock never visibly jumps or runs backwards.
     @ObservationIgnored private var anchorPosition: Double = 0
-    @ObservationIgnored private var anchorTime: CFTimeInterval = CACurrentMediaTime()
+    @ObservationIgnored private var anchorTime: CFTimeInterval = MediaClock.now()
     @ObservationIgnored private var slew: Double = 0
     @ObservationIgnored private var slewSpan: Double = 0.8
     /// The previous report, to tell a live position from a frozen one.
@@ -138,7 +138,7 @@ final class PlayerModel {
 
     /// Lyrics clock in seconds at media time `now`: playback position plus the user's offset,
     /// minus the audio output's delay when Spotify plays on this phone (Bluetooth headphones).
-    func position(at now: CFTimeInterval = CACurrentMediaTime()) -> Double {
+    func position(at now: CFTimeInterval = MediaClock.now()) -> Double {
         playbackPosition(at: now) + settings.timingOffsetMs / 1000 - appliedOutputLatency
     }
 
@@ -157,7 +157,7 @@ final class PlayerModel {
     }
 
     /// Spotify's playback position in seconds at media time `now`.
-    func playbackPosition(at now: CFTimeInterval = CACurrentMediaTime()) -> Double {
+    func playbackPosition(at now: CFTimeInterval = MediaClock.now()) -> Double {
         let duration = track?.duration ?? .infinity
         return min(max(0, rawPosition(at: now)), duration)
     }
@@ -169,7 +169,7 @@ final class PlayerModel {
     }
 
     /// Re-anchors the clock at `position` right now, dropping any pending correction.
-    private func setClock(_ position: Double, at now: CFTimeInterval = CACurrentMediaTime()) {
+    private func setClock(_ position: Double, at now: CFTimeInterval = MediaClock.now()) {
         anchorPosition = position
         anchorTime = now
         slew = 0
@@ -194,7 +194,7 @@ final class PlayerModel {
             if remoteAuthority { return }
             // No active device. Keep the last track on screen, just stop the clock.
             if isPlaying {
-                setClock(rawPosition(at: CACurrentMediaTime()))
+                setClock(rawPosition(at: MediaClock.now()))
                 isPlaying = false
             }
             lastSample = nil
@@ -208,7 +208,7 @@ final class PlayerModel {
         playingOnThisPhone = snapshot.deviceType?.lowercased() == "smartphone"
         outputLatency = AudioRoute.outputLatency
 
-        let now = CACurrentMediaTime()
+        let now = MediaClock.now()
         let sameItem = Self.sameItem(content, snapshot.content)
         let trackChanged = !sameItem
         let summary = "\(snapshot.isPlaying ? "playing" : "paused") \(snapshot.progress.s3)s "
@@ -403,7 +403,7 @@ final class PlayerModel {
     /// A reading from the Spotify app on this phone (App Remote): exact to a few milliseconds.
     func applyRemote(_ sample: SpotifyAppRemote.Sample) {
         let log = SyncLog.shared
-        let now = CACurrentMediaTime()
+        let now = MediaClock.now()
         let kind = sample.event ? "event" : "query"
         let summary = "\(kind) \(sample.paused ? "paused" : "playing") \(sample.position.s3)s "
             + "\(sample.uri.split(separator: ":").last.map { String($0.prefix(8)) } ?? "?") \"\(sample.name.prefix(24))\""
@@ -534,12 +534,12 @@ final class PlayerModel {
 
     /// Returns how long to wait before the next poll.
     private func pollOnce() async -> Double {
-        let now = CACurrentMediaTime()
+        let now = MediaClock.now()
         if now < backoffUntil { return backoffUntil - now }
         do {
-            let sentAt = CACurrentMediaTime()
+            let sentAt = MediaClock.now()
             let snapshot = try await api.playbackState()
-            apply(snapshot, roundTrip: CACurrentMediaTime() - sentAt)
+            apply(snapshot, roundTrip: MediaClock.now() - sentAt)
             accessProblem = nil
             isResyncing = false
             return nextPollInterval()
@@ -598,7 +598,7 @@ final class PlayerModel {
             if wasPlaying { try await api.pause() } else { try await api.play() }
         }, optimistic: { [weak self] in
             guard let self else { return }
-            self.setClock(self.rawPosition(at: CACurrentMediaTime()))
+            self.setClock(self.rawPosition(at: MediaClock.now()))
             self.isPlaying = !wasPlaying
         })
     }
@@ -675,7 +675,7 @@ final class PlayerModel {
     private func control(_ action: @escaping () async throws -> Void, optimistic: (() -> Void)? = nil) {
         optimistic?()
         // Ignore stale polls for a moment so the optimistic state isn't undone.
-        holdUntil = CACurrentMediaTime() + 1.5
+        holdUntil = MediaClock.now() + 1.5
         Task {
             do {
                 try await action()

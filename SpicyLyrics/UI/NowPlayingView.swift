@@ -17,7 +17,11 @@ struct NowPlayingView: View {
     @State private var skipFeedback: SkipDirection?
     @State private var skipCount = 0
     @Environment(\.horizontalSizeClass) private var sizeClass
+    #if DEBUG
+    @State private var chromeVisible = !UserDefaults.standard.bool(forKey: "demoHideChrome")
+    #else
     @State private var chromeVisible = true
+    #endif
     /// Bumped on every touch; restarts the auto-hide countdown.
     @State private var interactionTick = 0
     @State private var headerSwipe: CGFloat = 0
@@ -138,6 +142,12 @@ struct NowPlayingView: View {
                 scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
             }
             if defaults.bool(forKey: "demoSettings") { showSettings = true }
+            // Slow Core Animation (scrolling, the background) down with the lyrics clock.
+            if MediaClock.scale != 1 {
+                for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+                    scene.windows.forEach { $0.layer.speed = Float(MediaClock.scale) }
+                }
+            }
             if defaults.bool(forKey: "demoPiP") {
                 // Once the lyrics are on screen, as the "•••" menu would.
                 try? await Task.sleep(for: .seconds(3))

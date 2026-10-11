@@ -97,7 +97,7 @@ private struct Scrubber: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 0.25, paused: !isVisible)) { _ in
             let duration = max(player.track?.duration ?? 0, 0.001)
-            let position = player.playbackPosition(at: CACurrentMediaTime())
+            let position = player.playbackPosition(at: MediaClock.now())
             let fraction = dragFraction ?? clamp(position / duration, 0, 1)
             let dragging = dragFraction != nil
 
@@ -185,8 +185,22 @@ private struct VolumeRow: View {
         HStack(spacing: 10) {
             Image(systemName: "speaker.fill")
                 .font(.system(size: 11))
+            #if targetEnvironment(simulator)
+            // The Simulator draws no system volume slider; a still stand-in keeps the
+            // README recordings looking like the phone.
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.white.opacity(0.2))
+                    Capsule().fill(.white.opacity(0.6)).frame(width: geometry.size.width * 0.6)
+                }
+                .frame(height: 7)
+                .frame(maxHeight: .infinity)
+            }
+            .frame(height: 30)
+            #else
             SystemVolumeSlider()
                 .frame(height: 30)
+            #endif
             Image(systemName: "speaker.wave.3.fill")
                 .font(.system(size: 11))
         }

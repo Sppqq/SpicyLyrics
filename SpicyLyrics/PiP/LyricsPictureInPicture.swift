@@ -139,7 +139,7 @@ final class LyricsPictureInPicture: NSObject {
                     lyricsAnimator = LyricsAnimator(lyrics: lyrics, simple: simple)
                     animatorKey = (player.lyricsRevision, simple)
                 }
-                lyricsAnimator?.step(position: player.position(), now: CACurrentMediaTime(),
+                lyricsAnimator?.step(position: player.position(), now: MediaClock.now(),
                                      blurEnabled: (settings?.blurInactiveLines ?? false) && !reduced)
             } else {
                 lyricsAnimator = nil
@@ -445,7 +445,7 @@ final class PiPFrameRenderer {
         var pixelBuffer: CVPixelBuffer?
         CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pixelBuffer)
         guard let pixelBuffer else { return nil }
-        let now = CACurrentMediaTime()
+        let now = MediaClock.now()
 
         CVPixelBufferLockBaseAddress(pixelBuffer, [])
         if let base = CVPixelBufferGetBaseAddress(pixelBuffer),
