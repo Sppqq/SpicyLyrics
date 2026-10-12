@@ -431,6 +431,8 @@ struct PiPSnapshot: @unchecked Sendable {
     /// The track and artist at the bottom of the window.
     var showTitle = true
     var message: String?
+    /// No lyrics, and the setting asks for the big cover: it is drawn in the middle of the window.
+    var cover: UIImage?
     /// The animator's copy of the lyrics, so line indices and visuals always agree.
     var lyrics: PreparedLyrics?
     var revision = 0
@@ -477,9 +479,11 @@ struct PiPSnapshot: @unchecked Sendable {
         }
 
         switch player.lyricsState {
-        case .loaded:
-            guard let animator, !animator.lyrics.lines.isEmpty else {
-                message = String(localized: "Текст не найден")
+        case .loaded(let document):
+            guard let animator, !animator.lyrics.lines.isEmpty,
+                  !(settings?.hideStaticLyrics == true && document.kind == .static)
+            else {
+                showWithoutLyrics(player, settings)
                 return
             }
             lyrics = animator.lyrics
@@ -495,12 +499,20 @@ struct PiPSnapshot: @unchecked Sendable {
         case .loading:
             message = String(localized: "Загрузка текста…")
         case .notFound:
-            message = String(localized: "Текст не найден")
+            showWithoutLyrics(player, settings)
         case .failed, .unavailable:
             message = String(localized: "Текст недоступен")
         case .idle:
             message = player.statusMessage ?? String(localized: "Включите музыку в Spotify")
         }
+    }
+
+    /// A song without (shown) lyrics: what the "instead of the text" setting says, like in the app: the
+    /// big cover, or just the moving background. No "not found" message.
+    @MainActor
+    private mutating func showWithoutLyrics(_ player: PlayerModel, _ settings: AppSettings?) {
+        message = nil
+        if settings?.hiddenLyricsView == HiddenLyricsView.artwork.rawValue { cover = player.artwork }
     }
 }
 
@@ -706,6 +718,10 @@ final class PiPFrameRenderer {
 
         guard let lyrics = snapshot.lyrics else {
             isAnimating = false
+            if snapshot.message == nil {
+                if let cover = snapshot.cover?.cgImage { drawCover(cover, in: rect, context: context) }
+                return
+            }
             let text = snapshot.message ?? ""
             if messageLayout?.text != text {
                 messageLayout = (text, PiPTextLayout(blocks: [PiPTextBlock(runs: [text],
@@ -721,6 +737,29 @@ final class PiPFrameRenderer {
         context.saveGState()
         context.clip(to: CGRect(x: 0, y: Self.clipTop, width: rect.width, height: clipBottom - Self.clipTop))
         drawLyrics(lyrics, snapshot, width: rect.width - inset * 2, now: now, context: context)
+        context.restoreGState()
+    }
+
+    /// The cover as big as fits between the top and the footer, centred, with a soft shadow.
+    private func drawCover(_ image: CGImage, in rect: CGRect, context: CGContext) {
+        let room = CGRect(x: Self.inset, y: Self.clipTop + 8, width: rect.width - Self.inset * 2,
+                          height: clipBottom - Self.clipTop - 16)
+        let side = max(0, min(room.width, room.height))
+        let box = CGRect(x: rect.midX - side / 2, y: room.midY - side / 2, width: side, height: side)
+        let path = CGPath(roundedRect: box, cornerWidth: side * 0.05, cornerHeight: side * 0.05, transform: nil)
+        context.saveGState()
+        context.setShadow(offset: CGSize(width: 0, height: 10), blur: 28, color: UIColor.black.withAlphaComponent(0.5).cgColor)
+        context.addPath(path)
+        context.setFillColor(gray: 0, alpha: 1)
+        context.fillPath()
+        context.restoreGState()
+        context.saveGState()
+        context.addPath(path)
+        context.clip()
+        // The context is flipped (top-left origin); images are not.
+        context.translateBy(x: box.minX, y: box.maxY)
+        context.scaleBy(x: 1, y: -1)
+        context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
         context.restoreGState()
     }
 
