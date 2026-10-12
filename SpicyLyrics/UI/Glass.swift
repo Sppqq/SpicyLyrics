@@ -4,8 +4,19 @@ import SwiftUI
 /// from the song, like the player itself. Static, so it costs nothing while scrolling.
 struct ArtworkBackdrop: View {
     @Environment(PlayerModel.self) private var player
+    @Environment(AppSettings.self) private var settings
 
     var body: some View {
+        if let gradient = settings.appTheme.gradient {
+            Rectangle().fill(gradient)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+        } else {
+            coverBackdrop
+        }
+    }
+
+    private var coverBackdrop: some View {
         // The black base decides the size; the cover is only painted over it and clipped.
         Color.black
             .overlay {

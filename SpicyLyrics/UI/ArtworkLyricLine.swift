@@ -112,7 +112,7 @@ struct ArtworkLyricLine: View {
             hasDuets: false,
             simple: settings.simpleLyricsMode,
             centered: false,
-            font: LyricsFont(rawValue: settings.lyricsFont) ?? .standard,
+            font: LyricsFontChoice(stored: settings.lyricsFont),
             blurScale: 0,
             glowScale: settings.glowStrength,
             inactiveBrightness: settings.inactiveBrightness,

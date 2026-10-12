@@ -62,7 +62,7 @@ struct LyricsView: View {
             hasDuets: shown.lines.contains(where: \.oppositeAligned),
             simple: settings.simpleLyricsMode,
             centered: settings.centerLyrics,
-            font: LyricsFont(rawValue: settings.lyricsFont) ?? .standard,
+            font: LyricsFontChoice(stored: settings.lyricsFont),
             blurScale: CGFloat(settings.blurStrength),
             glowScale: settings.glowStrength,
             inactiveBrightness: settings.inactiveBrightness,

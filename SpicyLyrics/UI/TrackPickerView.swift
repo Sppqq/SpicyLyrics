@@ -16,6 +16,7 @@ struct TrackPickerView: View {
     }
 
     @Environment(PlayerModel.self) private var player
+    @Environment(AppSettings.self) private var settings
     @EnvironmentObject private var auth: SpotifyAuth
     @Environment(\.dismiss) private var dismiss
 
@@ -122,7 +123,7 @@ struct TrackPickerView: View {
                         .padding(.vertical, 8)
                         .background {
                             if tab == item {
-                                Capsule().fill(.white)
+                                Capsule().fill(settings.appTheme.accent)
                                     .matchedGeometryEffect(id: "tab", in: tabNamespace)
                             }
                         }
@@ -154,7 +155,7 @@ struct TrackPickerView: View {
             List {
                 if tab == .queue, let track = player.track {
                     NowPlayingCard(title: track.title, subtitle: track.artistLine, artwork: track.artworkURL,
-                                   playing: player.isPlaying)
+                                   playing: player.isPlaying, accent: settings.appTheme.accent)
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -431,6 +432,7 @@ private struct NowPlayingCard: View {
     let subtitle: String
     let artwork: URL?
     let playing: Bool
+    let accent: Color
 
     var body: some View {
         HStack(spacing: 14) {
@@ -449,7 +451,7 @@ private struct NowPlayingCard: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            EqualizerBars(playing: playing)
+            EqualizerBars(playing: playing, color: accent)
         }
         .padding(12)
         .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 22, style: .continuous))

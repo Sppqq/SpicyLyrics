@@ -174,6 +174,7 @@ struct NowPlayingView: View {
         }
         .sheet(isPresented: $showPicker) {
             TrackPickerView()
+                .environment(settings)
                 .environment(player)
                 .environmentObject(auth)
                 .presentationDetents([.medium, .large], selection: $pickerDetent)

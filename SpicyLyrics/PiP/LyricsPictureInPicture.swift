@@ -401,6 +401,8 @@ enum PiPFormat: String, CaseIterable, Identifiable {
 /// How the app draws its lyrics, from the settings.
 struct PiPStyle: Equatable {
     var design: UIFontDescriptor.SystemDesign = .default
+    /// A font family (built into iOS or imported) instead of a system design.
+    var family: String?
     var simple = false
     var centered = false
     var glow: Double = 1
@@ -431,6 +433,7 @@ struct PiPSnapshot: @unchecked Sendable {
     /// The track and artist at the bottom of the window.
     var showTitle = true
     var message: String?
+    var theme: AppTheme = .cover
     /// No lyrics, and the setting asks for the big cover: it is drawn in the middle of the window.
     var cover: UIImage?
     /// The animator's copy of the lyrics, so line indices and visuals always agree.
@@ -458,13 +461,13 @@ struct PiPSnapshot: @unchecked Sendable {
         artist = player.track?.artistLine ?? ""
         isPlaying = player.isPlaying
         artworkID = player.artworkID
-        artwork = player.backgroundArtwork
+        theme = settings?.appTheme ?? .cover
+        // A fixed theme paints its own background; the cover only matters for "Cover".
+        artwork = theme.isCover ? player.backgroundArtwork : nil
         if let settings {
-            switch LyricsFont(rawValue: settings.lyricsFont) ?? .standard {
-            case .standard: style.design = .default
-            case .rounded: style.design = .rounded
-            case .serif: style.design = .serif
-            }
+            let choice = LyricsFontChoice(stored: settings.lyricsFont)
+            style.design = choice.uiDesign
+            style.family = choice.family
             style.simple = settings.simpleLyricsMode
             style.centered = settings.centerLyrics
             style.glow = settings.glowStrength
@@ -620,6 +623,7 @@ final class PiPFrameRenderer {
     private var coverImages: (id: String, base: CGImage, blob: CGImage)?
     private var backdrop: CGContext?
     private var backdropKey: (artworkID: String, animated: Bool, hasArtwork: Bool, dim: CGFloat)?
+    private var backdropTheme: AppTheme?
     private var backdropRenderedAt: CFTimeInterval = 0
 
     init(format: PiPFormat) {
@@ -725,7 +729,7 @@ final class PiPFrameRenderer {
             let text = snapshot.message ?? ""
             if messageLayout?.text != text {
                 messageLayout = (text, PiPTextLayout(blocks: [PiPTextBlock(runs: [text],
-                                                                           font: ctFont(46, .bold, snapshot.style.design))],
+                                                                           font: ctFont(46, .bold, snapshot.style.design, family: snapshot.style.family))],
                                                      width: rect.width - inset * 2))
             }
             if let layout = messageLayout?.layout, let mask = layout.sharp.first {
@@ -770,9 +774,9 @@ final class PiPFrameRenderer {
         let cqw = column / 100
         let hasDuets = lyrics.lines.contains(where: \.oppositeAligned)
         let size = leadSize
-        let lead = ctFont(size, style.weight, style.design)
-        let background = ctFont(size * 0.75, style.weight, style.design)
-        let still = ctFont(size * 5 / 7, .medium, style.design)
+        let lead = ctFont(size, style.weight, style.design, family: style.family)
+        let background = ctFont(size * 0.75, style.weight, style.design, family: style.family)
+        let still = ctFont(size * 5 / 7, .medium, style.design, family: style.family)
 
         rows = lyrics.lines.map { line -> Row? in
             // `.line { padding-right: 5cqw }`, or 15cqw on the side a duet line leans away from.
@@ -823,7 +827,7 @@ final class PiPFrameRenderer {
             if let translation = snapshot.translations[line.sourceText], !translation.isEmpty {
                 // A backing vocal's translation is as much smaller as the vocal itself.
                 let translationSize = (line.isBackground ? size * 0.75 : size) * 0.55 * style.translationScale
-                blocks.append(PiPTextBlock(runs: [translation], font: ctFont(translationSize, .semibold, style.design),
+                blocks.append(PiPTextBlock(runs: [translation], font: ctFont(translationSize, .semibold, style.design, family: style.family),
                                            gray: line.isBackground ? 0.45 : 0.6, alignment: alignment,
                                            spacing: size * 0.1))
             }
@@ -1180,11 +1184,18 @@ final class PiPFrameRenderer {
         context.restoreGState()
     }
 
-    private func ctFont(_ size: CGFloat, _ weight: UIFont.Weight, _ design: UIFontDescriptor.SystemDesign) -> CTFont {
-        let key = "\(size)|\(weight.rawValue)|\(design.rawValue)"
+    private func ctFont(_ size: CGFloat, _ weight: UIFont.Weight, _ design: UIFontDescriptor.SystemDesign,
+                        family: String? = nil) -> CTFont {
+        let key = "\(size)|\(weight.rawValue)|\(design.rawValue)|\(family ?? "")"
         if let cached = fonts[key] { return cached as CTFont }
         let base = UIFont.systemFont(ofSize: size, weight: weight)
-        let font = base.fontDescriptor.withDesign(design).map { UIFont(descriptor: $0, size: size) } ?? base
+        var font = base.fontDescriptor.withDesign(design).map { UIFont(descriptor: $0, size: size) } ?? base
+        if let family {
+            // The family may be gone (an imported font that was removed): then the system font stays.
+            let descriptor = UIFontDescriptor(fontAttributes: [.family: family, .traits: [UIFontDescriptor.TraitKey.weight: weight]])
+            let custom = UIFont(descriptor: descriptor, size: size)
+            if custom.familyName == family { font = custom }
+        }
         fonts[key] = font
         return font as CTFont
     }
@@ -1207,21 +1218,29 @@ final class PiPFrameRenderer {
             coverImages = (coverID, rendered.base, rendered.blob)
             backdropKey = nil
         }
-        let hasArtwork = snapshot.artwork != nil && coverImages != nil
-        let stale = backdropKey?.artworkID != snapshot.artworkID || backdropKey?.animated != snapshot.animatedBackground
+        let themed = !snapshot.theme.isCover
+        let hasArtwork = !themed && snapshot.artwork != nil && coverImages != nil
+        let stale = backdropTheme != snapshot.theme || backdropKey?.artworkID != snapshot.artworkID || backdropKey?.animated != snapshot.animatedBackground
             || backdropKey?.hasArtwork != hasArtwork || backdropKey?.dim != snapshot.backgroundDim
         if stale || (snapshot.animatedBackground && hasArtwork && now - backdropRenderedAt >= Self.backgroundInterval) {
             let rect = CGRect(x: 0, y: 0, width: width, height: height)
             backdrop.setFillColor(red: 0.07, green: 0.07, blue: 0.09, alpha: 1)
             backdrop.fill(rect)
+            if themed, let gradient = CGGradient(colorsSpace: Self.sRGB, colors: snapshot.theme.colors.map(\.cgColor) as CFArray,
+                                                 locations: nil) {
+                backdrop.drawLinearGradient(gradient, start: CGPoint(x: 0, y: height), end: CGPoint(x: width, y: 0), options: [])
+            }
             if hasArtwork, let images = coverImages,
                let frame = renderBackground(images, time: snapshot.animatedBackground ? now : 0) {
                 backdrop.interpolationQuality = .medium
                 backdrop.draw(frame, in: rect)
             }
             // Darker than the app's background: the window is small and has to stay readable.
-            backdrop.setFillColor(red: 0, green: 0, blue: 0, alpha: snapshot.backgroundDim)
-            backdrop.fill(rect)
+            if !themed {
+                backdrop.setFillColor(red: 0, green: 0, blue: 0, alpha: snapshot.backgroundDim)
+                backdrop.fill(rect)
+            }
+            backdropTheme = snapshot.theme
             backdropKey = (snapshot.artworkID, snapshot.animatedBackground, hasArtwork, snapshot.backgroundDim)
             backdropRenderedAt = now
         }

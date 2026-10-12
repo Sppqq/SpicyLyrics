@@ -23,8 +23,20 @@ struct DynamicBackground: View {
     var blur: Double = 1
     /// × the default cover saturation.
     var saturation: Double = 1
+    @Environment(AppSettings.self) private var settings
 
     var body: some View {
+        if let gradient = settings.appTheme.gradient {
+            // A fixed theme: no cover, nothing moving.
+            Rectangle().fill(gradient)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+        } else {
+            coverBackground
+        }
+    }
+
+    private var coverBackground: some View {
         ZStack {
             Color(red: 0.07, green: 0.07, blue: 0.08)
             if KawarpBackground.isSupported {

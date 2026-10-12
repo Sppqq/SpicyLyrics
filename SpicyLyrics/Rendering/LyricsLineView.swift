@@ -10,7 +10,7 @@ struct LyricsTypography: Equatable {
     /// Simple Lyrics Mode: softer, wider fill (`--gradient-offset: 30%`, alpha 1 → 0.3).
     var simple = false
     var centered = false
-    var font: LyricsFont = .standard
+    var font = LyricsFontChoice(stored: LyricsFont.standard.rawValue)
     /// User multipliers (1 = the original look).
     var blurScale: CGFloat = 1
     var glowScale: Double = 1
@@ -21,27 +21,19 @@ struct LyricsTypography: Equatable {
     var translationBrightness: Double = 1
     var weight: Font.Weight = .bold
 
-    private var design: Font.Design {
-        switch font {
-        case .standard: return .default
-        case .rounded: return .rounded
-        case .serif: return .serif
-        }
-    }
-
-    var leadFont: Font { .system(size: fontSize, weight: weight, design: design) }
+    var leadFont: Font { font.font(size: fontSize, weight: weight) }
     /// Width of the lit → unlit fade, as a fraction of a glyph.
     var fillFade: Double { simple ? 0.5 : 0.2 }
     var leadAlpha: GradientAlpha { simple ? GradientAlpha(lit: 1, unlit: 0.3) : .lead }
     /// `.line.bg-line { --font-size: calc(var(--DefaultLyricsSize) * 0.75) }`
     var backgroundFontSize: CGFloat { fontSize * 0.75 }
-    var backgroundFont: Font { .system(size: backgroundFontSize, weight: weight, design: design) }
+    var backgroundFont: Font { font.font(size: backgroundFontSize, weight: weight) }
     /// `.word::after { margin-right: 0.32ch }` (a "0" in the bold face is ~0.6em wide).
     func wordGap(_ size: CGFloat) -> CGFloat { size * 0.6 * 0.32 }
     /// `.line { margin: 1cqw 0 }`, collapsing between neighbours.
     var lineSpacing: CGFloat { cqw * lineSpacingScale }
     /// Static lyrics: `--DefaultLyricsSize: 5cqw` against the synced 7cqw, weight 500.
-    var staticFont: Font { .system(size: fontSize * 5 / 7, weight: .medium, design: design) }
+    var staticFont: Font { font.font(size: fontSize * 5 / 7, weight: .medium) }
     /// `.line { padding-right: 5cqw }`, or the 15cqw duet inset on the side a line leans away from.
     func insets(opposite: Bool) -> EdgeInsets {
         if centered { return EdgeInsets(top: 0, leading: cqw * 5, bottom: 0, trailing: cqw * 5) }
