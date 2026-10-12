@@ -61,7 +61,7 @@ def make_source(repo, channel, releases):
         "description": "Sweet Lyrics for iOS: an unofficial port built on Spicy Lyrics. " + ("Testing channel: alpha, beta and stable releases." if testing else "Stable channel."),
         "iconURL": icon,
         "website": f"https://github.com/{repo}",
-        "tintColor": "#8B5CF6",
+        "tintColor": "#FF6B9D",
         "apps": [{
             "name": "Sweet Lyrics" + (" (Alpha & Beta)" if testing else ""),
             "bundleIdentifier": "com.spicylyrics.unofficial.ios",
@@ -69,7 +69,7 @@ def make_source(repo, channel, releases):
             "subtitle": "Word-synced lyrics for Spotify",
             "localizedDescription": "Word-by-word synced lyrics for Spotify. Unofficial port built on Spicy Lyrics, not affiliated with it. " + ("Experimental alpha and beta updates." if testing else "Stable updates."),
             "iconURL": icon,
-            "tintColor": "#8B5CF6",
+            "tintColor": "#FF6B9D",
             "category": "entertainment",
             "screenshots": [],
             "versions": versions,
