@@ -10,10 +10,12 @@ struct CoverVisualizerView: View {
     var dim: Double = 0
     /// Random colours (a new set for every song) instead of the cover's.
     var randomColors = false
+    /// Counts the frames drawn, for the FPS badge.
+    var frameCounter: FrameRateCounter?
 
     var body: some View {
         CoverVisualizer(image: player.backgroundArtwork, imageID: player.artworkID, player: player, reduced: reduced,
-                        randomColors: randomColors)
+                        randomColors: randomColors, frameCounter: frameCounter)
             .overlay(Color.black.opacity(dim))
             .ignoresSafeArea()
     }
@@ -28,6 +30,7 @@ struct CoverVisualizer: UIViewRepresentable {
     let player: PlayerModel
     var reduced = false
     var randomColors = false
+    var frameCounter: FrameRateCounter?
 
     static var isSupported: Bool { VisualizerSurface.isSupported }
 
@@ -46,6 +49,7 @@ struct CoverVisualizer: UIViewRepresentable {
     func updateUIView(_ view: VisualizerSurface, context: Context) {
         view.playing = player.isPlaying
         view.reduced = reduced
+        view.frameCounter = frameCounter
         view.setImage(image, id: imageID, random: randomColors)
     }
 }
@@ -69,6 +73,12 @@ final class VisualizerSurface: ShaderSurface {
     var playing = false { didSet { updateRate() } }
     var reduced = false { didSet { updateRate() } }
     var progress: () -> Double = { 0 }
+    var frameCounter: FrameRateCounter?
+
+    /// The frame rate it runs at.
+    static func framesPerSecond(playing: Bool, reduced: Bool) -> Int {
+        reduced ? 20 : (playing ? 30 : 20)
+    }
 
     private var palette = CoverPalette.fallback
     private var target = CoverPalette.fallback
@@ -126,7 +136,11 @@ final class VisualizerSurface: ShaderSurface {
     }
 
     private func updateRate() {
-        preferredFramesPerSecond = reduced ? 20 : (playing ? 30 : 20)
+        preferredFramesPerSecond = Self.framesPerSecond(playing: playing, reduced: reduced)
+    }
+
+    override func didDraw(now: CFTimeInterval) {
+        frameCounter?.tick(now)
     }
 
     override func encode(_ encoder: MTLRenderCommandEncoder, dt: Double, now: CFTimeInterval) {

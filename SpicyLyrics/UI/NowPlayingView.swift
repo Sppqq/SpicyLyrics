@@ -27,6 +27,8 @@ struct NowPlayingView: View {
     @State private var interactionTick = 0
     @State private var headerSwipe: CGFloat = 0
     @State private var headerHeight: CGFloat = 76
+    /// Frames of the nebula, for the FPS badge where the lyrics would be.
+    @State private var nebulaFrames = FrameRateCounter()
     @State private var controlsHeight: CGFloat = 250
     @State private var landscapeControlsHeight: CGFloat = 150
     @State private var isLandscape = false
@@ -71,7 +73,8 @@ struct NowPlayingView: View {
                     if showVisualizer {
                         // Less than half the background's darkening: the nebula should glow, the lines still read.
                         CoverVisualizerView(player: player, reduced: reduced, dim: settings.backgroundDim * 0.4,
-                                            randomColors: settings.nebulaColors == NebulaColors.random.rawValue)
+                                            randomColors: settings.nebulaColors == NebulaColors.random.rawValue,
+                                            frameCounter: settings.showLyricsFPS ? nebulaFrames : nil)
                             .allowsHitTesting(false)
                             .transition(.opacity)
                     }
@@ -708,6 +711,15 @@ struct NowPlayingView: View {
             .onTapGesture { toggleChrome() }
             .trackSwipes(enabled: settings.gesturesEnabled && player.track != nil,
                          onNext: { skip(.next) }, onPrevious: { skip(.previous) })
+            .overlay(alignment: .topLeading) {
+                // The lyrics' FPS badge, here counting the nebula's frames.
+                if settings.showLyricsFPS && showVisualizer {
+                    FPSBadge(counter: nebulaFrames,
+                             target: Double(VisualizerSurface.framesPerSecond(playing: player.isPlaying, reduced: reduced)))
+                        .padding(.top, topInset + 6)
+                        .padding(.leading, horizontalPadding)
+                }
+            }
         } else {
             visibleLyricsArea(topInset: topInset, bottomInset: bottomInset, horizontalPadding: horizontalPadding)
         }

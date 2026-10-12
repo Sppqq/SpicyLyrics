@@ -27,7 +27,7 @@ final class FrameRateCounter {
     }
 }
 
-/// "58 / 60 fps" over the lyrics.
+/// "58 / 60 fps" over the lyrics (or the nebula in their place).
 struct FPSBadge: View {
     let counter: FrameRateCounter
     let target: Double
