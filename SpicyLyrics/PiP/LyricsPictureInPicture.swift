@@ -454,7 +454,7 @@ struct PiPSnapshot: @unchecked Sendable {
         self.fpsText = fpsText
         animatedBackground = (settings?.pipAnimatedBackground ?? true) && !reduced
         showTitle = settings?.pipShowTitle ?? true
-        title = player.track?.title ?? "Spicy Lyrics"
+        title = player.track?.title ?? "Sweet Lyrics"
         artist = player.track?.artistLine ?? ""
         isPlaying = player.isPlaying
         artworkID = player.artworkID

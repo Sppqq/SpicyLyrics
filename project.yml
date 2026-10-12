@@ -53,7 +53,7 @@ targets:
     info:
       path: SpicyLyrics/Info.plist
       properties:
-        CFBundleDisplayName: Spicy Lyrics
+        CFBundleDisplayName: Sweet Lyrics
         CFBundleLocalizations:
           - en
           - ru

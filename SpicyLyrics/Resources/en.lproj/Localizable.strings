@@ -3,7 +3,7 @@
 "%lld мс" = "%lld ms";
 "%lld с" = "%lld s";
 "**App description** — любое, например «Тексты песен»." = "**App description**: anything, e.g. “Song lyrics”.";
-"**App name** — любое, например «Spicy Lyrics»." = "**App name**: anything, e.g. “Spicy Lyrics”.";
+"**App name** — любое, например «Sweet Lyrics»." = "**App name**: anything, e.g. “Sweet Lyrics”.";
 "**Redirect URIs** — вставьте адрес ниже и нажмите **Add**:" = "**Redirect URIs**: paste the address below and tap **Add**:";
 "**Website** — можно оставить пустым." = "**Website**: can stay empty.";
 "30 кадров в секунду, без размытия строк, неподвижный фон в приложении и в PiP." = "30 frames per second, no line blur, a still background in the app and in PiP.";

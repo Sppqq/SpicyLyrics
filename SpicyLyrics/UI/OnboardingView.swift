@@ -14,7 +14,7 @@ struct OnboardingView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Spicy Lyrics")
+                        Text("Sweet Lyrics")
                             .font(.system(size: 40, weight: .heavy))
                         Text(String(localized: "Синхронные по словам тексты для того, что играет у вас в Spotify."))
                             .font(.title3.weight(.medium))

@@ -21,7 +21,7 @@ struct DemoTrack {
         let info = TrackInfo(
             id: id,
             uri: "spotify:track:\(id)",
-            title: defaults.string(forKey: "demoTitle") ?? "Spicy Lyrics",
+            title: defaults.string(forKey: "demoTitle") ?? "Sweet Lyrics",
             artists: defaults.string(forKey: "demoArtist").map { [$0] } ?? [],
             album: "",
             duration: defaults.object(forKey: "demoDuration") != nil ? defaults.double(forKey: "demoDuration") : 240,

@@ -55,19 +55,19 @@ def make_source(repo, channel, releases):
     raw = f"https://raw.githubusercontent.com/{repo}/main"
     icon = raw + "/SpicyLyrics/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
     return {
-        "name": "Spicy Lyrics - " + ("Alpha & Beta" if testing else "Stable"),
+        "name": "Sweet Lyrics - " + ("Alpha & Beta" if testing else "Stable"),
         "identifier": "com.spicylyrics.unofficial.source" + (".testing" if testing else ""),
         "subtitle": "Alpha, beta and stable builds" if testing else "Stable releases",
-        "description": "Unofficial Spicy Lyrics for iOS. " + ("Testing channel: alpha, beta and stable releases." if testing else "Stable channel."),
+        "description": "Sweet Lyrics for iOS: an unofficial port built on Spicy Lyrics. " + ("Testing channel: alpha, beta and stable releases." if testing else "Stable channel."),
         "iconURL": icon,
         "website": f"https://github.com/{repo}",
         "tintColor": "#8B5CF6",
         "apps": [{
-            "name": "Spicy Lyrics" + (" (Alpha & Beta)" if testing else ""),
+            "name": "Sweet Lyrics" + (" (Alpha & Beta)" if testing else ""),
             "bundleIdentifier": "com.spicylyrics.unofficial.ios",
             "developerName": "Sppq",
             "subtitle": "Word-synced lyrics for Spotify",
-            "localizedDescription": "Word-by-word synced lyrics for Spotify. " + ("Experimental alpha and beta updates." if testing else "Stable updates."),
+            "localizedDescription": "Word-by-word synced lyrics for Spotify. Unofficial port built on Spicy Lyrics, not affiliated with it. " + ("Experimental alpha and beta updates." if testing else "Stable updates."),
             "iconURL": icon,
             "tintColor": "#8B5CF6",
             "category": "entertainment",

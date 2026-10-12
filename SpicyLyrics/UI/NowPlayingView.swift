@@ -692,7 +692,7 @@ struct NowPlayingView: View {
         case .episode(let title, _, _): return title
         case .ad: return String(localized: "Реклама")
         case .unknown: return String(localized: "Неизвестный трек")
-        case .none: return "Spicy Lyrics"
+        case .none: return "Sweet Lyrics"
         }
     }
 

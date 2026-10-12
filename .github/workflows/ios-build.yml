@@ -205,7 +205,7 @@ jobs:
           if [ "$CHANNEL" = alpha ]; then
             args+=(--prerelease --latest=false --title "Alpha $VERSION")
           else
-            args+=(--latest --title "Spicy Lyrics $VERSION")
+            args+=(--latest --title "Sweet Lyrics $VERSION")
             # Notes for a stable release cover everything since the previous stable one.
             [ -n "$PREVIOUS" ] && args+=(--notes-start-tag "$PREVIOUS")
           fi

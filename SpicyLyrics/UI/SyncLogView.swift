@@ -74,7 +74,7 @@ struct SyncLogView: View {
     private func header() -> [String] {
         let device = UIDevice.current
         return [
-            "Spicy Lyrics \(AppVersion.display)",
+            "Sweet Lyrics \(AppVersion.display)",
             "\(device.model), \(device.systemName) \(device.systemVersion)",
             "Exported \(SyncLog.time(Date()))",
             "offset \(Int(settings.timingOffsetMs)) ms, headphone latency \(settings.compensateOutputLatency ? "on" : "off") "

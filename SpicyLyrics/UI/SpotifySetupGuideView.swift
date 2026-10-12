@@ -39,7 +39,7 @@ struct SpotifySetupGuideView: View {
 
                 step(2, String(localized: "Создайте приложение")) {
                     Text("Нажмите **Create app** и заполните форму:")
-                    bullet("**App name** — любое, например «Spicy Lyrics».")
+                    bullet("**App name** — любое, например «Sweet Lyrics».")
                     bullet("**App description** — любое, например «Тексты песен».")
                     bullet("**Website** — можно оставить пустым.")
                     bullet("**Redirect URIs** — вставьте адрес ниже и нажмите **Add**:")

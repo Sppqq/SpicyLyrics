@@ -1,6 +1,6 @@
-<p align="center"><img src="docs/media/banner.png" alt="Spicy Lyrics for iOS: word-by-word lyrics for whatever you play on Spotify"></p>
+<p align="center"><img src="docs/media/banner.png" alt="Sweet Lyrics for iOS: word-by-word lyrics for whatever you play on Spotify"></p>
 
-# Spicy Lyrics for iOS
+# Sweet Lyrics for iOS
 
 **Word-by-word lyrics for whatever you're playing on Spotify**, in an Apple Music style
 player on your iPhone or iPad.
@@ -75,7 +75,7 @@ free apps that install apps from outside the App Store using your own Apple ID.
 - [AltStore](https://altstore.io): uses a small helper program on your computer.
 - [SideStore](https://sidestore.io): after the first setup, works on the phone alone.
 
-**2. Add Spicy Lyrics to it.** Copy this link:
+**2. Add Sweet Lyrics to it.** Copy this link:
 
 ```
 https://github.com/Sppqq/spicy-lyrics-ios/releases/latest/download/altstore-source.json
@@ -94,7 +94,7 @@ You get every new build as soon as it's made, so it can be buggier. Add only **o
 links: they install the same app.
 </details>
 
-**3. Install it.** Open the source, tap **Spicy Lyrics → Install** and wait a moment.
+**3. Install it.** Open the source, tap **Sweet Lyrics → Install** and wait a moment.
 
 **4. Connect Spotify.** Open the app and follow its guide. It takes about two minutes;
 [here's why it's needed](#why-do-i-have-to-create-a-spotify-app).
@@ -115,17 +115,17 @@ through it, and here are the same steps:
    `spicylyrics-ios://callback` and press **Add**. Tick **Web API**, accept, and **Save**.
 3. Open **Settings → User Management** and add the email of your Spotify account.
    You can add up to 5 people there, so friends can use your app too.
-4. Copy the **Client ID** from **Basic Information** and paste it into Spicy Lyrics.
+4. Copy the **Client ID** from **Basic Information** and paste it into Sweet Lyrics.
 
 ### The lyrics are a bit behind or ahead
 
-For the most exact timing, let Spicy Lyrics talk to the Spotify app on the same phone:
+For the most exact timing, let Sweet Lyrics talk to the Spotify app on the same phone:
 
 1. In your app on the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard),
    open **Settings** and tick **iOS** as well.
-2. Add the **Bundle ID** shown in Spicy Lyrics under *Settings → Sync → If it won't connect*,
+2. Add the **Bundle ID** shown in Sweet Lyrics under *Settings → Sync → If it won't connect*,
    and the redirect URI `spicylyrics-ios://callback`.
-3. Sign in again in Spicy Lyrics if it asks.
+3. Sign in again in Sweet Lyrics if it asks.
 
 ### The app stopped opening after a week
 
