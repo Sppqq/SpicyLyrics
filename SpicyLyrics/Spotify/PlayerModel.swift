@@ -192,6 +192,9 @@ final class PlayerModel {
     @ObservationIgnored private var playingOnThisPhone = false
     @ObservationIgnored private var routeObserver: NSObjectProtocol?
 
+    /// Spotify last reported the song playing on a phone (this one, almost always).
+    var isPlayingOnThisPhone: Bool { playingOnThisPhone }
+
     /// The headphone delay subtracted from the clock right now (0 when it does not apply).
     var appliedOutputLatency: Double {
         settings.compensateOutputLatency && playingOnThisPhone ? outputLatency : 0

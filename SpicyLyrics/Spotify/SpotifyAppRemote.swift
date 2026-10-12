@@ -44,13 +44,14 @@ final class SpotifyAppRemote: NSObject {
     @ObservationIgnored private var coverURI: String?
     /// Failed attempts in a row: retries back off from 8 s to a minute.
     @ObservationIgnored private var failures = 0
-    /// Spotify was already woken automatically this launch (only ever once).
-    @ObservationIgnored private var autoWoke = false
+    /// Automatic wake-ups this launch, and when the last one was: Spotify closes the connection when it
+    /// is sent to the background again, so one wake is not always enough, but never in a loop.
+    @ObservationIgnored private var wakes = 0
+    @ObservationIgnored private var lastWake = Date.distantPast
+    private static let maxWakes = 4
+    private static let wakeCooldown: TimeInterval = 12
 
     static let scope = "app-remote-control"
-    /// Set once App Remote has connected: after that, a refusal (a fresh install of this app, Spotify
-    /// restarted) is fixed by waking Spotify, without the user having to find the button.
-    private static let connectedBeforeKey = "appRemoteConnectedBefore"
 
     init(auth: SpotifyAuth, settings: AppSettings) {
         self.auth = auth
@@ -213,7 +214,8 @@ final class SpotifyAppRemote: NSObject {
         status = .connected
         failures = 0
         lastError = nil
-        UserDefaults.standard.set(true, forKey: Self.connectedBeforeKey)
+        // Stayed connected for a while after the last wake: the next refusal starts afresh.
+        if Date().timeIntervalSince(lastWake) > 120 { wakes = 0 }
         SyncLog.shared.add("remote", "connected")
         player?.setRemoteConnected(true)
         remote.playerAPI?.delegate = self
@@ -242,12 +244,17 @@ final class SpotifyAppRemote: NSObject {
         guard wanted else { return }
         status = .unavailable
         failures += 1
-        // Spotify refuses apps it was not woken by: after two refusals, wake it once (if allowed).
-        let hasWorked = UserDefaults.standard.bool(forKey: Self.connectedBeforeKey)
-        if failures == 2, settings.autoWakeSpotify || hasWorked, !autoWoke, UIApplication.shared.applicationState == .active {
-            autoWoke = true
-            SyncLog.shared.add("remote", "refused twice, waking Spotify")
+        // Spotify refuses apps it was not woken by (after a restart of this app, an update, or when it was
+        // sent to the background): wake it. Only when the song plays on this iPhone: waking Spotify
+        // starts playback here, which must never take over a song playing on another device.
+        if settings.autoWakeSpotify, player?.isPlayingOnThisPhone == true, wakes < Self.maxWakes,
+           Date().timeIntervalSince(lastWake) > Self.wakeCooldown, UIApplication.shared.applicationState == .active {
+            wakes += 1
+            lastWake = Date()
+            SyncLog.shared.add("remote", "refused, waking Spotify (\(wakes)/\(Self.maxWakes))")
             wakeSpotify()
+            // If Spotify never hands a token back, try the plain connection again later.
+            scheduleRetry(after: 20)
             return
         }
         scheduleRetry(after: min(60, 8 * pow(2, Double(min(failures, 4) - 1))))
