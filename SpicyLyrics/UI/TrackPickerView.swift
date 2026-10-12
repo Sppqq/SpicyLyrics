@@ -32,43 +32,25 @@ struct TrackPickerView: View {
 
     private static let recentScope = "user-read-recently-played"
 
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                Picker(String(localized: "Раздел"), selection: $tab) {
-                    ForEach(Tab.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
+    @Namespace private var tabNamespace
 
+    var body: some View {
+        ZStack {
+            ArtworkBackdrop()
+            VStack(spacing: 0) {
+                header
+                tabBar
                 if tab == .search {
                     searchField
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
-
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .navigationTitle(navigationTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "Готово")) { dismiss() }
-                }
-                if tab != .search {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button {
-                            Task { await load(tab) }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        .disabled(loading)
-                    }
-                }
-            }
         }
+        .animation(.spring(response: 0.38, dampingFraction: 0.85), value: tab)
         .task(id: tab) {
             if tab == .search {
                 searchFocused = results.isEmpty
@@ -92,9 +74,69 @@ struct TrackPickerView: View {
         }
     }
 
-    private var navigationTitle: String {
-        if let device = player.deviceName { return "Spotify · \(device)" }
-        return "Spotify"
+    // MARK: Chrome
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tab.title)
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .contentTransition(.interpolate)
+                Text(player.deviceName ?? "Spotify")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            if tab != .search {
+                roundButton("arrow.clockwise") { Task { await load(tab) } }
+                    .disabled(loading)
+                    .opacity(loading ? 0.5 : 1)
+            }
+            roundButton("xmark") { dismiss() }
+                .accessibilityLabel(String(localized: "Готово"))
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 22)
+        .padding(.bottom, 12)
+    }
+
+    private func roundButton(_ icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .bold))
+                .frame(width: 34, height: 34)
+                .background(.white.opacity(0.14), in: Circle())
+        }
+        .buttonStyle(SquishButtonStyle(scale: 0.88))
+    }
+
+    private var tabBar: some View {
+        HStack(spacing: 4) {
+            ForEach(Tab.allCases) { item in
+                Button {
+                    tab = item
+                } label: {
+                    Text(item.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(tab == item ? Color.black : Color.white.opacity(0.78))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background {
+                            if tab == item {
+                                Capsule().fill(.white)
+                                    .matchedGeometryEffect(id: "tab", in: tabNamespace)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4)
+        .background(.white.opacity(0.1), in: Capsule())
+        .padding(.horizontal, 16)
+        .padding(.bottom, 10)
+        .sensoryFeedback(.selection, trigger: tab)
     }
 
     // MARK: Content
@@ -113,19 +155,25 @@ struct TrackPickerView: View {
         } else {
             List {
                 if tab == .queue, let track = player.track {
-                    Section(String(localized: "Сейчас играет")) {
-                        TrackRow(title: track.title, subtitle: track.artistLine, artwork: track.artworkURL,
-                                 duration: track.duration, highlighted: true)
-                    }
+                    NowPlayingCard(title: track.title, subtitle: track.artistLine, artwork: track.artworkURL,
+                                   playing: player.isPlaying)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
-                Section(sectionTitle) {
+                Section {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, track in
                         Button {
                             choose(track, at: index)
                         } label: {
                             TrackRow(title: track.title, subtitle: track.artistLine, artwork: track.thumbnailURL,
-                                     duration: track.duration, highlighted: false)
+                                     duration: track.duration)
+                                .rowAppear(index: index)
                         }
+                        .buttonStyle(SquishButtonStyle(scale: 0.98))
+                        .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                         .contextMenu { menu(for: track, at: index) }
                         .swipeActions(edge: .trailing) {
                             if tab != .queue {
@@ -138,6 +186,11 @@ struct TrackPickerView: View {
                             }
                         }
                     }
+                } header: {
+                    Text(sectionTitle)
+                        .font(.headline)
+                        .foregroundStyle(.white.opacity(0.9))
+                        .textCase(nil)
                 }
                 if tab == .search && canLoadMore {
                     Button {
@@ -150,11 +203,16 @@ struct TrackPickerView: View {
                         }
                     }
                     .disabled(loading)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .scrollDismissesKeyboard(.immediately)
             .refreshable { if tab != .search { await load(tab) } }
+            .id(tab)
+            .transition(.opacity)
         }
     }
 
@@ -208,7 +266,7 @@ struct TrackPickerView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+        .background(.white.opacity(0.12), in: Capsule())
     }
 
     private var reloginPrompt: some View {
@@ -338,25 +396,14 @@ private struct TrackRow: View {
     let subtitle: String
     let artwork: URL?
     let duration: Double
-    let highlighted: Bool
 
     var body: some View {
         HStack(spacing: 12) {
-            AsyncImage(url: artwork) { image in
-                image.resizable().scaledToFill()
-            } placeholder: {
-                Image(systemName: "music.note")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(.white.opacity(0.08))
-            }
-            .frame(width: 44, height: 44)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-
+            CoverThumb(url: artwork, size: 50, radius: 8)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.body.weight(highlighted ? .semibold : .regular))
-                    .foregroundStyle(highlighted ? Color.green : Color.primary)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
                 Text(subtitle)
                     .font(.subheadline)
@@ -364,9 +411,7 @@ private struct TrackRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            if highlighted {
-                Image(systemName: "waveform").foregroundStyle(.green)
-            } else if duration > 0 {
+            if duration > 0 {
                 Text(PlaybackBar.format(duration))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -374,4 +419,89 @@ private struct TrackRow: View {
         }
         .contentShape(Rectangle())
     }
+}
+
+/// What is playing right now: a larger cover and live bars.
+private struct NowPlayingCard: View {
+    let title: String
+    let subtitle: String
+    let artwork: URL?
+    let playing: Bool
+
+    var body: some View {
+        HStack(spacing: 14) {
+            CoverThumb(url: artwork, size: 68, radius: 12)
+                .shadow(color: .black.opacity(0.45), radius: 14, y: 8)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(String(localized: "Сейчас играет"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(title)
+                    .font(.title3.weight(.bold))
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            EqualizerBars(playing: playing)
+        }
+        .padding(12)
+        .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(.white.opacity(0.16), lineWidth: 0.5)
+        }
+    }
+}
+
+private struct CoverThumb: View {
+    let url: URL?
+    let size: CGFloat
+    let radius: CGFloat
+
+    var body: some View {
+        AsyncImage(url: url) { phase in
+            if let image = phase.image {
+                image.resizable().scaledToFill().transition(.opacity)
+            } else {
+                Image(systemName: "music.note")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.white.opacity(0.08))
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+        }
+    }
+}
+
+/// The first rows slide up one after another when a list opens; later ones just appear.
+private struct RowAppear: ViewModifier {
+    let index: Int
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown || reduceMotion ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : 14)
+            .onAppear {
+                guard !shown else { return }
+                if index < 10 {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.82).delay(Double(index) * 0.035)) { shown = true }
+                } else {
+                    shown = true
+                }
+            }
+    }
+}
+
+private extension View {
+    func rowAppear(index: Int) -> some View { modifier(RowAppear(index: index)) }
 }

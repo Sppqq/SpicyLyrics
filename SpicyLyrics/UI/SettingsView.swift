@@ -12,6 +12,19 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    HStack(spacing: 10) {
+                        QuickTile(title: String(localized: "Экономия"), icon: "bolt.fill", tint: .yellow,
+                                  isOn: Binding(get: { settings.powerSaving }, set: { settings.powerSaving = $0 }))
+                        QuickTile(title: String(localized: "Фон"), icon: "photo.fill", tint: .indigo,
+                                  isOn: Binding(get: { settings.dynamicBackground }, set: { settings.dynamicBackground = $0 }))
+                        QuickTile(title: String(localized: "Перевод"), icon: "character.bubble.fill", tint: .blue,
+                                  isOn: Binding(get: { settings.translateLyrics }, set: { settings.translateLyrics = $0 }))
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
+
                 Section(String(localized: "Вид текста")) {
                     category(String(localized: "Текст"), "textformat.size", .purple,
                              value: "\(Int(settings.fontSize)) pt") { TextLookSettings() }
@@ -51,8 +64,9 @@ struct SettingsView: View {
                     category(String(localized: "О приложении"), "info.circle.fill", .gray, value: AppVersion.display) { AboutSettings() }
                 }
             }
+            .settingsPage()
             .navigationTitle(String(localized: "Настройки"))
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(String(localized: "Готово")) { dismiss() }
@@ -74,6 +88,7 @@ struct SettingsView: View {
                                               @ViewBuilder destination: @escaping () -> Destination) -> some View {
         NavigationLink {
             destination()
+                .settingsPage()
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
         } label: {
@@ -82,7 +97,14 @@ struct SettingsView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 29, height: 29)
-                    .background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    .background {
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(LinearGradient(colors: [color.opacity(0.85), color], startPoint: .top, endPoint: .bottom))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
+                            }
+                    }
                 Text(title)
                 Spacer(minLength: 8)
                 if let value {
@@ -92,10 +114,53 @@ struct SettingsView: View {
                 }
             }
         }
+        .listRowBackground(Color.white.opacity(0.09))
     }
 }
 
 // MARK: - Building blocks
+
+/// A big on/off tile for the three switches people reach for most.
+private struct QuickTile: View {
+    let title: String
+    let icon: String
+    let tint: Color
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Button {
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.74)) { isOn.toggle() }
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(isOn ? .white : .secondary)
+                    .symbolEffect(.bounce, value: isOn)
+                Spacer(minLength: 0)
+                Text(title)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(isOn ? .white : .primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 84, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(isOn ? AnyShapeStyle(LinearGradient(colors: [tint.opacity(0.95), tint.opacity(0.62)],
+                                                              startPoint: .topLeading, endPoint: .bottomTrailing))
+                               : AnyShapeStyle(Color.white.opacity(0.09)))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(.white.opacity(isOn ? 0.28 : 0.1), lineWidth: 0.5)
+            }
+        }
+        .buttonStyle(SquishButtonStyle())
+        .sensoryFeedback(.selection, trigger: isOn)
+        .accessibilityValue(isOn ? String(localized: "Вкл.") : String(localized: "Выкл."))
+    }
+}
 
 /// A slider with its title and current value on one line above it.
 private struct SliderRow: View {
