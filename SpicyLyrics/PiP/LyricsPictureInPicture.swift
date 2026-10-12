@@ -52,35 +52,56 @@ final class LyricsPictureInPicture: NSObject {
         displayLayer.videoGravity = .resizeAspect
     }
 
-    /// Connects the player and creates the controller (once the layer is in a window).
+    /// Connects the player. While the window may open on its own there is a controller from the
+    /// start; otherwise it only exists from the moment the window is asked for until it closes:
+    /// without one, iOS has nothing to open when the app is left.
     func configure(player: PlayerModel, settings: AppSettings, performance: PerformanceMonitor? = nil) {
         self.player = player
         self.settings = settings
         self.performance = performance
-        guard controller == nil, Self.isSupported else { return }
+        guard Self.isSupported else { return }
+        if settings.autoPictureInPicture { _ = ensureController() }
+        // Leaving the app: the window may open on its own any moment now, and it opens on
+        // whatever frame is on the layer. Make that one current and keep them coming.
+        if lifecycleObservers.isEmpty {
+            lifecycleObservers.append(NotificationCenter.default.addObserver(
+                forName: UIApplication.willResignActiveNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                guard let self else { return }
+                let auto = MainActor.assumeIsolated { self.settings?.autoPictureInPicture ?? false }
+                // Said again every time the app is left: whatever happened to it since, it follows the setting.
+                self.controller?.canStartPictureInPictureAutomaticallyFromInline = auto
+                guard auto else { return }
+                self.warmUp(for: 3)
+            })
+        }
+        renderFrame()
+        scheduleFrames(fps: idleFramesPerSecond)
+    }
+
+    private func ensureController() -> Bool {
+        if controller != nil { return true }
+        guard Self.isSupported else { return false }
         let source = AVPictureInPictureController.ContentSource(sampleBufferDisplayLayer: displayLayer, playbackDelegate: self)
         let controller = AVPictureInPictureController(contentSource: source)
         controller.delegate = self
         controller.requiresLinearPlayback = false
-        controller.canStartPictureInPictureAutomaticallyFromInline = settings.autoPictureInPicture
+        controller.canStartPictureInPictureAutomaticallyFromInline = mayOpenItself
         possibleObservation = controller.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { [weak self] controller, _ in
             DispatchQueue.main.async { self?.isPossible = controller.isPictureInPicturePossible }
         }
         self.controller = controller
-        // Leaving the app: the window may open on its own any moment now, and it opens on
-        // whatever frame is on the layer. Make that one current and keep them coming.
-        lifecycleObservers.append(NotificationCenter.default.addObserver(
-            forName: UIApplication.willResignActiveNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            guard let self else { return }
-            let auto = MainActor.assumeIsolated { self.settings?.autoPictureInPicture ?? false }
-            // Said again every time the app is left: whatever happened to it since, it follows the setting.
-            self.controller?.canStartPictureInPictureAutomaticallyFromInline = auto
-            guard auto else { return }
-            self.warmUp(for: 3)
-        })
-        renderFrame()
-        scheduleFrames(fps: idleFramesPerSecond)
+        return true
+    }
+
+    /// Lets go of the controller once the window is closed and may not open by itself.
+    private func releaseControllerIfIdle() {
+        guard controller != nil, !mayOpenItself, !keepsAppRunning else { return }
+        possibleObservation = nil
+        controller?.delegate = nil
+        controller = nil
+        isPossible = false
+        SyncLog.log("pip", "controller released")
     }
 
     /// While the window is closed: nothing, unless it may open on its own when leaving the app;
@@ -106,8 +127,10 @@ final class LyricsPictureInPicture: NSObject {
     }
 
     func setAutomaticStart(_ enabled: Bool) {
+        if enabled { _ = ensureController() }
         controller?.canStartPictureInPictureAutomaticallyFromInline = enabled
         if !isActive { scheduleFrames(fps: idleFramesPerSecond) }
+        if !enabled { releaseControllerIfIdle() }
     }
 
     /// Closes the window if it is up (the app is in front again).
@@ -124,24 +147,32 @@ final class LyricsPictureInPicture: NSObject {
     func start() {
         wanted = true
         lastError = nil
-        guard let controller else {
+        guard ensureController(), let controller else {
+            wanted = false
             lastError = String(localized: "Картинка в картинке не поддерживается на этом устройстве.")
             return
         }
         warmUp(for: 2)
+        // A fresh controller needs a moment (and a frame on the layer) before it says yes.
+        attemptStart(controller, triesLeft: 8)
+    }
+
+    private func attemptStart(_ controller: AVPictureInPictureController, triesLeft: Int) {
         if controller.isPictureInPicturePossible {
             controller.startPictureInPicture()
-        } else {
-            // The first frame may still be on its way; try again a moment later.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-                guard let self, let controller = self.controller else { return }
-                if controller.isPictureInPicturePossible {
-                    controller.startPictureInPicture()
-                } else {
-                    SyncLog.log("pip", "not possible right now")
-                    self.lastError = String(localized: "Окно «картинка в картинке» сейчас недоступно. Попробуйте ещё раз.")
-                }
-            }
+            return
+        }
+        guard triesLeft > 0 else {
+            SyncLog.log("pip", "not possible right now")
+            wanted = false
+            lastError = String(localized: "Окно «картинка в картинке» сейчас недоступно. Попробуйте ещё раз.")
+            releaseControllerIfIdle()
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self, self.controller === controller else { return }
+            self.renderFrame()
+            self.attemptStart(controller, triesLeft: triesLeft - 1)
         }
     }
 
@@ -276,6 +307,7 @@ extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
         wanted = false
         controller.canStartPictureInPictureAutomaticallyFromInline = mayOpenItself
         isActive = false
+        DispatchQueue.main.async { [weak self] in self?.releaseControllerIfIdle() }
         MainActor.assumeIsolated { SilentAudio.shared.stop() }
         isTransitioning = false
         scheduleFrames(fps: idleFramesPerSecond)
@@ -289,6 +321,7 @@ extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
         isTransitioning = false
         MainActor.assumeIsolated { SilentAudio.shared.stop() }
         scheduleFrames(fps: idleFramesPerSecond)
+        DispatchQueue.main.async { [weak self] in self?.releaseControllerIfIdle() }
         SyncLog.log("pip", "failed to start: \(error.localizedDescription)")
         lastError = String(localized: "Не удалось открыть окно: \(error.localizedDescription)")
     }
