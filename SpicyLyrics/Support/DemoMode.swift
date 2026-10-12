@@ -43,9 +43,8 @@ enum DemoQueue {
     static let tracks: [TrackSummary] = [
         track(0, "2E6DVdvabtPxTZmUljxytZ", "Mesmerizer", "Bao The Whale, Neuro-sama", "7c65e4c82b767a49bef9e27a", 160),
         track(1, "2kPuQ8BYGdJglM9aFX9pA0", "sleep mode", "KIDSCRY2DAY", "83e0e28d498b56018c783178", 160),
-        track(2, "2eKkLkQcKRINUndAxUdGkH", "The Code", "Nemo", "08d1437f035253a0a65c868f", 180),
-        track(3, "2kPuQ8BYGdJglM9aFX9pA0", "sleep mode", "KIDSCRY2DAY", "83e0e28d498b56018c783178", 160),
-        track(4, "2E6DVdvabtPxTZmUljxytZ", "Mesmerizer", "Bao The Whale, Neuro-sama", "7c65e4c82b767a49bef9e27a", 160),
+        track(2, "5anhQfzFw43g2yHDJ8tk8m", "I Wanna Be Honest", "PureSnow, Beverly", "8f1ba7258f434ce2423c0cfc", 172),
+        track(3, "2eKkLkQcKRINUndAxUdGkH", "The Code", "Nemo", "08d1437f035253a0a65c868f", 180),
     ]
 }
 #endif

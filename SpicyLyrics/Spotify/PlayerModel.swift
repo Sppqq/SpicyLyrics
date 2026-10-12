@@ -139,6 +139,10 @@ final class PlayerModel {
     /// not a pause): ease back by the smallest lead they saw.
     private static let aheadThreshold: Double = 0.05
     private static let aheadCount = 3
+    /// App Remote answers in a few milliseconds, so a lead this big, again and again, is a real
+    /// desync (a stall that was not a pause), not noise: fix it without waiting for an event.
+    private static let remoteAheadThreshold: Double = 0.15
+    private static let remoteAheadCount = 4
     /// A normal round trip; anything slower (a stall, a refreshed token, a retried connection)
     /// makes the answer this much less certain, and only a fast answer may fine-tune the clock.
     private static let normalRoundTrip: Double = 0.3
@@ -539,6 +543,17 @@ final class PlayerModel {
         } else if drift > Self.refineThreshold {
             blend(to: measured, predicted: predicted, now: now)
             decision = "behind → blend"
+        } else if drift < -Self.remoteAheadThreshold {
+            aheadLead = aheadStreak == 0 ? -drift : min(aheadLead, -drift)
+            aheadStreak += 1
+            decision = "ahead (\(aheadStreak))"
+            if aheadStreak >= Self.remoteAheadCount {
+                blend(to: predicted + unapplied - aheadLead, predicted: predicted, now: now)
+                decision = "out of sync \(aheadLead.signedMs) → fixed"
+                aheadStreak = 0
+            }
+        } else {
+            aheadStreak = 0
         }
         log.add("remote", "\(summary) drift \(drift.signedMs) → \(decision)")
         log.synced("App Remote", drift: drift)

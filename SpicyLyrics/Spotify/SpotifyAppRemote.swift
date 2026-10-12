@@ -48,6 +48,9 @@ final class SpotifyAppRemote: NSObject {
     @ObservationIgnored private var autoWoke = false
 
     static let scope = "app-remote-control"
+    /// Set once App Remote has connected: after that, a refusal (a fresh install of this app, Spotify
+    /// restarted) is fixed by waking Spotify, without the user having to find the button.
+    private static let connectedBeforeKey = "appRemoteConnectedBefore"
 
     init(auth: SpotifyAuth, settings: AppSettings) {
         self.auth = auth
@@ -210,6 +213,7 @@ final class SpotifyAppRemote: NSObject {
         status = .connected
         failures = 0
         lastError = nil
+        UserDefaults.standard.set(true, forKey: Self.connectedBeforeKey)
         SyncLog.shared.add("remote", "connected")
         player?.setRemoteConnected(true)
         remote.playerAPI?.delegate = self
@@ -239,7 +243,8 @@ final class SpotifyAppRemote: NSObject {
         status = .unavailable
         failures += 1
         // Spotify refuses apps it was not woken by: after two refusals, wake it once (if allowed).
-        if failures == 2, settings.autoWakeSpotify, !autoWoke, UIApplication.shared.applicationState == .active {
+        let hasWorked = UserDefaults.standard.bool(forKey: Self.connectedBeforeKey)
+        if failures == 2, settings.autoWakeSpotify || hasWorked, !autoWoke, UIApplication.shared.applicationState == .active {
             autoWoke = true
             SyncLog.shared.add("remote", "refused twice, waking Spotify")
             wakeSpotify()

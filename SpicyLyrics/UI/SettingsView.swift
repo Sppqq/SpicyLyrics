@@ -500,8 +500,9 @@ private struct PictureInPictureSettings: View {
         Form {
             Section {
                 Toggle(String(localized: "Открывать при сворачивании"), isOn: $settings.autoPictureInPicture)
+                Toggle(String(localized: "Закрывать при возврате в приложение"), isOn: $settings.closePiPOnReturn)
             } footer: {
-                Text(String(localized: "Текст поверх других приложений. Вручную окно открывается из меню «•••» в плеере."))
+                Text(String(localized: "Текст поверх других приложений. Вручную окно открывается из меню «•••» в плеере. Если открыть приложение, окно закроется само: текст уже на экране."))
             }
 
             Section {

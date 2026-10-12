@@ -34,6 +34,9 @@ final class LyricsPictureInPicture: NSObject {
     @ObservationIgnored private var warmUntil: CFTimeInterval = 0
     @ObservationIgnored private var lifecycleObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var lastPlaying: Bool?
+    /// The window was asked for (the menu button, or the setting that opens it on leaving). iOS
+    /// sometimes opens it on its own after a manual start, even with the setting off.
+    @ObservationIgnored private var wanted = false
     @ObservationIgnored private var lyricsAnimator: LyricsAnimator?
     /// What the animator was built for: comparing whole lyrics every frame was the costliest
     /// thing PiP did, the player's revision number says the same for free.
@@ -69,7 +72,11 @@ final class LyricsPictureInPicture: NSObject {
         lifecycleObservers.append(NotificationCenter.default.addObserver(
             forName: UIApplication.willResignActiveNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            guard let self, MainActor.assumeIsolated({ self.settings?.autoPictureInPicture ?? false }) else { return }
+            guard let self else { return }
+            let auto = MainActor.assumeIsolated { self.settings?.autoPictureInPicture ?? false }
+            // Said again every time the app is left: whatever happened to it since, it follows the setting.
+            self.controller?.canStartPictureInPictureAutomaticallyFromInline = auto
+            guard auto else { return }
             self.warmUp(for: 3)
         })
         renderFrame()
@@ -103,7 +110,19 @@ final class LyricsPictureInPicture: NSObject {
         if !isActive { scheduleFrames(fps: idleFramesPerSecond) }
     }
 
+    /// Closes the window if it is up (the app is in front again).
+    func stopIfIdle() {
+        guard isActive, !isTransitioning else { return }
+        stop()
+    }
+
+    /// Whether iOS may open the window by itself right now.
+    private var mayOpenItself: Bool {
+        MainActor.assumeIsolated { settings?.autoPictureInPicture ?? false }
+    }
+
     func start() {
+        wanted = true
         lastError = nil
         guard let controller else {
             lastError = String(localized: "Картинка в картинке не поддерживается на этом устройстве.")
@@ -224,6 +243,12 @@ extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
 
     func pictureInPictureControllerWillStartPictureInPicture(_ controller: AVPictureInPictureController) {
         SyncLog.log("pip", "starting")
+        if !wanted && !mayOpenItself {
+            // iOS opened it on its own although the setting is off: close it again.
+            SyncLog.log("pip", "opened by iOS against the setting, closing")
+            controller.canStartPictureInPictureAutomaticallyFromInline = false
+            DispatchQueue.main.async { controller.stopPictureInPicture() }
+        }
         isTransitioning = true
         MainActor.assumeIsolated { SilentAudio.shared.start() }
         renderFrame()
@@ -233,6 +258,7 @@ extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
 
     func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
         SyncLog.log("pip", "started")
+        if !wanted && !mayOpenItself { controller.stopPictureInPicture() }
         isActive = true
         isTransitioning = false
         scheduleFrames(fps: fullFramesPerSecond)
@@ -247,6 +273,8 @@ extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
 
     func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
         SyncLog.log("pip", "stopped")
+        wanted = false
+        controller.canStartPictureInPictureAutomaticallyFromInline = mayOpenItself
         isActive = false
         MainActor.assumeIsolated { SilentAudio.shared.stop() }
         isTransitioning = false
@@ -256,6 +284,7 @@ extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
 
     func pictureInPictureController(_ controller: AVPictureInPictureController,
                                     failedToStartPictureInPictureWithError error: Error) {
+        wanted = false
         isActive = false
         isTransitioning = false
         MainActor.assumeIsolated { SilentAudio.shared.stop() }

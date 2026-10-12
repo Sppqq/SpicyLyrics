@@ -75,7 +75,8 @@ struct NowPlayingView: View {
                         // Less than half the background's darkening: the nebula should glow, the lines still read.
                         CoverVisualizerView(player: player, reduced: reduced, dim: settings.backgroundDim * 0.4,
                                             randomColors: settings.nebulaColors == NebulaColors.random.rawValue,
-                                            frameCounter: settings.showLyricsFPS ? nebulaFrames : nil)
+                                            frameCounter: settings.showLyricsFPS ? nebulaFrames : nil,
+                                            maxFrameRate: Int(settings.lyricsFrameRate))
                             .allowsHitTesting(false)
                             .transition(.opacity)
                     }
@@ -138,7 +139,10 @@ struct NowPlayingView: View {
             if !active { Self.relayoutWindows() }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Self.relayoutWindows() }
+            guard phase == .active else { return }
+            Self.relayoutWindows()
+            // The lyrics are on screen again: the floating window has nothing left to do.
+            if settings.closePiPOnReturn { pip.stopIfIdle() }
         }
         .onChange(of: settings.pipFormat) { _, _ in pip.refreshFrame() }
         .animation(.easeInOut(duration: 0.3), value: player.autoSkipNotice)
@@ -720,7 +724,8 @@ struct NowPlayingView: View {
                 // The lyrics' FPS badge, here counting the nebula's frames.
                 if settings.showLyricsFPS && showVisualizer {
                     FPSBadge(counter: nebulaFrames,
-                             target: Double(VisualizerSurface.framesPerSecond(playing: player.isPlaying, reduced: reduced)))
+                             target: Double(VisualizerSurface.framesPerSecond(playing: player.isPlaying, reduced: reduced,
+                                                                     maxFrameRate: Int(settings.lyricsFrameRate))))
                         .padding(.top, topInset + 6)
                         .padding(.leading, horizontalPadding)
                 }

@@ -62,6 +62,8 @@ final class AppSettings {
     var translationReplaces: Bool { didSet { defaults.set(translationReplaces, forKey: Keys.translationReplaces) } }
     /// Open the floating lyrics window when leaving the app.
     var autoPictureInPicture: Bool { didSet { defaults.set(autoPictureInPicture, forKey: Keys.autoPiP) } }
+    /// Opening the app closes the floating window.
+    var closePiPOnReturn: Bool { didSet { defaults.set(closePiPOnReturn, forKey: Keys.closePiPOnReturn) } }
     /// PiP: drifting cover background like the app (off = still cover, for weaker phones).
     var pipAnimatedBackground: Bool { didSet { defaults.set(pipAnimatedBackground, forKey: Keys.pipAnimatedBackground) } }
     /// PiP: track and artist under the lyrics.
@@ -196,6 +198,7 @@ final class AppSettings {
             Keys.showLyricsFPS: false,
             Keys.pipShowFPS: false,
             Keys.autoWakeSpotify: false,
+            Keys.closePiPOnReturn: true,
         ])
         spotifyClientID = defaults.string(forKey: Keys.clientID) ?? ""
         spicyLyricsKey = defaults.string(forKey: Keys.spicyKey) ?? ""
@@ -223,6 +226,7 @@ final class AppSettings {
         pipBlurLines = defaults.object(forKey: Keys.pipBlurLines) as? Bool ?? true
         simpleLyricsMode = defaults.bool(forKey: Keys.simpleMode)
         autoPictureInPicture = defaults.bool(forKey: Keys.autoPiP)
+        closePiPOnReturn = defaults.bool(forKey: Keys.closePiPOnReturn)
         pipAnimatedBackground = defaults.bool(forKey: Keys.pipAnimatedBackground)
         pipShowTitle = defaults.bool(forKey: Keys.pipShowTitle)
         translateLyrics = defaults.bool(forKey: Keys.translate)
@@ -370,6 +374,7 @@ final class AppSettings {
         static let pipBlurLines = "pipBlurLines"
         static let simpleMode = "simpleLyricsMode"
         static let autoPiP = "autoPictureInPicture"
+        static let closePiPOnReturn = "closePiPOnReturn"
         static let pipAnimatedBackground = "pipAnimatedBackground"
         static let pipShowTitle = "pipShowTitle"
         static let translate = "translateLyrics"

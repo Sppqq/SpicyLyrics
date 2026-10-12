@@ -12,10 +12,11 @@ struct CoverVisualizerView: View {
     var randomColors = false
     /// Counts the frames drawn, for the FPS badge.
     var frameCounter: FrameRateCounter?
+    var maxFrameRate = 60
 
     var body: some View {
         CoverVisualizer(image: player.backgroundArtwork, imageID: player.artworkID, player: player, reduced: reduced,
-                        randomColors: randomColors, frameCounter: frameCounter)
+                        randomColors: randomColors, frameCounter: frameCounter, maxFrameRate: maxFrameRate)
             .overlay(Color.black.opacity(dim))
             .ignoresSafeArea()
     }
@@ -31,6 +32,8 @@ struct CoverVisualizer: UIViewRepresentable {
     var reduced = false
     var randomColors = false
     var frameCounter: FrameRateCounter?
+    /// The most frames per second it may draw (the lyrics' setting).
+    var maxFrameRate = 60
 
     static var isSupported: Bool { VisualizerSurface.isSupported }
 
@@ -48,6 +51,7 @@ struct CoverVisualizer: UIViewRepresentable {
 
     func updateUIView(_ view: VisualizerSurface, context: Context) {
         view.playing = player.isPlaying
+        view.maxFrameRate = maxFrameRate
         view.reduced = reduced
         view.frameCounter = frameCounter
         view.setImage(image, id: imageID, random: randomColors)
@@ -72,12 +76,14 @@ final class VisualizerSurface: ShaderSurface {
 
     var playing = false { didSet { updateRate() } }
     var reduced = false { didSet { updateRate() } }
+    var maxFrameRate = 60 { didSet { updateRate() } }
     var progress: () -> Double = { 0 }
     var frameCounter: FrameRateCounter?
 
     /// The frame rate it runs at.
-    static func framesPerSecond(playing: Bool, reduced: Bool) -> Int {
-        reduced ? 20 : (playing ? 30 : 20)
+    static func framesPerSecond(playing: Bool, reduced: Bool, maxFrameRate: Int = 60) -> Int {
+        // The flow is slow, so more than 60 never shows; paused it settles to a trickle.
+        reduced ? 20 : (playing ? min(max(30, maxFrameRate), 60) : 20)
     }
 
     private var palette = CoverPalette.fallback
@@ -136,7 +142,7 @@ final class VisualizerSurface: ShaderSurface {
     }
 
     private func updateRate() {
-        preferredFramesPerSecond = Self.framesPerSecond(playing: playing, reduced: reduced)
+        preferredFramesPerSecond = Self.framesPerSecond(playing: playing, reduced: reduced, maxFrameRate: maxFrameRate)
     }
 
     override func didDraw(now: CFTimeInterval) {
