@@ -76,7 +76,8 @@ struct ArtworkLyricLine: View {
                 LyricLineView(line: Self.leftAligned(lines[index]), visual: visuals[index], typography: typography,
                               translation: translation(lines[index]))
                 ForEach(Self.backing(of: index, in: lines), id: \.self) { row in
-                    LyricLineView(line: Self.leftAligned(lines[row]), visual: visuals[row], typography: typography)
+                    LyricLineView(line: Self.leftAligned(lines[row]), visual: visuals[row], typography: typography,
+                                  translation: translation(lines[row]))
                 }
             }
         }

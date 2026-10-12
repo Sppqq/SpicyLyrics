@@ -722,8 +722,10 @@ struct NowPlayingView: View {
             let freeHeight = geometry.size.height - topInset - bottomInset
             let lyrics = artworkLyrics
             let lineFont: CGFloat = isLandscape ? 20 : 24
-            // Room for two lines and a backing vocal or a translation under the cover.
-            let lineHeight: CGFloat = lyrics == nil ? 0 : lineFont * 4.4
+            // Room for two lines and a backing vocal or a translation under the cover; with
+            // translations under the lines, a little more for the backing vocal's own.
+            let translated = settings.translateLyrics && !settings.translationReplaces
+            let lineHeight: CGFloat = lyrics == nil ? 0 : lineFont * (translated ? 5.2 : 4.4)
             let gap: CGFloat = lyrics == nil ? 0 : 20
             let side = max(0, min(geometry.size.width - margin * 2, freeHeight - margin * 2 - lineHeight - gap, 720))
             let blockTop = topInset + freeHeight / 2 - (side + gap + lineHeight) / 2
