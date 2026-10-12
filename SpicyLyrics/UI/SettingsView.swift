@@ -14,11 +14,11 @@ struct SettingsView: View {
             List {
                 Section {
                     HStack(spacing: 10) {
-                        QuickTile(title: String(localized: "Экономия"), icon: "bolt.fill", tint: .yellow,
+                        QuickTile(title: String(localized: "Экономия"), icon: "bolt.fill", tint: Sweet.butter,
                                   isOn: Binding(get: { settings.powerSaving }, set: { settings.powerSaving = $0 }))
-                        QuickTile(title: String(localized: "Фон"), icon: "photo.fill", tint: .indigo,
+                        QuickTile(title: String(localized: "Фон"), icon: "photo.fill", tint: Sweet.pink,
                                   isOn: Binding(get: { settings.dynamicBackground }, set: { settings.dynamicBackground = $0 }))
-                        QuickTile(title: String(localized: "Перевод"), icon: "character.bubble.fill", tint: .blue,
+                        QuickTile(title: String(localized: "Перевод"), icon: "character.bubble.fill", tint: Sweet.lilac,
                                   isOn: Binding(get: { settings.translateLyrics }, set: { settings.translateLyrics = $0 }))
                     }
                     .listRowInsets(EdgeInsets())
@@ -26,36 +26,36 @@ struct SettingsView: View {
                 }
 
                 Section(String(localized: "Вид текста")) {
-                    category(String(localized: "Текст"), "textformat.size", .purple,
+                    category(String(localized: "Текст"), "textformat.size", Sweet.lilac,
                              value: "\(Int(settings.fontSize)) pt") { TextLookSettings() }
-                    category(String(localized: "Эффекты"), "sparkles", .pink,
+                    category(String(localized: "Эффекты"), "sparkles", Sweet.pink,
                              value: settings.simpleLyricsMode ? "Simple" : nil) { EffectsSettings() }
-                    category(String(localized: "Фон"), "photo.fill", .indigo,
+                    category(String(localized: "Фон"), "photo.fill", Sweet.sky,
                              value: settings.dynamicBackground ? nil : String(localized: "Выкл.")) { BackgroundSettings() }
-                    category(String(localized: "Перевод и романизация"), "character.bubble.fill", .blue,
+                    category(String(localized: "Перевод и романизация"), "character.bubble.fill", Sweet.lilac,
                              value: translationSummary) { LanguageSettings() }
                 }
 
                 Section(String(localized: "Экран плеера")) {
-                    category(String(localized: "Интерфейс"), "rectangle.bottomhalf.inset.filled", .orange) { InterfaceSettings() }
-                    category(String(localized: "Горизонтальный режим"), "rectangle.landscape.rotate", .teal,
+                    category(String(localized: "Интерфейс"), "rectangle.bottomhalf.inset.filled", Sweet.peach) { InterfaceSettings() }
+                    category(String(localized: "Горизонтальный режим"), "rectangle.landscape.rotate", Sweet.mint,
                              value: settings.landscapeLyricsOnly ? String(localized: "Только текст") : nil) { LandscapeSettings() }
-                    category(String(localized: "Жесты"), "hand.draw.fill", .red,
+                    category(String(localized: "Жесты"), "hand.draw.fill", Sweet.coral,
                              value: settings.gesturesEnabled ? String(localized: "Вкл.") : String(localized: "Выкл.")) { GestureSettings() }
-                    category(String(localized: "Картинка в картинке"), "pip.fill", .green,
+                    category(String(localized: "Картинка в картинке"), "pip.fill", Sweet.mint,
                              value: settings.autoPictureInPicture ? String(localized: "Авто") : nil) { PictureInPictureSettings() }
                 }
 
                 Section(String(localized: "Работа")) {
-                    category(String(localized: "Синхронизация"), "timer", .cyan,
+                    category(String(localized: "Синхронизация"), "timer", Sweet.sky,
                              value: settings.timingOffsetMs == 0 ? nil : String(localized: "\(Int(settings.timingOffsetMs)) мс")) { SyncSettings() }
-                    category(String(localized: "Батарея и нагрев"), "bolt.fill", .yellow,
+                    category(String(localized: "Батарея и нагрев"), "bolt.fill", Sweet.butter,
                              value: settings.powerSaving ? String(localized: "Экономия") : (performance.constrained ? String(localized: "Авто-экономия") : nil)) {
                         PerformanceSettings()
                     }
                     category(String(localized: "Журнал"), "list.bullet.rectangle.fill", .gray,
                              value: settings.syncLogEnabled ? nil : String(localized: "Выкл.")) { SyncLogView() }
-                    category(String(localized: "Источники текстов"), "doc.text.fill", .brown) { SourceSettings() }
+                    category(String(localized: "Источники текстов"), "doc.text.fill", Sweet.peach) { SourceSettings() }
                     category("Spotify", "music.note", Color(red: 0.12, green: 0.84, blue: 0.38),
                              value: settings.hasValidClientID ? "…" + String(settings.spotifyClientID.suffix(4)) : String(localized: "Не настроен")) { SpotifySettings() }
                 }

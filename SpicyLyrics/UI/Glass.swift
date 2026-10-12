@@ -6,8 +6,8 @@ struct ArtworkBackdrop: View {
     @Environment(PlayerModel.self) private var player
 
     var body: some View {
-        // The black base decides the size; the cover is only painted over it and clipped.
-        Color.black
+        // The plum base decides the size; the cover is only painted over it and clipped.
+        Rectangle().fill(Sweet.night)
             .overlay {
                 AsyncImage(url: player.track?.artworkURL) { phase in
                     if let image = phase.image {
@@ -36,6 +36,7 @@ extension View {
     func settingsPage() -> some View {
         scrollContentBackground(.hidden)
             .background { ArtworkBackdrop() }
+            .tint(Sweet.pink)
     }
 }
 

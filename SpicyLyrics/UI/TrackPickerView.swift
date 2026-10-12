@@ -48,6 +48,7 @@ struct TrackPickerView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background { ArtworkBackdrop() }
+        .tint(Sweet.pink)
         .animation(.spring(response: 0.38, dampingFraction: 0.85), value: tab)
         .task(id: tab) {
             if tab == .search {
@@ -117,12 +118,12 @@ struct TrackPickerView: View {
                 } label: {
                     Text(item.title)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(tab == item ? Color.black : Color.white.opacity(0.78))
+                        .foregroundStyle(tab == item ? Color.white : Color.white.opacity(0.78))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background {
                             if tab == item {
-                                Capsule().fill(.white)
+                                Capsule().fill(Sweet.gradient)
                                     .matchedGeometryEffect(id: "tab", in: tabNamespace)
                             }
                         }
@@ -180,7 +181,7 @@ struct TrackPickerView: View {
                                 } label: {
                                     Label(String(localized: "В очередь"), systemImage: "text.badge.plus")
                                 }
-                                .tint(.green)
+                                .tint(Sweet.pink)
                             }
                         }
                     }
@@ -449,7 +450,7 @@ private struct NowPlayingCard: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            EqualizerBars(playing: playing)
+            EqualizerBars(playing: playing, color: Sweet.pink)
         }
         .padding(12)
         .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 22, style: .continuous))

@@ -15,7 +15,8 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Sweet Lyrics")
-                            .font(.system(size: 40, weight: .heavy))
+                            .font(.system(size: 42, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Sweet.gradient)
                         Text(String(localized: "Синхронные по словам тексты для того, что играет у вас в Spotify."))
                             .font(.title3.weight(.medium))
                             .foregroundStyle(.secondary)
@@ -41,8 +42,10 @@ struct OnboardingView: View {
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(.white.opacity(canLogIn ? 0.12 : 0.9), in: Capsule())
-                            .foregroundStyle(canLogIn ? .white : .black)
+                            .background {
+                                if canLogIn { Capsule().fill(.white.opacity(0.12)) } else { Capsule().fill(Sweet.gradient) }
+                            }
+                            .foregroundStyle(.white)
                     }
 
                     Text(String(localized: "Приложение не связано со Spotify AB и с авторами Spicy Lyrics. Это неофициальный порт расширения Spicy Lyrics под AGPL-3.0."))
@@ -52,9 +55,12 @@ struct OnboardingView: View {
                 .padding(24)
             }
             .background(
-                LinearGradient(colors: [Color(red: 0.25, green: 0.1, blue: 0.35), .black],
-                               startPoint: .topLeading, endPoint: .bottom)
-                    .ignoresSafeArea()
+                ZStack {
+                    Sweet.night
+                    RadialGradient(colors: [Sweet.pink.opacity(0.45), .clear], center: .topLeading, startRadius: 0, endRadius: 420)
+                    RadialGradient(colors: [Sweet.lilac.opacity(0.3), .clear], center: .bottomTrailing, startRadius: 0, endRadius: 380)
+                }
+                .ignoresSafeArea()
             )
         }
     }
@@ -64,15 +70,16 @@ struct OnboardingView: View {
             Task { await logIn() }
         } label: {
             HStack {
-                if busy { ProgressView().tint(.black) }
+                if busy { ProgressView().tint(.white) }
                 Text(String(localized: "Войти через Spotify"))
                     .font(.headline)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(Color(red: 0.12, green: 0.84, blue: 0.38), in: Capsule())
-            .foregroundStyle(.black)
+            .background(Sweet.gradient, in: Capsule())
+            .foregroundStyle(.white)
         }
+        .buttonStyle(SquishButtonStyle())
         .disabled(busy)
     }
 

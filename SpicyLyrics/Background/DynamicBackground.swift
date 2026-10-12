@@ -26,7 +26,7 @@ struct DynamicBackground: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.07, green: 0.07, blue: 0.08)
+            Rectangle().fill(Sweet.night)
             if KawarpBackground.isSupported {
                 KawarpBackground(image: image, imageID: imageID, animated: animated, playing: playing,
                                  speed: speed, blur: blur, saturation: saturation)
