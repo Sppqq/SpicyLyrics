@@ -12,6 +12,7 @@ struct SpicyLyricsApp: App {
 
     init() {
         AudioRoute.prepare()
+        CustomFonts.shared.registerAll()
         let settings = AppSettings()
         SyncLog.shared.enabled = settings.syncLogEnabled
         let auth = SpotifyAuth(settings: settings)
@@ -34,7 +35,7 @@ struct SpicyLyricsApp: App {
                 .environment(appRemote)
                 .environmentObject(auth)
                 .preferredColorScheme(.dark)
-                .tint(.white)
+                .tint(settings.appTheme.accent)
         }
     }
 }

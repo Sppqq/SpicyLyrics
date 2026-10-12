@@ -26,8 +26,10 @@ struct SettingsView: View {
                 }
 
                 Section(String(localized: "Вид текста")) {
+                    category(String(localized: "Тема"), "paintpalette.fill", .indigo,
+                             value: settings.appTheme.title) { ThemeSettings() }
                     category(String(localized: "Текст"), "textformat.size", .purple,
-                             value: "\(Int(settings.fontSize)) pt") { TextLookSettings() }
+                             value: LyricsFontChoice(stored: settings.lyricsFont).title) { TextLookSettings() }
                     category(String(localized: "Эффекты"), "sparkles", .pink,
                              value: settings.simpleLyricsMode ? "Simple" : nil) { EffectsSettings() }
                     category(String(localized: "Фон"), "photo.fill", .indigo,
@@ -207,11 +209,16 @@ private struct TextLookSettings: View {
     var body: some View {
         @Bindable var settings = settings
         Form {
+            Section { LyricPreview() }
+
             Section {
-                Picker(String(localized: "Шрифт"), selection: $settings.lyricsFont) {
-                    ForEach(LyricsFont.allCases) { font in
-                        Text(font.title).tag(font.rawValue)
-                    }
+                NavigationLink {
+                    FontSettings()
+                        .settingsPage()
+                        .navigationTitle(String(localized: "Шрифт"))
+                        .navigationBarTitleDisplayMode(.inline)
+                } label: {
+                    LabeledContent(String(localized: "Шрифт"), value: LyricsFontChoice(stored: settings.lyricsFont).title)
                 }
                 Picker(String(localized: "Насыщенность шрифта"), selection: $settings.lyricsWeight) {
                     ForEach(LyricsWeight.allCases) { weight in

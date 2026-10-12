@@ -76,6 +76,9 @@ final class AppSettings {
     var centerLyrics: Bool { didSet { defaults.set(centerLyrics, forKey: Keys.centerLyrics) } }
     /// `LyricsFont.rawValue`.
     var lyricsFont: String { didSet { defaults.set(lyricsFont, forKey: Keys.lyricsFont) } }
+    /// `AppTheme.rawValue`.
+    var theme: String { didSet { defaults.set(theme, forKey: Keys.theme) } }
+    var appTheme: AppTheme { AppTheme(rawValue: theme) ?? .cover }
     /// Swipes to change tracks and pinch to resize the lyrics.
     var gesturesEnabled: Bool { didSet { defaults.set(gesturesEnabled, forKey: Keys.gestures) } }
     /// The system volume slider under the playback buttons.
@@ -171,6 +174,7 @@ final class AppSettings {
             Keys.pipFormat: PiPFormat.wide.rawValue,
             Keys.centerLyrics: false,
             Keys.lyricsFont: LyricsFont.standard.rawValue,
+            Keys.theme: AppTheme.cover.rawValue,
             Keys.landscapeTitle: true,
             Keys.landscapeLyricsOnly: false,
             Keys.hideNotFound: false,
@@ -238,6 +242,7 @@ final class AppSettings {
         appLanguage = defaults.string(forKey: Keys.appLanguage) ?? "system"
         centerLyrics = defaults.bool(forKey: Keys.centerLyrics)
         lyricsFont = defaults.string(forKey: Keys.lyricsFont) ?? LyricsFont.standard.rawValue
+        theme = defaults.string(forKey: Keys.theme) ?? AppTheme.cover.rawValue
         landscapeArtwork = defaults.bool(forKey: Keys.landscapeArtwork)
         landscapeTitle = defaults.bool(forKey: Keys.landscapeTitle)
         landscapeLyricsOnly = defaults.bool(forKey: Keys.landscapeLyricsOnly)
@@ -383,6 +388,7 @@ final class AppSettings {
         static let appLanguage = "appLanguage"
         static let centerLyrics = "centerLyrics"
         static let lyricsFont = "lyricsFont"
+        static let theme = "appTheme"
         static let landscapeArtwork = "landscapeArtwork"
         static let landscapeTitle = "landscapeTitle"
         static let landscapeLyricsOnly = "landscapeLyricsOnly"
@@ -488,7 +494,7 @@ enum AutoSkipMode: String, CaseIterable, Identifiable {
 
 /// Typeface for the lyrics.
 enum LyricsFont: String, CaseIterable, Identifiable {
-    case standard, rounded, serif
+    case standard, rounded, serif, mono
 
     var id: String { rawValue }
 
@@ -497,6 +503,7 @@ enum LyricsFont: String, CaseIterable, Identifiable {
         case .standard: return "SF Pro"
         case .rounded: return "SF Pro Rounded"
         case .serif: return "New York"
+        case .mono: return "SF Mono"
         }
     }
 }
