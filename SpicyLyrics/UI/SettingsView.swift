@@ -535,10 +535,10 @@ private struct SyncSettings: View {
         @Bindable var settings = settings
         Form {
             Section {
-                Toggle(String(localized: "Точное время из приложения Spotify"), isOn: $settings.useAppRemote)
+                Toggle(String(localized: "Связь с приложением Spotify"), isOn: $settings.useAppRemote)
                 if settings.useAppRemote {
                     LabeledContent(String(localized: "Состояние"), value: appRemote.statusText)
-                    Toggle(String(localized: "Будить Spotify самому"), isOn: $settings.autoWakeSpotify)
+                    Toggle(String(localized: "Открывать Spotify, если молчит"), isOn: $settings.autoWakeSpotify)
                     if let error = appRemote.lastError, appRemote.status != .connected {
                         Text(error)
                             .font(.footnote.monospaced())
@@ -556,8 +556,10 @@ private struct SyncSettings: View {
                         Button(String(localized: "Открыть Spotify и подключиться")) { appRemote.wakeSpotify() }
                     }
                 }
+            } header: {
+                Text(String(localized: "Откуда брать время песни"))
             } footer: {
-                Text(String(localized: "Когда Spotify играет на этом iPhone, позиция берётся прямо из его приложения, без задержек интернета. Иначе время берётся из Spotify Web API."))
+                Text(String(localized: "Включено: когда Spotify играет на этом iPhone, время песни берётся прямо из приложения Spotify — точно в такт и даже без интернета. Выключено или Spotify играет на другом устройстве (компьютер, колонка): время узнаётся у Spotify через интернет, чуть менее точно."))
             }
 
             if settings.useAppRemote {
@@ -580,7 +582,7 @@ private struct SyncSettings: View {
                 } header: {
                     Text(String(localized: "Если не подключается"))
                 } footer: {
-                    Text(String(localized: "1. Spotify должен играть на этом iPhone. 2. В developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте этот Bundle ID (AltStore меняет его при установке) и Redirect URI. 3. Нажмите «Открыть Spotify и подключиться» (или включите «Будить Spotify самому»: если Spotify дважды откажет, приложение один раз откроет его и вернётся). Если состояние «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify."))
+                    Text(String(localized: "1. Включите музыку в Spotify на этом iPhone. 2. На developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте Bundle ID и Redirect URI отсюда (нажатие копирует Bundle ID; AltStore меняет его при установке). 3. Нажмите «Открыть Spotify и подключиться». Если пишет «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify."))
                 }
             }
 
@@ -591,23 +593,25 @@ private struct SyncSettings: View {
                 }
                 Button(String(localized: "Сбросить сдвиг")) { settings.timingOffsetMs = 0 }
                     .disabled(settings.timingOffsetMs == 0)
+            } header: {
+                Text(String(localized: "Текст спешит или опаздывает"))
             } footer: {
-                Text(String(localized: "Положительный сдвиг показывает слова раньше."))
+                Text(String(localized: "Слова загораются позже, чем их поют, — двигайте вправо (плюс). Раньше — влево (минус)."))
             }
 
             Section {
-                SliderRow(title: String(localized: "Опрос Spotify Web API"), value: $settings.webPollInterval, range: 1...5,
+                SliderRow(title: String(localized: "Через интернет: раз в"), value: $settings.webPollInterval, range: 1...5,
                           step: 0.5, format: { String(format: "%.1f", $0) + " " + String(localized: "с") })
-                SliderRow(title: String(localized: "Сверка с приложением Spotify"), value: $settings.remoteQueryInterval,
+                SliderRow(title: String(localized: "С приложением Spotify: раз в"), value: $settings.remoteQueryInterval,
                           range: 0.5...5, step: 0.5, format: { String(format: "%.1f", $0) + " " + String(localized: "с") })
-                Toggle(String(localized: "Индикатор синхронизации"), isOn: $settings.showSyncIndicator)
+                Toggle(String(localized: "Значок сверки над текстом"), isOn: $settings.showSyncIndicator)
                 NavigationLink(String(localized: "Журнал")) {
                     SyncLogView().navigationTitle(String(localized: "Журнал"))
                 }
             } header: {
                 Text(String(localized: "Как часто сверять время"))
             } footer: {
-                Text(String(localized: "Индикатор над текстом показывает, откуда пришло время (App Remote или Web API), насколько часы расходились и как давно была сверка. Частый опрос Web API тратит общий лимит запросов вашего Client ID."))
+                Text(String(localized: "Чаще — точнее, но частые запросы через интернет расходуют общий лимит вашего Client ID. Значок над текстом показывает, откуда пришло время («приложение» или «интернет»), на сколько часы разошлись и как давно была сверка. Нажмите на него, чтобы проверить связь с приложением Spotify."))
             }
 
             Section {

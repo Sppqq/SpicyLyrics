@@ -137,8 +137,8 @@ A free Apple ID can have only 3 such apps at a time.
 
 - **"INVALID_CLIENT" or error 403 when signing in**: something in your Spotify app is off.
   Check the Client ID, the redirect URI, and that your email is under User Management.
-- **The sync badge says "SDK: sign in again"**: sign in again in the app.
-- **"SDK: no link"**: Spotify has to be playing on this phone. Tap the badge →
+- **The sync badge says "sign in again"**: sign in again in the app.
+- **"no link to Spotify"**: Spotify has to be playing on this phone. Tap the badge →
   *Open Spotify and Connect*.
 - **Anything else**: go to *Settings → Log → Share Log File* and
   [open an issue](https://github.com/Sppqq/spicy-lyrics-ios/issues) with the file attached.

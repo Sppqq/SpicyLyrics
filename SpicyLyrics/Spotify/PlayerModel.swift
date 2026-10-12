@@ -703,7 +703,12 @@ final class PlayerModel {
     private func nextPollInterval() -> Double {
         // App Remote keeps time: the Web API only fills in details, so ask it less often.
         if remoteAuthority { return 5 }
-        guard isPlaying else { return 3 }
+        guard isPlaying else {
+            // Stopped at the very end of a song: Spotify is most likely between two songs, ask
+            // again soon so the next one shows up right away.
+            if let duration = track?.duration, duration > 0, duration - playbackPosition() < 3 { return 1 }
+            return 3
+        }
         if refineSamples > 0 { return 0.35 }
         if let duration = track?.duration, duration > 0 {
             let remaining = duration - playbackPosition()

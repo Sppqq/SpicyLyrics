@@ -225,6 +225,7 @@ extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
     func pictureInPictureControllerWillStartPictureInPicture(_ controller: AVPictureInPictureController) {
         SyncLog.log("pip", "starting")
         isTransitioning = true
+        MainActor.assumeIsolated { SilentAudio.shared.start() }
         renderFrame()
         scheduleFrames(fps: fullFramesPerSecond)
         checkClock("pip opening")
@@ -247,6 +248,7 @@ extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
     func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
         SyncLog.log("pip", "stopped")
         isActive = false
+        MainActor.assumeIsolated { SilentAudio.shared.stop() }
         isTransitioning = false
         scheduleFrames(fps: idleFramesPerSecond)
         checkClock("pip closed")
@@ -256,6 +258,7 @@ extension LyricsPictureInPicture: AVPictureInPictureControllerDelegate {
                                     failedToStartPictureInPictureWithError error: Error) {
         isActive = false
         isTransitioning = false
+        MainActor.assumeIsolated { SilentAudio.shared.stop() }
         scheduleFrames(fps: idleFramesPerSecond)
         SyncLog.log("pip", "failed to start: \(error.localizedDescription)")
         lastError = String(localized: "Не удалось открыть окно: \(error.localizedDescription)")

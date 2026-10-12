@@ -88,7 +88,7 @@ struct SyncLogView: View {
 }
 
 /// A small badge over the lyrics: where the time last came from, how far off the clock was and,
-/// while the Spotify app (SDK) is not keeping time, why. Tap it for the SDK's state and a fix.
+/// while the Spotify app (App Remote) is not keeping time, why. Tap it for its state and a fix.
 struct SyncIndicator: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppSettings.self) private var settings
@@ -98,7 +98,7 @@ struct SyncIndicator: View {
     var body: some View {
         Menu {
             Section {
-                Text("SDK (App Remote): \(settings.useAppRemote ? appRemote.statusText : String(localized: "Выключено"))")
+                Text(String(localized: "Связь с приложением Spotify: \(settings.useAppRemote ? appRemote.statusText : String(localized: "Выключено"))"))
                 if let error = appRemote.lastError, appRemote.status != .connected {
                     Text(error)
                 }
@@ -120,7 +120,7 @@ struct SyncIndicator: View {
                     EmptyView()
                 }
             } else {
-                Button(String(localized: "Включить SDK"), systemImage: "bolt.horizontal") { settings.useAppRemote = true }
+                Button(String(localized: "Включить связь с приложением Spotify"), systemImage: "bolt.horizontal") { settings.useAppRemote = true }
             }
         } label: {
             badge
@@ -128,14 +128,19 @@ struct SyncIndicator: View {
     }
 
     private var sdkNote: String? {
-        guard settings.useAppRemote else { return "SDK off" }
+        guard settings.useAppRemote else { return String(localized: "без приложения Spotify") }
         switch appRemote.status {
         case .connected: return nil
-        case .needsLogin: return String(localized: "SDK: войти заново")
-        case .connecting: return String(localized: "SDK: подключение")
-        case .unavailable: return String(localized: "SDK: нет связи")
-        case .off: return "SDK off"
+        case .needsLogin: return String(localized: "войдите заново")
+        case .connecting: return String(localized: "подключаюсь к Spotify")
+        case .unavailable: return String(localized: "нет связи со Spotify")
+        case .off: return String(localized: "без приложения Spotify")
         }
+    }
+
+    /// "App Remote" / "Web API" in words people know.
+    private static func sourceName(_ source: String) -> String {
+        source == "App Remote" ? String(localized: "приложение") : String(localized: "интернет")
     }
 
     private var badge: some View {
@@ -146,9 +151,9 @@ struct SyncIndicator: View {
                     .fill(player.remoteConnected ? Color.green : Color.orange)
                     .frame(width: 7, height: 7)
                 if let sync {
-                    Text("\(sync.source) \(sync.drift.signedMs) · \(String(format: "%.1f", context.date.timeIntervalSince(sync.at)))s")
+                    Text("\(Self.sourceName(sync.source)) \(sync.drift.signedMs) · \(String(format: "%.1f", context.date.timeIntervalSince(sync.at)))s")
                 } else {
-                    Text(player.remoteConnected ? "App Remote" : "Web API")
+                    Text(Self.sourceName(player.remoteConnected ? "App Remote" : "Web API"))
                 }
                 if let sdkNote {
                     Text("· " + sdkNote).foregroundStyle(.orange)

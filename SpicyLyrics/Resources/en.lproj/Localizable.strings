@@ -144,7 +144,8 @@
 "Показать элементы управления" = "Show Controls";
 "Показывать" = "Show";
 "Полная плавность" = "Full smoothness";
-"Положительный сдвиг показывает слова раньше." = "A positive offset shows words earlier.";
+"Слова загораются позже, чем их поют, — двигайте вправо (плюс). Раньше — влево (минус)." = "Words light up after they are sung: move right (plus). Before: move left (minus).";
+"Текст спешит или опаздывает" = "Lyrics Early or Late";
 "Полоска громкости" = "Volume Slider";
 "Получить ключ Spicy Lyrics" = "Get a Spicy Lyrics Key";
 "Поставьте галочку согласия с условиями и нажмите **Save**." = "Tick the box to accept the terms and tap **Save**.";
@@ -267,11 +268,12 @@
 "Подключение…" = "Connecting…";
 "Подключено" = "Connected";
 "Spotify не отвечает" = "Spotify isn't responding";
-"Точное время из приложения Spotify" = "Exact timing from the Spotify app";
+"Связь с приложением Spotify" = "Link to the Spotify App";
+"Откуда брать время песни" = "Where Song Timing Comes From";
 "Состояние" = "Status";
 "Войти заново" = "Sign In Again";
 "Открыть Spotify и подключиться" = "Open Spotify and Connect";
-"Когда Spotify играет на этом iPhone, позиция берётся прямо из его приложения, без задержек интернета. Иначе время берётся из Spotify Web API." = "When Spotify plays on this iPhone, the position comes straight from its app, with no network delay. Otherwise timing comes from the Spotify Web API.";
+"Включено: когда Spotify играет на этом iPhone, время песни берётся прямо из приложения Spotify — точно в такт и даже без интернета. Выключено или Spotify играет на другом устройстве (компьютер, колонка): время узнаётся у Spotify через интернет, чуть менее точно." = "On: when Spotify plays on this iPhone, the song's timing comes straight from the Spotify app, right on the beat and even offline. Off, or Spotify plays on another device (a computer, a speaker): the timing is asked from Spotify over the internet, a little less exact.";
 "Журнал синхронизации" = "Sync Log";
 "Вести журнал" = "Keep a Log";
 "Отправить файл журнала" = "Share Log File";
@@ -289,14 +291,14 @@
 "Текст в окне" = "Lyrics in the Window";
 "Меньше кадров — меньше нагрузка и нагрев. Размытие строк работает, только если оно включено и в «Эффектах»." = "Fewer frames mean less load and heat. Line blur only works if it is also on in Effects.";
 "Сбросить вид окна" = "Reset Window Look";
-"Опрос Spotify Web API" = "Spotify Web API Polling";
-"Сверка с приложением Spotify" = "Spotify App Check";
+"Через интернет: раз в" = "Over the Internet: Every";
+"С приложением Spotify: раз в" = "With the Spotify App: Every";
 "с" = "s";
-"Индикатор синхронизации" = "Sync Indicator";
+"Значок сверки над текстом" = "Sync Badge Over Lyrics";
 "Как часто сверять время" = "How Often to Check the Time";
-"Индикатор над текстом показывает, откуда пришло время (App Remote или Web API), насколько часы расходились и как давно была сверка. Частый опрос Web API тратит общий лимит запросов вашего Client ID." = "The badge over the lyrics shows where the time came from (App Remote or Web API), how far the clock was off and how long ago it was checked. Frequent Web API polling uses up your Client ID's shared request quota.";
+"Чаще — точнее, но частые запросы через интернет расходуют общий лимит вашего Client ID. Значок над текстом показывает, откуда пришло время («приложение» или «интернет»), на сколько часы разошлись и как давно была сверка. Нажмите на него, чтобы проверить связь с приложением Spotify." = "More often is more exact, but frequent requests over the internet use up your Client ID's shared quota. The badge over the lyrics shows where the time came from (\"app\" or \"internet\"), how far the clock was off and how long ago it was checked. Tap it to check the link to the Spotify app.";
 
-/* Customization, FPS, SDK diagnostics */
+/* Customization, FPS, Spotify app link diagnostics */
 "Полужирный" = "Semibold";
 "Жирный" = "Bold";
 "Плотный" = "Heavy";
@@ -317,16 +319,20 @@
 "Кадры" = "Frames";
 "Меньше кадров — меньше нагрев. На паузе текст рисуется 15 раз в секунду, в режиме экономии — не больше 30. Счётчик показывает реальные кадры / цель. Частота PiP настраивается в «Картинке в картинке»." = "Fewer frames, less heat. While paused the lyrics draw 15 times a second, with battery saver at most 30. The counter shows actual frames / target. The PiP frame rate is set under Picture in Picture.";
 "Если не подключается" = "If It Won't Connect";
-"1. Spotify должен играть на этом iPhone. 2. В developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте этот Bundle ID (AltStore меняет его при установке) и Redirect URI. 3. Нажмите «Открыть Spotify и подключиться» (или включите «Будить Spotify самому»: если Spotify дважды откажет, приложение один раз откроет его и вернётся). Если состояние «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify." = "1. Spotify has to be playing on this iPhone. 2. In developer.spotify.com → your app → Settings, tick “iOS” and add this Bundle ID (AltStore changes it when installing) and the Redirect URI. 3. Tap “Open Spotify and Connect” (or turn on “Wake Spotify Automatically”: after two refusals the app opens Spotify once and comes back). If the state says “Sign In Again”, sign in again: the old login had no access to the Spotify app.";
+"1. Включите музыку в Spotify на этом iPhone. 2. На developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте Bundle ID и Redirect URI отсюда (нажатие копирует Bundle ID; AltStore меняет его при установке). 3. Нажмите «Открыть Spotify и подключиться». Если пишет «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify." = "1. Play music in Spotify on this iPhone. 2. On developer.spotify.com → your app → Settings, tick “iOS” and add the Bundle ID and Redirect URI from here (a tap copies the Bundle ID; AltStore changes it when installing). 3. Tap “Open Spotify and Connect”. If it says “Sign in again”, sign in again: the old login had no access to the Spotify app.";
 "Скопировано" = "Copied";
 "Нет Client ID" = "No Client ID";
 "Не удалось открыть Spotify. Он установлен?" = "Couldn't open Spotify. Is it installed?";
 "Spotify не ответил за 15 секунд" = "Spotify didn't answer within 15 seconds";
-"SDK: войти заново" = "SDK: sign in again";
-"SDK: подключение" = "SDK: connecting";
-"SDK: нет связи" = "SDK: no link";
-"Включить SDK" = "Turn On SDK";
-"Будить Spotify самому" = "Wake Spotify Automatically";
+"войдите заново" = "sign in again";
+"подключаюсь к Spotify" = "connecting to Spotify";
+"нет связи со Spotify" = "no link to Spotify";
+"без приложения Spotify" = "Spotify app link off";
+"приложение" = "app";
+"интернет" = "internet";
+"Связь с приложением Spotify: %@" = "Spotify app link: %@";
+"Включить связь с приложением Spotify" = "Turn On Spotify App Link";
+"Открывать Spotify, если молчит" = "Open Spotify If It's Silent";
 "Авторы" = "Credits";
 "Автор" = "Author";
 "Тестер" = "Tester";
