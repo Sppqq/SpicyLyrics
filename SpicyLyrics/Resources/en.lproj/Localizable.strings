@@ -389,3 +389,4 @@
 "Ещё" = "More";
 "Закрывать при возврате в приложение" = "Close when returning to the app";
 "Текст поверх других приложений. Вручную окно открывается из меню «•••» в плеере. Если открыть приложение, окно закроется само: текст уже на экране." = "Lyrics over other apps. To open the window manually, use the “•••” menu in the player. Opening the app closes the window: the lyrics are already on screen.";
+"Не нужна: играет на другом устройстве" = "Not needed: playing on another device";

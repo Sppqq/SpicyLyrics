@@ -605,7 +605,7 @@ private struct SyncSettings: View {
                 if settings.useAppRemote {
                     LabeledContent(String(localized: "Состояние"), value: appRemote.statusText)
                     Toggle(String(localized: "Открывать Spotify, если молчит"), isOn: $settings.autoWakeSpotify)
-                    if let error = appRemote.lastError, appRemote.status != .connected {
+                    if let error = appRemote.lastError, appRemote.status != .connected, !appRemote.otherDeviceActive {
                         Text(error)
                             .font(.footnote.monospaced())
                             .foregroundStyle(.orange)

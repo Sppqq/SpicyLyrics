@@ -101,7 +101,7 @@ struct SyncIndicator: View {
         Menu {
             Section {
                 Text(String(localized: "Связь с приложением Spotify: \(settings.useAppRemote ? appRemote.statusText : String(localized: "Выключено"))"))
-                if let error = appRemote.lastError, appRemote.status != .connected {
+                if let error = appRemote.lastError, appRemote.status != .connected, !appRemote.otherDeviceActive {
                     Text(error)
                 }
             }

@@ -197,7 +197,7 @@ final class AppSettings {
             Keys.lyricsFrameRate: 60.0,
             Keys.showLyricsFPS: false,
             Keys.pipShowFPS: false,
-            Keys.autoWakeSpotify: true,
+            Keys.autoWakeSpotify: false,
             Keys.closePiPOnReturn: true,
         ])
         spotifyClientID = defaults.string(forKey: Keys.clientID) ?? ""

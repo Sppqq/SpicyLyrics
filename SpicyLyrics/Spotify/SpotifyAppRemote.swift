@@ -44,12 +44,8 @@ final class SpotifyAppRemote: NSObject {
     @ObservationIgnored private var coverURI: String?
     /// Failed attempts in a row: retries back off from 8 s to a minute.
     @ObservationIgnored private var failures = 0
-    /// Automatic wake-ups this launch, and when the last one was: Spotify closes the connection when it
-    /// is sent to the background again, so one wake is not always enough, but never in a loop.
-    @ObservationIgnored private var wakes = 0
-    @ObservationIgnored private var lastWake = Date.distantPast
-    private static let maxWakes = 4
-    private static let wakeCooldown: TimeInterval = 12
+    /// Spotify was already woken automatically this launch (only ever once).
+    @ObservationIgnored private var autoWoke = false
 
     static let scope = "app-remote-control"
 
@@ -214,8 +210,6 @@ final class SpotifyAppRemote: NSObject {
         status = .connected
         failures = 0
         lastError = nil
-        // Stayed connected for a while after the last wake: the next refusal starts afresh.
-        if Date().timeIntervalSince(lastWake) > 120 { wakes = 0 }
         SyncLog.shared.add("remote", "connected")
         player?.setRemoteConnected(true)
         remote.playerAPI?.delegate = self
@@ -244,17 +238,11 @@ final class SpotifyAppRemote: NSObject {
         guard wanted else { return }
         status = .unavailable
         failures += 1
-        // Spotify refuses apps it was not woken by (after a restart of this app, an update, or when it was
-        // sent to the background): wake it. Only when the song plays on this iPhone: waking Spotify
-        // starts playback here, which must never take over a song playing on another device.
-        if settings.autoWakeSpotify, player?.isPlayingOnThisPhone == true, wakes < Self.maxWakes,
-           Date().timeIntervalSince(lastWake) > Self.wakeCooldown, UIApplication.shared.applicationState == .active {
-            wakes += 1
-            lastWake = Date()
-            SyncLog.shared.add("remote", "refused, waking Spotify (\(wakes)/\(Self.maxWakes))")
+        // Spotify refuses apps it was not woken by: after two refusals, wake it once (if allowed).
+        if failures == 2, settings.autoWakeSpotify, !autoWoke, UIApplication.shared.applicationState == .active {
+            autoWoke = true
+            SyncLog.shared.add("remote", "refused twice, waking Spotify")
             wakeSpotify()
-            // If Spotify never hands a token back, try the plain connection again later.
-            scheduleRetry(after: 20)
             return
         }
         scheduleRetry(after: min(60, 8 * pow(2, Double(min(failures, 4) - 1))))
@@ -363,6 +351,13 @@ extension SpotifyAppRemote: SPTAppRemotePlayerStateDelegate {
 }
 
 extension SpotifyAppRemote {
+    /// The song plays on another device (computer, speaker). The Spotify app on this phone has nothing
+    /// to report then, so being refused is expected and nothing is wrong.
+    var otherDeviceActive: Bool {
+        guard let player else { return false }
+        return player.deviceName != nil && !player.isPlayingOnThisPhone
+    }
+
     /// The connection state in words, for settings and the sync badge.
     var statusText: String {
         switch status {
@@ -370,7 +365,9 @@ extension SpotifyAppRemote {
         case .needsLogin: return String(localized: "Нужно войти заново")
         case .connecting: return String(localized: "Подключение…")
         case .connected: return String(localized: "Подключено")
-        case .unavailable: return String(localized: "Spotify не отвечает")
+        case .unavailable:
+            return otherDeviceActive ? String(localized: "Не нужна: играет на другом устройстве")
+                                     : String(localized: "Spotify не отвечает")
         }
     }
 }
