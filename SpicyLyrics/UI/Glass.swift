@@ -6,24 +6,28 @@ struct ArtworkBackdrop: View {
     @Environment(PlayerModel.self) private var player
 
     var body: some View {
-        ZStack {
-            Color.black
-            AsyncImage(url: player.track?.artworkURL) { phase in
-                if let image = phase.image {
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .saturation(1.35)
-                        .blur(radius: 70, opaque: true)
-                        .scaleEffect(1.4)
-                        .transition(.opacity)
+        // The black base decides the size; the cover is only painted over it and clipped.
+        Color.black
+            .overlay {
+                AsyncImage(url: player.track?.artworkURL) { phase in
+                    if let image = phase.image {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .saturation(1.35)
+                            .blur(radius: 70, opaque: true)
+                            .scaleEffect(1.4)
+                            .transition(.opacity)
+                    }
                 }
+                .animation(.easeInOut(duration: 0.6), value: player.track?.artworkURL)
             }
-            .animation(.easeInOut(duration: 0.6), value: player.track?.artworkURL)
-            LinearGradient(colors: [.black.opacity(0.35), .black.opacity(0.72)], startPoint: .top, endPoint: .bottom)
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
+            .overlay {
+                LinearGradient(colors: [.black.opacity(0.35), .black.opacity(0.72)], startPoint: .top, endPoint: .bottom)
+            }
+            .clipped()
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
     }
 }
 

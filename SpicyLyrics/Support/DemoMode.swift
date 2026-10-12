@@ -8,7 +8,7 @@ import Foundation
 ///     -demoArtwork <cover URL> -demoStart <seconds> -demoDuration <seconds>
 ///
 /// `-demoLandscape YES` turns the screen sideways, `-demoSettings YES` opens Settings,
-/// `-demoPiP YES` opens the floating window, `-demoHideChrome YES` starts with only the lyrics. App
+/// `-demoPiP YES` opens the floating window, `-demoQueue YES` opens the queue with sample tracks, `-demoHideChrome YES` starts with only the lyrics. App
 /// settings can be set the same way (`-simpleLyricsMode YES`): launch arguments override
 /// UserDefaults.
 struct DemoTrack {
@@ -30,5 +30,22 @@ struct DemoTrack {
         )
         return DemoTrack(info: info, start: defaults.double(forKey: "demoStart"))
     }()
+}
+
+/// Sample "up next" list for the queue screenshot (no Spotify account in the Simulator).
+enum DemoQueue {
+    private static let cdn = "https://image-cdn-fa.spotifycdn.com/image/ab67616d00004851"
+    private static func track(_ index: Int, _ id: String, _ title: String, _ artist: String, _ cover: String, _ seconds: Double) -> TrackSummary {
+        TrackSummary(id: "demo\(index)", uri: "spotify:track:\(id)", title: title, artists: [artist], albumURI: nil,
+                     duration: seconds, thumbnailURL: URL(string: cdn + cover), contextURI: nil)
+    }
+
+    static let tracks: [TrackSummary] = [
+        track(0, "2E6DVdvabtPxTZmUljxytZ", "Mesmerizer", "Bao The Whale, Neuro-sama", "7c65e4c82b767a49bef9e27a", 160),
+        track(1, "2kPuQ8BYGdJglM9aFX9pA0", "sleep mode", "KIDSCRY2DAY", "83e0e28d498b56018c783178", 160),
+        track(2, "2eKkLkQcKRINUndAxUdGkH", "The Code", "Nemo", "08d1437f035253a0a65c868f", 180),
+        track(3, "2kPuQ8BYGdJglM9aFX9pA0", "sleep mode", "KIDSCRY2DAY", "83e0e28d498b56018c783178", 160),
+        track(4, "2E6DVdvabtPxTZmUljxytZ", "Mesmerizer", "Bao The Whale, Neuro-sama", "7c65e4c82b767a49bef9e27a", 160),
+    ]
 }
 #endif

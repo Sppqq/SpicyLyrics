@@ -35,21 +35,19 @@ struct TrackPickerView: View {
     @Namespace private var tabNamespace
 
     var body: some View {
-        ZStack {
-            ArtworkBackdrop()
-            VStack(spacing: 0) {
-                header
-                tabBar
-                if tab == .search {
-                    searchField
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-                content
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 0) {
+            header
+            tabBar
+            if tab == .search {
+                searchField
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .background { ArtworkBackdrop() }
         .animation(.spring(response: 0.38, dampingFraction: 0.85), value: tab)
         .task(id: tab) {
             if tab == .search {
@@ -345,6 +343,12 @@ struct TrackPickerView: View {
             needsRelogin = true
             return
         }
+        #if DEBUG
+        if DemoTrack.current != nil, tab == .queue {
+            queue = DemoQueue.tracks
+            return
+        }
+        #endif
         loading = true
         error = nil
         defer { loading = false }

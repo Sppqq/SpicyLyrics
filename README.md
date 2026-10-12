@@ -35,9 +35,10 @@ the popular Spicetify extension for Spotify on desktop. Made by
 
 <p align="center">
   <img src="docs/media/simple.webp" width="250" alt="Simple Lyrics Mode">
-  <img src="docs/media/settings.png" width="250" alt="Settings">
+  <img src="docs/media/queue.webp" width="250" alt="The queue sheet: now playing and what's next">
+  <img src="docs/media/settings.png" width="250" alt="Settings with quick switches">
 </p>
-<p align="center"><sub>Simple Lyrics Mode · lots of settings</sub></p>
+<p align="center"><sub>Simple Lyrics Mode · queue · settings</sub></p>
 
 ## What it can do
 

@@ -11,6 +11,7 @@ struct NowPlayingView: View {
     @Environment(LyricsPictureInPicture.self) private var pip
     @State private var showSettings = false
     @State private var showPicker = false
+    @State private var pickerDetent: PresentationDetent = .medium
     @State private var showSetupGuide = false
     @State private var showOwnLyrics = false
     /// Big ⏭/⏮ flash after a swipe changes the track.
@@ -171,7 +172,7 @@ struct NowPlayingView: View {
             TrackPickerView()
                 .environment(player)
                 .environmentObject(auth)
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.medium, .large], selection: $pickerDetent)
                 .presentationDragIndicator(.visible)
         }
         .onChange(of: settings.showRomanization) { _, _ in player.settingsChanged() }
@@ -189,6 +190,10 @@ struct NowPlayingView: View {
                 scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
             }
             if defaults.bool(forKey: "demoSettings") { showSettings = true }
+            if defaults.bool(forKey: "demoQueue") {
+                pickerDetent = .large
+                showPicker = true
+            }
             // Slow Core Animation (scrolling, the background) down with the lyrics clock.
             if MediaClock.scale != 1 {
                 for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
