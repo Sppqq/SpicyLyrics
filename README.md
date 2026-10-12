@@ -12,7 +12,7 @@ the popular Spicetify extension for Spotify on desktop. Made by
 
 > **Heads up: it works, but it's still early.** You can use it every day, but expect some bugs
 > and settings that change between versions. If something breaks, please
-> [tell us](https://github.com/Sppqq/spicy-lyrics-ios/issues).
+> [tell us](https://github.com/Sppqq/sweet-lyrics-ios/issues).
 
 <p align="center">
   <img src="docs/media/code.webp" width="250" alt="Word-by-word lyrics over the flowing cover">
@@ -78,7 +78,7 @@ free apps that install apps from outside the App Store using your own Apple ID.
 **2. Add Sweet Lyrics to it.** Copy this link:
 
 ```
-https://github.com/Sppqq/spicy-lyrics-ios/releases/latest/download/altstore-source.json
+https://github.com/Sppqq/sweet-lyrics-ios/releases/latest/download/altstore-source.json
 ```
 
 In AltStore or SideStore go to **Sources → +**, paste the link and tap **Add**.
@@ -87,7 +87,7 @@ In AltStore or SideStore go to **Sources → +**, paste the link and tap **Add**
 <summary>Want new features first? Use the test channel instead</summary>
 
 ```
-https://github.com/Sppqq/spicy-lyrics-ios/releases/latest/download/altstore-source-testing.json
+https://github.com/Sppqq/sweet-lyrics-ios/releases/latest/download/altstore-source-testing.json
 ```
 
 You get every new build as soon as it's made, so it can be buggier. Add only **one** of the two
@@ -142,7 +142,7 @@ A free Apple ID can have only 3 such apps at a time.
 - **"no link to Spotify"**: Spotify has to be playing on this phone. Tap the badge →
   *Open Spotify and Connect*.
 - **Anything else**: go to *Settings → Log → Share Log File* and
-  [open an issue](https://github.com/Sppqq/spicy-lyrics-ios/issues) with the file attached.
+  [open an issue](https://github.com/Sppqq/sweet-lyrics-ios/issues) with the file attached.
 
 ### Good to know
 
@@ -152,7 +152,7 @@ A free Apple ID can have only 3 such apps at a time.
 
 ### Can I install it without AltStore?
 
-Yes. Every [release](https://github.com/Sppqq/spicy-lyrics-ios/releases) has an `.ipa` file that
+Yes. Every [release](https://github.com/Sppqq/sweet-lyrics-ios/releases) has an `.ipa` file that
 you can sign with another tool, such as [Sideloadly](https://sideloadly.io).
 
 ## For developers

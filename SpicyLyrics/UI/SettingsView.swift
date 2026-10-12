@@ -855,7 +855,7 @@ private struct AboutSettings: View {
             Section {
                 Link(String(localized: "Spicy Lyrics (оригинал)"), destination: URL(string: "https://github.com/Spikerko/spicy-lyrics")!)
                 Link("Spicy Lyrics Mobile (Android)", destination: URL(string: "https://github.com/spicylyrics/mobile")!)
-                Link(String(localized: "Этот проект на GitHub"), destination: URL(string: "https://github.com/Sppqq/spicy-lyrics-ios")!)
+                Link(String(localized: "Этот проект на GitHub"), destination: URL(string: "https://github.com/Sppqq/sweet-lyrics-ios")!)
                 Link("LRCLIB", destination: URL(string: "https://lrclib.net")!)
             } footer: {
                 Text(String(localized: "Неофициальный iOS-порт. Распространяется по лицензии AGPL-3.0, как и оригинал. Не связан со Spotify AB."))
