@@ -152,6 +152,10 @@ final class AppSettings {
     var reportConsent: Int { didSet { defaults.set(reportConsent, forKey: Keys.reportConsent) } }
     /// The app version that last ran, to ask about reports once after an update.
     var lastSeenVersion: String { didSet { defaults.set(lastSeenVersion, forKey: Keys.lastSeenVersion) } }
+    /// Tell about a newer stable release (Settings → About).
+    var notifyUpdates: Bool { didSet { defaults.set(notifyUpdates, forKey: Keys.notifyUpdates) } }
+    /// A release the user chose to skip: no notice for it, only for a newer one.
+    var skippedUpdateVersion: String { didSet { defaults.set(skippedUpdateVersion, forKey: Keys.skippedUpdateVersion) } }
     /// Random, made once per install: tells reports from one phone apart, and nothing else.
     let installID: String
 
@@ -222,6 +226,7 @@ final class AppSettings {
             Keys.autoWakeSpotify: false,
             Keys.reportConsent: 0,
             Keys.lastSeenVersion: "",
+            Keys.notifyUpdates: true,
             Keys.closePiPOnReturn: true,
         ])
         spotifyClientID = defaults.string(forKey: Keys.clientID) ?? ""
@@ -294,6 +299,8 @@ final class AppSettings {
         autoWakeSpotify = defaults.bool(forKey: Keys.autoWakeSpotify)
         reportConsent = defaults.integer(forKey: Keys.reportConsent)
         lastSeenVersion = defaults.string(forKey: Keys.lastSeenVersion) ?? ""
+        notifyUpdates = defaults.bool(forKey: Keys.notifyUpdates)
+        skippedUpdateVersion = defaults.string(forKey: Keys.skippedUpdateVersion) ?? ""
         let install = defaults.string(forKey: Keys.installID) ?? UUID().uuidString
         defaults.set(install, forKey: Keys.installID)
         installID = install
@@ -475,6 +482,8 @@ final class AppSettings {
         static let autoWakeSpotify = "autoWakeSpotify"
         static let reportConsent = "reportConsent"
         static let lastSeenVersion = "lastSeenVersion"
+        static let notifyUpdates = "notifyUpdates"
+        static let skippedUpdateVersion = "skippedUpdateVersion"
         static let installID = "installID"
     }
 }

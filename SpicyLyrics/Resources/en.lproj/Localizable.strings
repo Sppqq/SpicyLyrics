@@ -440,3 +440,18 @@
 "Например: на этой песне текст отстаёт на секунду, после паузы всё нормально." = "For example: on this song the lyrics lag by a second, after a pause it's fine.";
 "Не удалось прочитать фото: %lld" = "Couldn't read photos: %lld";
 "Позиция в треке" = "Track position";
+
+/* Update notices. */
+"Вышла новая версия" = "A New Version Is Out";
+"Sweet Lyrics %@ уже доступна (у вас %@). Обновить можно в AltStore или SideStore → My Apps. Отключить эти уведомления: Настройки → О приложении." = "Sweet Lyrics %@ is available (you have %@). Update it in AltStore or SideStore → My Apps. To turn these notices off: Settings → About.";
+"Пропустить эту версию" = "Skip This Version";
+"Позже" = "Later";
+"Обновления" = "Updates";
+"Сообщать о новых версиях" = "Notify About New Versions";
+"Обновить до %@" = "Update to %@";
+"Проверить сейчас" = "Check Now";
+"Есть %@" = "%@ available";
+"Доступна версия %@." = "Version %@ is available.";
+"Не удалось проверить: нет связи с GitHub." = "Couldn't check: GitHub is unreachable.";
+"Установлена последняя версия (проверено %@)." = "You're on the latest version (checked %@).";
+"Когда выходит стабильная версия, приложение предложит обновиться (не чаще раза в 6 часов проверяет GitHub). Обновление ставится через AltStore или SideStore." = "When a stable version comes out, the app offers to update (it checks GitHub at most every 6 hours). Updates install through AltStore or SideStore.";

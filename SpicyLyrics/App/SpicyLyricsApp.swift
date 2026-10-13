@@ -9,6 +9,7 @@ struct SpicyLyricsApp: App {
     @State private var performance = PerformanceMonitor()
     @State private var pip = LyricsPictureInPicture()
     @State private var appRemote: SpotifyAppRemote
+    @State private var updates: UpdateChecker
 
     init() {
         AudioRoute.prepare()
@@ -25,6 +26,7 @@ struct SpicyLyricsApp: App {
         let player = PlayerModel(api: api, lyrics: lyrics, settings: settings, localLyrics: localLyrics)
         ReportService.shared.attach(settings: settings, player: player, appRemote: appRemote)
         _appRemote = State(initialValue: appRemote)
+        _updates = State(initialValue: UpdateChecker(settings: settings))
         _player = State(initialValue: player)
     }
 
@@ -36,6 +38,7 @@ struct SpicyLyricsApp: App {
                 .environment(performance)
                 .environment(pip)
                 .environment(appRemote)
+                .environment(updates)
                 .environmentObject(auth)
                 .preferredColorScheme(.dark)
                 .tint(settings.appTheme.accent)
@@ -50,6 +53,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(LyricsPictureInPicture.self) private var pip
     @Environment(SpotifyAppRemote.self) private var appRemote
+    @Environment(UpdateChecker.self) private var updates
     /// Letting go of Spotify after the app went to the background, unless the floating window
     /// turns up meanwhile.
     @State private var stopTask: Task<Void, Never>?
@@ -67,7 +71,10 @@ struct RootView: View {
         .onChange(of: scenePhase, initial: true) { old, phase in
             updateActivity(phase)
             // Back in the app: the lyrics on screen were last drawn a while ago.
-            if phase == .active, old != .active { player.resync("app active") }
+            if phase == .active, old != .active {
+                player.resync("app active")
+                Task { await updates.check() }
+            }
         }
         .onChange(of: auth.isLoggedIn) { _, _ in updateActivity(scenePhase) }
         .onChange(of: settings.keepScreenOn) { _, _ in updateActivity(scenePhase) }
@@ -75,18 +82,46 @@ struct RootView: View {
         .onChange(of: settings.useAppRemote) { _, _ in appRemote.refresh() }
         .onChange(of: settings.syncLogEnabled) { _, enabled in SyncLog.shared.enabled = enabled }
         .onOpenURL { url in appRemote.handle(url) }
-        .task { askAboutReportsAfterUpdate() }
+        .task {
+            askAboutReportsAfterUpdate()
+            await updates.check()
+        }
         .alert(String(localized: "Помочь улучшить приложение?"), isPresented: $askAboutReports) {
             Button(String(localized: "Разрешить")) { settings.reportConsent = 1 }
             Button(String(localized: "Не сейчас"), role: .cancel) { settings.reportConsent = 2 }
         } message: {
             Text(String(localized: "Когда что-то ломается, приложение может анонимно отправлять разработчику журнал: версия приложения, модель телефона и iOS, названия треков и тайминги. Без аккаунта Spotify, ключей и токенов. Изменить это можно в Настройках → Отчёты об ошибках."))
         }
+        .alert(String(localized: "Вышла новая версия"), isPresented: updateNoticeShown, presenting: updates.pendingNotice) { release in
+            Button(String(localized: "Обновить")) {
+                remindLater = release.version
+                updates.openUpdate(release)
+            }
+            Button(String(localized: "Пропустить эту версию")) { updates.skip(release) }
+            Button(String(localized: "Позже"), role: .cancel) { remindLater = release.version }
+        } message: { release in
+            Text(String(localized: "Sweet Lyrics \(release.version) уже доступна (у вас \(AppVersion.marketing)). Обновить можно в AltStore или SideStore → My Apps. Отключить эти уведомления: Настройки → О приложении."))
+        }
         #if DEBUG
         .task {
             if let demo = DemoTrack.current { player.startDemo(demo) }
         }
         #endif
+    }
+
+    /// "Later" hides the notice until the next launch.
+    @State private var remindLater: String?
+
+    /// The update notice waits for the reports question (one alert at a time) and the login.
+    private var updateNoticeShown: Binding<Bool> {
+        Binding(get: {
+            guard auth.isLoggedIn || isDemo, !askAboutReports, let notice = updates.pendingNotice else { return false }
+            return notice.version != remindLater
+        }, set: { shown in
+            if !shown, let notice = updates.pendingNotice, settings.skippedUpdateVersion != notice.version {
+                remindLater = notice.version
+            }
+        })
     }
 
     /// Once, the first time the app runs after an update (not on a fresh install), while nothing

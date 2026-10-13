@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(PlayerModel.self) private var player
     @Environment(PerformanceMonitor.self) private var performance
+    @Environment(UpdateChecker.self) private var updates
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -65,7 +66,8 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    category(String(localized: "О приложении"), "info.circle.fill", .gray, value: AppVersion.display) { AboutSettings() }
+                    category(String(localized: "О приложении"), "info.circle.fill", .gray,
+                             value: updates.latest.map { String(localized: "Есть \($0.version)") } ?? AppVersion.display) { AboutSettings() }
                 }
             }
             .settingsPage()
@@ -843,10 +845,40 @@ private struct SpotifySettings: View {
 }
 
 private struct AboutSettings: View {
+    @Environment(AppSettings.self) private var settings
+    @Environment(UpdateChecker.self) private var updates
+
     var body: some View {
+        @Bindable var settings = settings
         Form {
             Section {
                 LabeledContent(String(localized: "Версия"), value: AppVersion.display)
+            }
+            if UpdateChecker.isSupported {
+                Section {
+                    Toggle(String(localized: "Сообщать о новых версиях"), isOn: $settings.notifyUpdates)
+                    if let latest = updates.latest {
+                        Button {
+                            updates.openUpdate(latest)
+                        } label: {
+                            Label(String(localized: "Обновить до \(latest.version)"), systemImage: "arrow.down.app.fill")
+                        }
+                    }
+                    Button {
+                        Task { await updates.check(force: true) }
+                    } label: {
+                        HStack {
+                            Text(String(localized: "Проверить сейчас"))
+                            Spacer()
+                            if updates.checking { ProgressView() }
+                        }
+                    }
+                    .disabled(updates.checking)
+                } header: {
+                    Text(String(localized: "Обновления"))
+                } footer: {
+                    Text(updateStatus)
+                }
             }
             Section(String(localized: "Авторы")) {
                 creditLink(String(localized: "Автор"), name: "sppq", url: "https://spicylyrics.org/sppq")
@@ -862,6 +894,16 @@ private struct AboutSettings: View {
                 Text(String(localized: "Неофициальный iOS-порт. Распространяется по лицензии AGPL-3.0, как и оригинал. Не связан со Spotify AB."))
             }
         }
+    }
+
+    private var updateStatus: String {
+        let note = String(localized: "Когда выходит стабильная версия, приложение предложит обновиться (не чаще раза в 6 часов проверяет GitHub). Обновление ставится через AltStore или SideStore.")
+        if updates.failed { return String(localized: "Не удалось проверить: нет связи с GitHub.") + " " + note }
+        if let latest = updates.latest { return String(localized: "Доступна версия \(latest.version).") + " " + note }
+        if let checked = updates.lastChecked {
+            return String(localized: "Установлена последняя версия (проверено \(checked.formatted(.relative(presentation: .named)))).") + " " + note
+        }
+        return note
     }
 
     private func creditLink(_ role: String, name: String, url: String) -> some View {
