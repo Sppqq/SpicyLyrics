@@ -73,7 +73,10 @@ struct RootView: View {
             // Back in the app: the lyrics on screen were last drawn a while ago.
             if phase == .active, old != .active {
                 player.resync("app active")
-                Task { await updates.check() }
+                Task {
+                    await updates.check()
+                    await ReportService.shared.refreshThreads()
+                }
             }
         }
         .onChange(of: auth.isLoggedIn) { _, _ in updateActivity(scenePhase) }
@@ -85,6 +88,7 @@ struct RootView: View {
         .task {
             askAboutReportsAfterUpdate()
             await updates.check()
+            await ReportService.shared.refreshThreads()
         }
         .alert(String(localized: "Помочь улучшить приложение?"), isPresented: $askAboutReports) {
             Button(String(localized: "Разрешить")) { settings.reportConsent = 1 }
@@ -102,11 +106,48 @@ struct RootView: View {
         } message: { release in
             Text(String(localized: "Sweet Lyrics \(release.version) уже доступна (у вас \(AppVersion.marketing)). Обновить можно в AltStore или SideStore → My Apps. Отключить эти уведомления: Настройки → О приложении."))
         }
+        .alert(String(localized: "Разработчик ответил на ваш отчёт"), isPresented: answerNoticeShown,
+               presenting: ReportService.shared.unreadAnswer) { thread in
+            Button(String(localized: "Открыть")) { openThread = thread.id }
+            Button(String(localized: "Позже"), role: .cancel) { answerLater = thread.lastDeveloperMessage?.id }
+        } message: { thread in
+            Text(thread.lastDeveloperMessage?.text.prefix(300).description ?? "")
+        }
+        .sheet(item: Binding(get: { openThread.map(OpenThread.init) }, set: { openThread = $0?.id })) { open in
+            NavigationStack {
+                ReportThreadView(threadID: open.id)
+                    .navigationTitle(String(localized: "Отчёт"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(String(localized: "Готово")) { openThread = nil }
+                        }
+                    }
+            }
+        }
         #if DEBUG
         .task {
             if let demo = DemoTrack.current { player.startDemo(demo) }
         }
         #endif
+    }
+
+    /// The report thread opened from the answer notice.
+    @State private var openThread: String?
+    /// "Later" on the answer notice: not again for this answer until the next launch.
+    @State private var answerLater: Int?
+
+    private struct OpenThread: Identifiable { let id: String }
+
+    /// A new answer to the user's report: after the other questions, never two alerts at once.
+    private var answerNoticeShown: Binding<Bool> {
+        Binding(get: {
+            guard openThread == nil, !askAboutReports, !updateNoticeShown.wrappedValue,
+                  let thread = ReportService.shared.unreadAnswer else { return false }
+            return thread.lastDeveloperMessage?.id != answerLater
+        }, set: { shown in
+            if !shown, openThread == nil { answerLater = ReportService.shared.unreadAnswer?.lastDeveloperMessage?.id }
+        })
     }
 
     /// "Later" hides the notice until the next launch.

@@ -27,3 +27,4 @@ cloudflare/node_modules/
 cloudflare/.wrangler/
 cloudflare/.admin-token
 cloudflare/.dev.vars
+cloudflare/.bot-token

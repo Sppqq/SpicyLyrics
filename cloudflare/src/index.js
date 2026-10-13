@@ -1,5 +1,8 @@
 // Sweet Lyrics report collector: the app posts a bug report (log, a note, a few photos), this
-// stores it in D1 (text) and R2 (photos). /admin is a small page for reading them.
+// stores it in D1 (text) and R2 (photos). Every report is a thread: the developer (or the bot that
+// works through reports, /v1/bot) answers, the app shows the answers and lets the sender reply.
+// Status: open → in_progress → closed; a reply from the sender reopens a closed report.
+// /admin is a small page for reading, answering and closing them.
 
 const MAX_BODY = 8 * 1024 * 1024;
 const MAX_LOG = 300_000;
@@ -11,12 +14,18 @@ const RETENTION_DAYS = 90;
 // Anonymous endpoint: keep one install or one network from filling the database.
 const LIMITS = { installPerHour: 12, ipPerHour: 40, ipPerDay: 200 };
 const UUID = /^[0-9a-fA-F-]{36}$/;
+const STATUSES = ["open", "in_progress", "closed"];
+const MAX_REPLY = 4_000;
+// Replies from one install per hour.
+const MESSAGES_PER_HOUR = 20;
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/v1/report" && request.method === "POST") return await receive(request, env);
+      if (url.pathname.startsWith("/v1/threads")) return await threads(request, env, url);
+      if (url.pathname.startsWith("/v1/bot/")) return await bot(request, env, url);
       if (url.pathname === "/") return text("Sweet Lyrics reports\n");
       if (url.pathname.startsWith("/admin")) return await admin(request, env, url);
       return text("Not found\n", 404);
@@ -28,9 +37,14 @@ export default {
 
   async scheduled(_event, env) {
     const cutoff = Math.floor(Date.now() / 1000) - RETENTION_DAYS * 86400;
-    const old = await env.DB.prepare("SELECT id, photos, photo_exts FROM reports WHERE created_at < ?").bind(cutoff).all();
-    for (const row of old.results) await deletePhotos(env, row);
-    await env.DB.prepare("DELETE FROM reports WHERE created_at < ?").bind(cutoff).run();
+    // A thread still being talked in stays: retention counts from its last message.
+    const old = await env.DB.prepare(
+      "SELECT id, photos, photo_exts FROM reports WHERE MAX(created_at, updated_at) < ?").bind(cutoff).all();
+    for (const row of old.results) {
+      await deletePhotos(env, row);
+      await env.DB.prepare("DELETE FROM messages WHERE report_id = ?").bind(row.id).run();
+      await env.DB.prepare("DELETE FROM reports WHERE id = ?").bind(row.id).run();
+    }
   },
 };
 
@@ -82,11 +96,11 @@ async function receive(request, env) {
 
   const field = (value) => String(value ?? "").slice(0, MAX_FIELD);
   await env.DB.prepare(
-    `INSERT INTO reports (id, created_at, kind, error_kind, message, app_version, build, channel, os, device, locale,
-                          install_id, ip_hash, log, photos, photo_exts)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO reports (id, created_at, updated_at, status, kind, error_kind, message, app_version, build, channel, os,
+                          device, locale, install_id, ip_hash, log, photos, photo_exts)
+     VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
-    id, now, kind, field(meta.errorKind), String(meta.message ?? "").slice(0, MAX_MESSAGE),
+    id, now, now, kind, field(meta.errorKind), String(meta.message ?? "").slice(0, MAX_MESSAGE),
     field(meta.appVersion), field(meta.build), field(meta.channel), field(meta.os), field(meta.device), field(meta.locale),
     installId, ipHash, String(form.get("log") || "").slice(0, MAX_LOG), photos.length, photos.join(","),
   ).run();
@@ -104,6 +118,126 @@ async function deletePhotos(env, row) {
   if (keys.length) await env.PHOTOS.delete(keys);
 }
 
+// MARK: Threads (the app)
+
+// The sender's side, keyed by their install id (random, only their app knows it).
+async function threads(request, env, url) {
+  const installId = request.headers.get("x-install-id") || "";
+  if (!UUID.test(installId)) return json({ error: "install" }, 400);
+  const parts = url.pathname.split("/").filter(Boolean); // v1, threads, id?, messages?
+
+  if (parts.length === 2 && request.method === "GET") {
+    const reports = (await env.DB.prepare(
+      `SELECT id, created_at, updated_at, status, message FROM reports
+       WHERE install_id = ? AND kind = 'manual' ORDER BY created_at DESC LIMIT 30`).bind(installId).all()).results;
+    const ids = reports.map((r) => r.id);
+    const messages = ids.length ? (await env.DB.prepare(
+      `SELECT id, report_id, created_at, author, text FROM messages WHERE report_id IN (${ids.map(() => "?").join(",")}) ORDER BY id`
+    ).bind(...ids).all()).results : [];
+    return json({
+      threads: reports.map((r) => ({
+        id: r.id, createdAt: r.created_at, updatedAt: r.updated_at || r.created_at, status: r.status, note: r.message || "",
+        messages: messages.filter((m) => m.report_id === r.id)
+          .map((m) => ({ id: m.id, createdAt: m.created_at, author: m.author, text: m.text })),
+      })),
+    });
+  }
+
+  if (parts.length === 4 && parts[3] === "messages" && request.method === "POST") {
+    const row = await env.DB.prepare("SELECT id FROM reports WHERE id = ? AND install_id = ?").bind(parts[2], installId).first();
+    if (!row) return json({ error: "not found" }, 404);
+    const now = Math.floor(Date.now() / 1000);
+    const recent = await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM messages m JOIN reports r ON r.id = m.report_id
+       WHERE r.install_id = ? AND m.author = 'user' AND m.created_at > ?`).bind(installId, now - 3600).first();
+    if ((recent?.n || 0) >= MESSAGES_PER_HOUR) return json({ error: "slow down" }, 429);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "body" }, 400); }
+    const value = String(body?.text || "").trim().slice(0, MAX_REPLY);
+    if (!value) return json({ error: "empty" }, 400);
+    await env.DB.prepare("INSERT INTO messages (report_id, created_at, author, text) VALUES (?, ?, 'user', ?)")
+      .bind(row.id, now, value).run();
+    // A reply to a closed report opens it again: it needs looking at.
+    await env.DB.prepare(
+      "UPDATE reports SET updated_at = ?, status = CASE WHEN status = 'closed' THEN 'open' ELSE status END WHERE id = ?")
+      .bind(now, row.id).run();
+    return json({ ok: true });
+  }
+  return json({ error: "not found" }, 404);
+}
+
+// MARK: Bot (works through the reports every hour)
+
+async function bot(request, env, url) {
+  if (!(await bearer(request, env.BOT_TOKEN))) return json({ error: "auth" }, 401);
+  const parts = url.pathname.split("/").filter(Boolean); // v1, bot, ...
+
+  // What needs an answer: reports not closed whose last word is not the developer's.
+  if (parts[2] === "inbox" && request.method === "GET") {
+    const rows = (await env.DB.prepare(
+      `SELECT r.id, r.created_at, r.updated_at, r.status, r.kind, r.error_kind, r.message, r.app_version, r.build,
+              r.channel, r.os, r.device, r.locale, r.photos,
+              (SELECT author FROM messages m WHERE m.report_id = r.id ORDER BY m.id DESC LIMIT 1) AS last_author
+       FROM reports r WHERE r.status != 'closed' ORDER BY r.created_at LIMIT 100`).all()).results;
+    return json({ reports: rows.filter((r) => r.last_author !== "dev") });
+  }
+
+  const row = parts[2] === "report" && parts[3]
+    ? await env.DB.prepare("SELECT * FROM reports WHERE id = ?").bind(parts[3]).first() : null;
+  if (!row) return json({ error: "not found" }, 404);
+
+  if (!parts[4] && request.method === "GET") {
+    const thread = (await env.DB.prepare("SELECT id, created_at, author, text FROM messages WHERE report_id = ? ORDER BY id")
+      .bind(row.id).all()).results;
+    const { ip_hash, install_id, ...report } = row;
+    const photos = (row.photo_exts || "").split(",").filter(Boolean).map((_, i) => `${url.origin}/v1/bot/report/${row.id}/photo/${i}`);
+    return json({ report, thread, photos });
+  }
+  if (parts[4] === "photo" && request.method === "GET") {
+    const index = Number(parts[5]);
+    const ext = (row.photo_exts || "").split(",").filter(Boolean)[index];
+    const object = ext ? await env.PHOTOS.get(`${row.id}/${index}.${ext}`) : null;
+    if (!object) return json({ error: "not found" }, 404);
+    return new Response(object.body, { headers: { "content-type": ext === "png" ? "image/png" : "image/jpeg" } });
+  }
+  if (request.method === "POST" && (parts[4] === "reply" || parts[4] === "status")) {
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "body" }, 400); }
+    if (parts[4] === "reply") {
+      if (!String(body?.text || "").trim()) return json({ error: "empty" }, 400);
+      await addDevMessage(env, row.id, body.text, body.status);
+    } else if (!(await setStatus(env, row.id, body?.status))) {
+      return json({ error: "status" }, 400);
+    }
+    return json({ ok: true });
+  }
+  return json({ error: "not found" }, 404);
+}
+
+async function addDevMessage(env, id, value, status) {
+  const message = String(value || "").trim().slice(0, MAX_REPLY);
+  if (!message) return;
+  const now = Math.floor(Date.now() / 1000);
+  await env.DB.prepare("INSERT INTO messages (report_id, created_at, author, text) VALUES (?, ?, 'dev', ?)").bind(id, now, message).run();
+  await env.DB.prepare("UPDATE reports SET updated_at = ? WHERE id = ?").bind(now, id).run();
+  if (status) await setStatus(env, id, String(status));
+}
+
+async function setStatus(env, id, status) {
+  if (!STATUSES.includes(status)) return false;
+  await env.DB.prepare("UPDATE reports SET status = ?, updated_at = ? WHERE id = ?")
+    .bind(status, Math.floor(Date.now() / 1000), id).run();
+  return true;
+}
+
+async function bearer(request, token) {
+  if (!token) return false;
+  const header = request.headers.get("authorization") || "";
+  if (!header.startsWith("Bearer ")) return false;
+  const [a, b] = await Promise.all([sha256(header.slice(7)), sha256(token)]);
+  return crypto.subtle.timingSafeEqual(a, b);
+}
+
 // MARK: Admin
 
 async function admin(request, env, url) {
@@ -114,18 +248,30 @@ async function admin(request, env, url) {
 
   if (parts.length === 1) {
     const kind = url.searchParams.get("kind");
+    const status = url.searchParams.get("status");
+    const page = Math.max(0, Number(url.searchParams.get("page")) || 0);
+    const where = [], binds = [];
+    if (kind) { where.push("kind = ?"); binds.push(kind); }
+    if (status) { where.push("status = ?"); binds.push(status); }
     const rows = await env.DB.prepare(
-      `SELECT id, created_at, kind, error_kind, message, app_version, build, channel, os, device, photos
-       FROM reports ${kind ? "WHERE kind = ?" : ""} ORDER BY created_at DESC LIMIT 200`
-    ).bind(...(kind ? [kind] : [])).all();
+      `SELECT id, created_at, status, kind, error_kind, message, app_version, build, channel, os, device, photos,
+              (SELECT COUNT(*) FROM messages m WHERE m.report_id = reports.id) AS messages
+       FROM reports ${where.length ? "WHERE " + where.join(" AND ") : ""}
+       ORDER BY MAX(created_at, updated_at) DESC LIMIT 100 OFFSET ?`
+    ).bind(...binds, page * 100).all();
+    const query = (extra) => "?" + new URLSearchParams({ ...(kind ? { kind } : {}), ...(status ? { status } : {}), ...extra });
+    const pager = (page ? `<a href="/admin${query({ page: page - 1 })}">← newer</a> ` : "") +
+      (rows.results.length === 100 ? `<a href="/admin${query({ page: page + 1 })}">older →</a>` : "");
     const body = rows.results.map((r) =>
-      `<tr><td><a href="/admin/r/${r.id}">${esc(when(r.created_at))}</a></td><td>${esc(r.kind)}</td>` +
+      `<tr><td><a href="/admin/r/${r.id}">${esc(when(r.created_at))}</a></td>` +
+      `<td>${esc(r.status)}${r.messages ? " · " + r.messages + " msg" : ""}</td><td>${esc(r.kind)}</td>` +
       `<td>${esc(r.app_version)} ${esc(r.channel)} (${esc(r.build)})</td><td>${esc(r.os)}</td><td>${esc(r.device)}</td>` +
       `<td>${r.photos ? "photos: " + r.photos : ""}</td><td>${esc(r.error_kind || "")} ${esc((r.message || "").slice(0, 120))}</td></tr>`
     ).join("");
     return page("Reports",
-      `<p><a href="/admin">all</a> · <a href="/admin?kind=manual">manual</a> · <a href="/admin?kind=auto">auto</a></p>` +
-      `<table><tr><th>When</th><th>Kind</th><th>App</th><th>iOS</th><th>Device</th><th></th><th>Note / error</th></tr>${body}</table>`);
+      `<p><a href="/admin">all</a> · <a href="/admin?kind=manual">manual</a> · <a href="/admin?kind=auto">auto</a> · ` +
+      STATUSES.map((s) => `<a href="/admin?status=${s}">${s}</a>`).join(" · ") + `</p>` +
+      `<table><tr><th>When</th><th>Status</th><th>Kind</th><th>App</th><th>iOS</th><th>Device</th><th></th><th>Note / error</th></tr>${body}</table><p>${pager}</p>`);
   }
 
   if (parts[1] === "r" && parts[2]) {
@@ -137,9 +283,18 @@ async function admin(request, env, url) {
     if (parts[3] === "delete" && request.method === "POST") {
       if (request.headers.get("origin") !== url.origin) return text("Forbidden\n", 403);
       await deletePhotos(env, row);
+      await env.DB.prepare("DELETE FROM messages WHERE report_id = ?").bind(row.id).run();
       await env.DB.prepare("DELETE FROM reports WHERE id = ?").bind(row.id).run();
       return Response.redirect(url.origin + "/admin", 303);
     }
+    if ((parts[3] === "reply" || parts[3] === "status") && request.method === "POST") {
+      if (request.headers.get("origin") !== url.origin) return text("Forbidden\n", 403);
+      const form = await request.formData();
+      if (parts[3] === "reply") await addDevMessage(env, row.id, String(form.get("text") || ""), form.get("status"));
+      else await setStatus(env, row.id, String(form.get("status") || ""));
+      return Response.redirect(`${url.origin}/admin/r/${row.id}`, 303);
+    }
+    const thread = (await env.DB.prepare("SELECT * FROM messages WHERE report_id = ? ORDER BY id").bind(row.id).all()).results;
     const exts = (row.photo_exts || "").split(",").filter(Boolean);
     const images = exts.map((_, i) =>
       `<a href="/admin/p/${row.id}/${i}"><img src="/admin/p/${row.id}/${i}" style="max-width:320px;margin:4px"></a>`).join("");
@@ -148,7 +303,16 @@ async function admin(request, env, url) {
       `<p><b>${esc(when(row.created_at))}</b> · ${esc(row.kind)} ${esc(row.error_kind || "")}</p>` +
       `<p>${esc(row.app_version)} ${esc(row.channel)} (${esc(row.build)}) · iOS ${esc(row.os)} · ${esc(row.device)} · ${esc(row.locale)}` +
       `<br>install ${esc(row.install_id)}</p>` +
+      `<p>Status: <b>${esc(row.status)}</b> ` +
+      STATUSES.filter((s) => s !== row.status).map((s) =>
+        `<form method="post" action="/admin/r/${row.id}/status" style="display:inline">` +
+        `<input type="hidden" name="status" value="${s}"><button>${s}</button></form>`).join(" ") + `</p>` +
       (row.message ? `<h3>Note</h3><pre>${esc(row.message)}</pre>` : "") +
+      (thread.length ? `<h3>Thread</h3>` + thread.map((m) =>
+        `<p><b>${m.author === "dev" ? "Developer" : "Sender"}</b> · ${esc(when(m.created_at))}</p><pre>${esc(m.text)}</pre>`).join("") : "") +
+      `<form method="post" action="/admin/r/${row.id}/reply"><textarea name="text" rows="4" style="width:100%;max-width:640px" required></textarea><br>` +
+      `<select name="status"><option value="">keep status</option>${STATUSES.map((s) => `<option>${s}</option>`).join("")}</select> ` +
+      `<button>Reply</button></form>` +
       (images ? `<h3>Photos</h3>${images}` : "") +
       `<h3>Log</h3><p><a href="/admin/r/${row.id}/log.txt">log.txt</a></p><pre>${esc(row.log || "")}</pre>` +
       `<form method="post" action="/admin/r/${row.id}/delete" onsubmit="return confirm('Delete this report?')"><button>Delete</button></form>`);

@@ -81,6 +81,10 @@ final class ReportService {
             throw SendError.rejected(0)
         }
         guard status == 200 else { throw SendError.rejected(status) }
+        if kind == "manual" {
+            Self.hasSentReports = true
+            await refreshThreads(force: true)
+        }
     }
 
     /// The log as it goes out: no names of the user's devices.
@@ -113,6 +117,93 @@ final class ReportService {
             guard let value = element.value as? Int8, value != 0 else { return id }
             return id + String(UnicodeScalar(UInt8(value)))
         }
+    }
+
+    // MARK: Threads
+
+    /// A report the user sent by hand, with the developer's answers and their replies.
+    struct Thread: Identifiable, Equatable, Decodable {
+        struct Message: Identifiable, Equatable, Decodable {
+            let id: Int
+            let createdAt: Double
+            /// "user" or "dev".
+            let author: String
+            let text: String
+
+            var fromDeveloper: Bool { author == "dev" }
+            var date: Date { Date(timeIntervalSince1970: createdAt) }
+        }
+
+        let id: String
+        let createdAt: Double
+        let status: String
+        let note: String
+        let messages: [Message]
+
+        var date: Date { Date(timeIntervalSince1970: createdAt) }
+        var isClosed: Bool { status == "closed" }
+        var lastDeveloperMessage: Message? { messages.last(where: \.fromDeveloper) }
+    }
+
+    private(set) var threads: [Thread] = []
+    /// The newest developer answer the user has not seen yet (for the notice at launch).
+    var unreadAnswer: Thread? { threads.first(where: isUnread) }
+    var unreadCount: Int { threads.filter(isUnread).count }
+
+    func isUnread(_ thread: Thread) -> Bool { (thread.lastDeveloperMessage?.id ?? 0) > seenAnswerID }
+
+    @ObservationIgnored private var lastThreadsFetch: Date = .distantPast
+    private var seenAnswerID: Int = UserDefaults.standard.integer(forKey: "reportSeenAnswer") {
+        didSet { UserDefaults.standard.set(seenAnswerID, forKey: "reportSeenAnswer") }
+    }
+    /// Only phones that ever sent a report ask for answers.
+    private static var hasSentReports: Bool {
+        get { UserDefaults.standard.bool(forKey: "reportSent") }
+        set { UserDefaults.standard.set(newValue, forKey: "reportSent") }
+    }
+    private static let threadsURL = URL(string: "https://sweet.sppq.dev/v1/threads")!
+
+    /// The user's reports and their answers: every 10 minutes at most after sending one, every
+    /// 6 hours otherwise (reports sent before this existed are found that way), or now (`force`).
+    func refreshThreads(force: Bool = false) async {
+        guard let settings else { return }
+        let interval: TimeInterval = Self.hasSentReports || !threads.isEmpty ? 600 : 6 * 3600
+        guard force || Date().timeIntervalSince(lastThreadsFetch) > interval else { return }
+        lastThreadsFetch = Date()
+        var request = URLRequest(url: Self.threadsURL, timeoutInterval: 20)
+        request.setValue(settings.installID, forHTTPHeaderField: "X-Install-Id")
+        struct Payload: Decodable { let threads: [Thread] }
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let payload = try? JSONDecoder().decode(Payload.self, from: data) else { return }
+        threads = payload.threads
+        if !threads.isEmpty { Self.hasSentReports = true }
+    }
+
+    /// The user read the answers (opened the thread or dismissed the notice).
+    func markAnswersSeen() {
+        let newest = threads.compactMap { $0.lastDeveloperMessage?.id }.max() ?? 0
+        if newest > seenAnswerID { seenAnswerID = newest }
+    }
+
+    /// A reply in a thread. Reopens it on the server if it was closed.
+    func reply(to thread: Thread, text: String) async throws {
+        guard let settings else { throw SendError.notReady }
+        var request = URLRequest(url: Self.threadsURL.appendingPathComponent(thread.id).appendingPathComponent("messages"),
+                                 timeoutInterval: 30)
+        request.httpMethod = "POST"
+        request.setValue(settings.installID, forHTTPHeaderField: "X-Install-Id")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["text": text])
+        let status: Int
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        } catch {
+            throw SendError.rejected(0)
+        }
+        guard status == 200 else { throw SendError.rejected(status) }
+        await refreshThreads(force: true)
     }
 
     // MARK: Errors

@@ -26,6 +26,198 @@ struct ReportSettings: View {
             } footer: {
                 Text(String(localized: "Опишите, что не так, приложите фото и журнал. Это увидит только разработчик."))
             }
+
+            if !reports.threads.isEmpty {
+                Section {
+                    ForEach(reports.threads) { thread in
+                        NavigationLink {
+                            ReportThreadView(threadID: thread.id)
+                                .settingsPage()
+                                .navigationTitle(String(localized: "Отчёт"))
+                                .navigationBarTitleDisplayMode(.inline)
+                        } label: {
+                            ThreadRow(thread: thread, unread: reports.isUnread(thread))
+                        }
+                    }
+                } header: {
+                    Text(String(localized: "Мои отчёты"))
+                } footer: {
+                    Text(String(localized: "Здесь появляются ответы разработчика. Можно ответить в той же переписке."))
+                }
+            }
+        }
+        .task { await reports.refreshThreads(force: true) }
+        .refreshable { await reports.refreshThreads(force: true) }
+    }
+
+    private var reports: ReportService { .shared }
+}
+
+private struct ThreadRow: View {
+    let thread: ReportService.Thread
+    let unread: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text(thread.note.isEmpty ? String(localized: "Без описания") : thread.note)
+                    .lineLimit(1)
+                Spacer()
+                if unread {
+                    Circle().fill(.blue).frame(width: 8, height: 8)
+                }
+            }
+            HStack(spacing: 6) {
+                StatusBadge(status: thread.status)
+                Text(thread.date.formatted(date: .abbreviated, time: .omitted))
+                if let answer = thread.messages.last {
+                    Text("· " + (answer.fromDeveloper ? String(localized: "ответ разработчика") : String(localized: "ваше сообщение")))
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct StatusBadge: View {
+    let status: String
+
+    var body: some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.25), in: Capsule())
+            .foregroundStyle(color)
+    }
+
+    private var title: String {
+        switch status {
+        case "in_progress": return String(localized: "В работе")
+        case "closed": return String(localized: "Закрыт")
+        default: return String(localized: "Открыт")
+        }
+    }
+
+    private var color: Color {
+        switch status {
+        case "in_progress": return .orange
+        case "closed": return .gray
+        default: return .blue
+        }
+    }
+}
+
+/// One report: what the user wrote, the developer's answers, their replies, and a field to reply.
+struct ReportThreadView: View {
+    let threadID: String
+    @State private var draft = ""
+    @State private var sending = false
+    @State private var failure: String?
+    @FocusState private var focused: Bool
+
+    private var reports: ReportService { .shared }
+    private var thread: ReportService.Thread? { reports.threads.first { $0.id == threadID } }
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                if let thread {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            StatusBadge(status: thread.status)
+                            Text(thread.date.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        bubble(thread.note.isEmpty ? String(localized: "Отчёт без описания") : thread.note,
+                               fromDeveloper: false, date: thread.date)
+                        ForEach(thread.messages) { message in
+                            bubble(message.text, fromDeveloper: message.fromDeveloper, date: message.date)
+                                .id(message.id)
+                        }
+                        if thread.isClosed {
+                            Text(String(localized: "Отчёт закрыт. Если проблема осталась, напишите — он откроется снова."))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+            .onAppear {
+                reports.markAnswersSeen()
+                if let last = thread?.messages.last?.id { proxy.scrollTo(last, anchor: .bottom) }
+            }
+            .onChange(of: thread?.messages.count) { _, _ in
+                reports.markAnswersSeen()
+                if let last = thread?.messages.last?.id { withAnimation { proxy.scrollTo(last, anchor: .bottom) } }
+            }
+        }
+        .safeAreaInset(edge: .bottom) { composer }
+        .task { await reports.refreshThreads(force: true) }
+        .refreshable { await reports.refreshThreads(force: true) }
+    }
+
+    private func bubble(_ text: String, fromDeveloper: Bool, date: Date) -> some View {
+        VStack(alignment: fromDeveloper ? .leading : .trailing, spacing: 3) {
+            Text(fromDeveloper ? String(localized: "Разработчик") : String(localized: "Вы"))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(text)
+                .textSelection(.enabled)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(fromDeveloper ? Color.white.opacity(0.12) : Color.accentColor.opacity(0.35),
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            Text(date.formatted(date: .omitted, time: .shortened))
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: fromDeveloper ? .leading : .trailing)
+    }
+
+    private var composer: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let failure {
+                Text(failure).font(.footnote).foregroundStyle(.red)
+            }
+            HStack(alignment: .bottom, spacing: 8) {
+                TextField(String(localized: "Ответить"), text: $draft, axis: .vertical)
+                    .lineLimit(1...5)
+                    .focused($focused)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                Button {
+                    Task { await send() }
+                } label: {
+                    if sending {
+                        ProgressView().frame(width: 34, height: 34)
+                    } else {
+                        Image(systemName: "arrow.up.circle.fill").font(.system(size: 32))
+                    }
+                }
+                .disabled(sending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityLabel(String(localized: "Отправить"))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+    }
+
+    private func send() async {
+        guard let thread else { return }
+        sending = true
+        failure = nil
+        defer { sending = false }
+        do {
+            try await reports.reply(to: thread, text: draft.trimmingCharacters(in: .whitespacesAndNewlines))
+            draft = ""
+        } catch {
+            failure = error.localizedDescription
         }
     }
 }

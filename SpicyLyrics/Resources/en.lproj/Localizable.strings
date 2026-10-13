@@ -457,3 +457,22 @@
 "Когда выходит стабильная версия, приложение предложит обновиться (не чаще раза в 6 часов проверяет GitHub). Обновление ставится через AltStore или SideStore." = "When a stable version comes out, the app offers to update (it checks GitHub at most every 6 hours). Updates install through AltStore or SideStore.";
 
 "♪ Без слов ♪" = "♪ Instrumental ♪";
+
+/* Report threads. */
+"Мои отчёты" = "My Reports";
+"Здесь появляются ответы разработчика. Можно ответить в той же переписке." = "The developer's answers show up here. You can reply in the same thread.";
+"Без описания" = "No description";
+"Отчёт без описания" = "Report without a description";
+"ответ разработчика" = "developer answered";
+"ваше сообщение" = "your message";
+"В работе" = "In Progress";
+"Закрыт" = "Closed";
+"Открыт" = "Open";
+"Отчёт" = "Report";
+"Отчёт закрыт. Если проблема осталась, напишите — он откроется снова." = "This report is closed. If the problem is still there, write here and it opens again.";
+"Разработчик" = "Developer";
+"Вы" = "You";
+"Ответить" = "Reply";
+"Новый ответ" = "New answer";
+"Разработчик ответил на ваш отчёт" = "The Developer Answered Your Report";
+"Открыть" = "Open";
