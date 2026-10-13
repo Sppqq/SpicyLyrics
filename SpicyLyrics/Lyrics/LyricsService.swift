@@ -70,6 +70,11 @@ final class LyricsService {
             } catch is CancellationError {
                 return .failed("cancelled")
             } catch {
+                // LRCLIB is only a fallback. When Spicy Lyrics already said "no lyrics", an LRCLIB
+                // outage (e.g. HTTP 503) is not a failure: say "not found" and don't cache a miss, so
+                // the next attempt asks again.
+                SyncLog.shared.add("lyrics", "LRCLIB unavailable: \(error.localizedDescription)")
+                if failures.isEmpty { return .notFound }
                 failures.append("LRCLIB: \(error.localizedDescription)")
             }
         }
