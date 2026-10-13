@@ -1,6 +1,8 @@
 name = "sweet-lyrics-reports"
 main = "src/index.js"
 compatibility_date = "2025-01-01"
+# Keep the old workers.dev address working for app builds that still post there.
+workers_dev = true
 
 [[d1_databases]]
 binding = "DB"
@@ -10,6 +12,11 @@ database_id = "31822868-fd3f-4d61-8530-7299c244b398"
 [[r2_buckets]]
 binding = "PHOTOS"
 bucket_name = "sweet-lyrics-report-photos"
+
+# Custom domain: the zone sppq.dev must be on this Cloudflare account.
+[[routes]]
+pattern = "sweet.sppq.dev"
+custom_domain = true
 
 # Old reports are deleted every night.
 [triggers]

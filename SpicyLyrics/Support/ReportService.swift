@@ -10,7 +10,7 @@ import UIKit
 final class ReportService {
     static let shared = ReportService()
 
-    static let endpoint = URL(string: "https://sweet-lyrics-reports.vsevolodpisarcuk.workers.dev/v1/report")!
+    static let endpoint = URL(string: "https://sweet.sppq.dev/v1/report")!
 
     enum SendError: LocalizedError {
         case notReady
