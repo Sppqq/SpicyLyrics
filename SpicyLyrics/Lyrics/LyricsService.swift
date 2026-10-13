@@ -252,6 +252,10 @@ final class LyricsService {
             let instrumental: Bool?
         }
         let payload = try JSONDecoder().decode(Payload.self, from: data)
+        if payload.instrumental == true {
+            // Not "not found": the song has no words.
+            return LRCParser.plain(String(localized: "♪ Без слов ♪"), sourceName: "LRCLIB")
+        }
         if let synced = payload.syncedLyrics?.nilIfBlank,
            let document = LRCParser.parse(synced, duration: track.duration, sourceName: "LRCLIB") {
             return document

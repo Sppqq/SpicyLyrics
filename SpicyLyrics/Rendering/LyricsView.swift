@@ -126,6 +126,10 @@ struct LyricsView: View {
                         }
                         .padding(.horizontal, horizontalPadding)
                         .padding(.vertical, geometry.size.height * 0.6)
+                        // iOS 17 has no scroll phases: a view inside the scroll view watches its pan.
+                        .background {
+                            if #unavailable(iOS 18.0) { ScrollPanWatcher(onChange: scrollInteraction) }
+                        }
                         .contentShape(Rectangle())
                         .onTapGesture(coordinateSpace: .scrollView) { point in
                             guard inVisibleArea(point.y, viewport: geometry.size.height) else { return }
@@ -166,14 +170,7 @@ struct LyricsView: View {
                         }
                     }
                 }
-                .modifier(ScrollInteractionObserver { interacting in
-                    userScrolling = interacting
-                    if interacting {
-                        onInteraction()
-                    } else {
-                        resumeAutoScrollAt = Date().addingTimeInterval(Self.userScrollCooldown)
-                    }
-                })
+                .modifier(ScrollInteractionObserver(onChange: scrollInteraction))
                 .mask(EdgeFade(top: topInset, bottom: bottomInset))
                 // Pinch to resize the lyrics; saved when the fingers lift.
                 .pinch(enabled: settings.gesturesEnabled) { scale in
@@ -210,6 +207,16 @@ struct LyricsView: View {
                     withAnimation(.easeIn(duration: 1.5)) { showResetSize = false }
                 }
             }
+        }
+    }
+
+    /// The user started or stopped dragging the lyrics.
+    private func scrollInteraction(_ interacting: Bool) {
+        userScrolling = interacting
+        if interacting {
+            onInteraction()
+        } else {
+            resumeAutoScrollAt = Date().addingTimeInterval(Self.userScrollCooldown)
         }
     }
 
@@ -266,7 +273,7 @@ extension LyricsView {
                         onInteraction()
                         guard shown.kind != .static else { return }
                         resumeAutoScrollAt = .distantPast
-                        player.seek(to: max(0, line.start - settings.timingOffsetMs / 1000))
+                        player.seek(to: seekTarget(line))
                     }
                     .contextMenu { lineMenu(line) }
                     // Entirely under the header or the controls: nobody sees it, so it is not
@@ -285,13 +292,19 @@ extension LyricsView {
         }
     }
 
+    /// Where to seek so `line` lights up right away: its start, less the user's offset, plus the
+    /// headphone delay the clock subtracts (else the line before stayed lit ~200 ms on AirPods).
+    private func seekTarget(_ line: PreparedLine) -> Double {
+        max(0, line.start - settings.timingOffsetMs / 1000 + player.appliedOutputLatency)
+    }
+
     /// Long press on a line.
     @ViewBuilder
     func lineMenu(_ line: PreparedLine) -> some View {
         if !line.isInterlude {
             if shown.kind != .static {
                 Button {
-                    player.seek(to: max(0, line.start - settings.timingOffsetMs / 1000))
+                    player.seek(to: seekTarget(line))
                 } label: {
                     Label(String(localized: "Перемотать сюда"), systemImage: "play.circle")
                 }
@@ -362,7 +375,9 @@ private final class LineCulling {
     }
 }
 
-/// Pauses auto-scroll while the user drags the lyrics (iOS 18+; on iOS 17 it simply keeps following).
+/// Pauses auto-scroll while the user drags the lyrics. iOS 18 reports the scroll phase; on iOS 17
+/// the scroll view's own pan gesture is watched (without it, the next line yanked the lyrics back
+/// mid-drag).
 private struct ScrollInteractionObserver: ViewModifier {
     let onChange: (Bool) -> Void
 
@@ -386,6 +401,62 @@ private struct ScrollInteractionObserver: ViewModifier {
             }
         } else {
             content
+        }
+    }
+}
+
+/// iOS 17: finds the enclosing UIScrollView and follows its pan gesture and deceleration.
+private struct ScrollPanWatcher: UIViewRepresentable {
+    let onChange: (Bool) -> Void
+
+    func makeUIView(context: Context) -> WatcherView {
+        let view = WatcherView()
+        view.onChange = onChange
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ view: WatcherView, context: Context) {
+        view.onChange = onChange
+    }
+
+    final class WatcherView: UIView {
+        var onChange: (Bool) -> Void = { _ in }
+        private weak var scrollView: UIScrollView?
+        private var settleTimer: Timer?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            guard window != nil, scrollView == nil else { return }
+            var view = superview
+            while let current = view, !(current is UIScrollView) { view = current.superview }
+            guard let found = view as? UIScrollView else { return }
+            scrollView = found
+            found.panGestureRecognizer.addTarget(self, action: #selector(panned(_:)))
+        }
+
+        @objc private func panned(_ recognizer: UIPanGestureRecognizer) {
+            switch recognizer.state {
+            case .began:
+                settleTimer?.invalidate()
+                onChange(true)
+            case .ended, .cancelled, .failed:
+                waitForRest()
+            default:
+                break
+            }
+        }
+
+        /// The flick coasts on after the finger lifts: done once it stops.
+        private func waitForRest() {
+            settleTimer?.invalidate()
+            settleTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] timer in
+                guard let self else { return timer.invalidate() }
+                if self.scrollView?.isDecelerating != true {
+                    timer.invalidate()
+                    self.onChange(false)
+                }
+            }
         }
     }
 }

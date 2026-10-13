@@ -183,7 +183,7 @@ final class PlayerModel {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.outputLatency = AudioRoute.outputLatency
-                SyncLog.shared.add("audio", "route \(AudioRoute.outputName), latency \(self.outputLatency.signedMs)")
+                SyncLog.shared.add("audio", "output \(AudioRoute.outputKind), latency \(self.outputLatency.signedMs)")
             }
         }
     }
@@ -385,9 +385,11 @@ final class PlayerModel {
                     decision = "frozen device, catch up → blend"
                 }
             }
-        } else if roundTrip > Self.normalRoundTrip * 2, abs(drift) < Self.resyncThreshold {
+        } else if roundTrip > Self.normalRoundTrip * 2, abs(drift) < max(Self.resyncThreshold, roundTrip) {
             // A slow answer (the phone lagged, a token was refreshed, the connection retried): its
-            // position is off by up to half the round trip either way. Wait for a fast one.
+            // position is off by up to half the round trip either way. Wait for a fast one. Even a
+            // big drift is no proof while it is within that error: a 3 s answer once jumped the
+            // clock 1.3 s ahead, and the next ones had to pull it back.
             refineSamples = max(refineSamples, 1)
             decision = "slow answer, kept clock"
         } else {
@@ -533,10 +535,12 @@ final class PlayerModel {
             var leadNote = ""
             if rebase {
                 leadActive = false
-                // A spontaneous event (not our own control, not a pause) shows how far ahead
-                // Spotify's position really was.
+                // An event not caused by our own controls shows how far ahead Spotify's position
+                // really was. A pause made elsewhere (Spotify, the lock screen, headphones) counts
+                // too: it carries the exact position. Leaving pauses out kept the lead stuck at
+                // 635 ms while it really was ~260 ms (a report: lyrics late all song long).
                 let observed = startLead - drift
-                if !sample.paused, now >= holdUntil, (0...1.5).contains(observed) {
+                if now >= holdUntil, (0...1.5).contains(observed) {
                     startLead = (startLead + observed) / 2
                     leadNote = " (start lead \(observed.signedMs) → now \(startLead.signedMs))"
                 } else {

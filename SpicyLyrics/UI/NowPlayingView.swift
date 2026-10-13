@@ -45,8 +45,9 @@ struct NowPlayingView: View {
     var body: some View {
         GeometryReader { geometry in
             let size = Self.clampedToWindow(geometry.size)
-            // Side by side in landscape, and on iPad in any orientation (wide enough for both).
-            let landscape = (size.width > size.height && size.width > 560) || size.width >= 700
+            // Side by side in landscape. iPad upright gets the portrait layout: side by side, the
+            // lyrics column was too narrow and every line wrapped.
+            let landscape = size.width > size.height && size.width > 560
             ZStack {
                 // The PiP layer has to be in the window; it sits behind everything, right under
                 // the lyrics: the floating window opens out of it and closes back into it.
@@ -420,6 +421,7 @@ struct NowPlayingView: View {
                 Spacer(minLength: 0)
 
                 controls()
+                    .frame(maxWidth: 620)
                     .padding(.horizontal, 26)
                     .padding(.bottom, 6)
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { controlsHeight = $0 }
@@ -456,14 +458,16 @@ struct NowPlayingView: View {
     // MARK: Landscape
 
     private func landscapeLayout(_ size: CGSize) -> some View {
-        let lyricsOnly = settings.landscapeLyricsOnly || lyricsHidden || bigArtworkShown
+        let lyricsOnly = settings.landscapeLyricsOnly || lyricsHidden
+        // The big cover sits where the lyrics were: the column keeps the title and controls,
+        // just not the small cover.
         let showTitle = settings.landscapeTitle && !lyricsOnly
         let column = min(size.width * 0.4, 420)
         let blockWidth = column - 40
         // The artwork gets whatever height the title and controls leave free.
         let reserved = (chromeVisible ? landscapeControlsHeight + 18 : 0) + (showTitle ? 62 : 0) + 24
         let artworkSide = min(blockWidth, size.height * 0.62, size.height - reserved)
-        let showArtwork = settings.landscapeArtwork && !lyricsOnly && artworkSide >= 72
+        let showArtwork = settings.landscapeArtwork && !lyricsOnly && !bigArtworkShown && artworkSide >= 72
         let infoWidth = showArtwork ? artworkSide : min(blockWidth, 320)
         // With artwork and title switched off the column is empty once the controls hide:
         // slide the lyrics to the middle instead of leaving a gap (no re-wrapping).
@@ -501,7 +505,8 @@ struct NowPlayingView: View {
             .onTapGesture { toggleChrome() }
             // "•••" in the column's corner, out of the title's way.
             .overlay(alignment: .topTrailing) {
-                if chromeVisible && !lyricsOnly {
+                // Whenever the controls are up: settings and the track list stay in reach.
+                if chromeVisible {
                     moreMenu
                         .padding(.top, 4)
                         .transition(.opacity)

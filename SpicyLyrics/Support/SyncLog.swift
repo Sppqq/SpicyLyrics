@@ -28,11 +28,12 @@ final class SyncLog {
     private static let limit = 4000
 
     func add(_ source: String, _ message: String, at date: Date = Date()) {
+        // Errors go to the reports even with the log off (the user agreed to those separately).
+        ReportService.shared.noteError(source: source, message: message)
         guard enabled else { return }
         entries.append(Entry(id: nextID, date: date, media: CACurrentMediaTime(), source: source, message: message))
         nextID += 1
         if entries.count > Self.limit { entries.removeFirst(entries.count - Self.limit) }
-        ReportService.shared.noteError(source: source, message: message)
     }
 
     /// From any thread.
@@ -70,8 +71,8 @@ final class SyncLog {
     }
 
     func export(header: [String]) -> URL? {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("SpicyLyrics-sync-\(Int(Date().timeIntervalSince1970)).txt")
+        // One file, rewritten: the log screen refreshes it as entries come in.
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("SweetLyrics-log.txt")
         do {
             try text(header: header).write(to: url, atomically: true, encoding: .utf8)
             return url

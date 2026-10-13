@@ -18,7 +18,7 @@ struct PlaybackBar: View {
     var lyricsAvailable = true
     /// False while the controls are faded out: the scrubber stops ticking.
     var isVisible = true
-    /// Landscape: tighter spacing and no bottom icon row (it does not fit beside the lyrics).
+    /// Landscape: tighter spacing.
     var compact = false
 
     var body: some View {
@@ -47,9 +47,8 @@ struct PlaybackBar: View {
                     .padding(.bottom, compact ? 0 : 20)
             }
 
-            if !compact {
-                accessoryRow
-            }
+            accessoryRow
+                .padding(.top, compact ? 8 : 0)
         }
     }
 

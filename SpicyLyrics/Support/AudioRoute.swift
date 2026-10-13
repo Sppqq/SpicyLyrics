@@ -16,9 +16,15 @@ enum AudioRoute {
         min(max(AVAudioSession.sharedInstance().outputLatency, 0), 0.5)
     }
 
-    /// Name of the current output ("iPhone Speaker", "AirPods Pro").
+    /// Name of the current output ("iPhone Speaker", "AirPods Pro"). The user may have named it
+    /// ("AirPods Pro (Name)"): shown on screen, never written to the log.
     static var outputName: String {
         AVAudioSession.sharedInstance().currentRoute.outputs.first?.portName ?? "?"
+    }
+
+    /// The kind of output for the log ("BluetoothA2DPOutput", "Speaker"): no personal names.
+    static var outputKind: String {
+        AVAudioSession.sharedInstance().currentRoute.outputs.first?.portType.rawValue ?? "?"
     }
 }
 

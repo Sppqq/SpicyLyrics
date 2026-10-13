@@ -90,11 +90,20 @@ final class ReportService {
         return Self.sanitize(SyncLog.shared.text(header: header))
     }
 
-    /// `on Smartphone "Vsevolod's iPhone"` becomes `on Smartphone "…"`.
+    /// `on Smartphone "Vsevolod's iPhone"` becomes `on Smartphone "…"`, and a headphone name
+    /// from older builds (`route AirPods Pro (Name), latency`) becomes `route …, latency`.
     nonisolated static func sanitize(_ text: String) -> String {
-        guard let expression = try? NSRegularExpression(pattern: #" on (\w+) "[^"\n]*""#) else { return text }
-        let range = NSRange(text.startIndex..., in: text)
-        return expression.stringByReplacingMatches(in: text, range: range, withTemplate: " on $1 \"…\"")
+        let rules = [
+            (#" on (\w+) "[^"\n]*""#, " on $1 \"…\""),
+            (#"\broute [^\n]*?, latency"#, "route …, latency"),
+        ]
+        var result = text
+        for (pattern, template) in rules {
+            guard let expression = try? NSRegularExpression(pattern: pattern) else { continue }
+            let range = NSRange(result.startIndex..., in: result)
+            result = expression.stringByReplacingMatches(in: result, range: range, withTemplate: template)
+        }
+        return result
     }
 
     private static var deviceModel: String {
@@ -140,8 +149,12 @@ final class ReportService {
     /// Real failures only: not the App Remote refusals that are normal, not "not found".
     nonisolated static func isReportable(_ source: String, _ message: String) -> Bool {
         switch source {
-        case "remote":
+        case "remote", "web":
+            // App Remote refusals are normal; a failed poll is the network, retried in seconds.
             return false
+        case "translate":
+            // Only the last of three tries is a real failure.
+            return message.contains("failed (3)")
         case "api":
             guard message.hasPrefix("HTTP "), let code = Int(message.dropFirst(5).prefix(3)) else { return false }
             return code >= 500

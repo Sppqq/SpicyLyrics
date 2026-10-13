@@ -39,6 +39,8 @@ final class SpotifyAppRemote: NSObject {
     @ObservationIgnored private var queryTask: Task<Void, Never>?
     /// Gives up on a connection attempt Spotify never answers.
     @ObservationIgnored private var connectTimeout: Task<Void, Never>?
+    /// `connect()` is between its start and `remote.connect()` (getting a token).
+    @ObservationIgnored private var connectStarting = false
     /// Token handed back by Spotify after "wake Spotify", used for the next connection.
     @ObservationIgnored private var wakeToken: String?
     /// Gives up on a wake that never came back with a token.
@@ -155,6 +157,10 @@ final class SpotifyAppRemote: NSObject {
     }
 
     private func connect() async {
+        // Two scene changes a moment apart started two attempts at once (both refused).
+        guard !connectStarting else { return }
+        connectStarting = true
+        defer { connectStarting = false }
         retryTask?.cancel()
         retryTask = nil
         guard wanted, settings.useAppRemote, auth.isLoggedIn else {

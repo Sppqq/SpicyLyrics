@@ -69,6 +69,14 @@ struct TrackPickerView: View {
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: queuedTitle)
+        // The player's own alert can't show over this sheet: a failed "add to queue" shows here.
+        .alert("Spotify", isPresented: Binding(get: { player.transientError != nil }, set: { shown in
+            if !shown { player.transientError = nil }
+        })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(player.transientError ?? "")
+        }
         .sensoryFeedback(.success, trigger: queuedCount)
         .animation(.spring(response: 0.38, dampingFraction: 0.85), value: tab)
         .task(id: tab) {
