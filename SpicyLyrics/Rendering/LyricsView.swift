@@ -111,7 +111,7 @@ struct LyricsView: View {
                         let focus = animator.focusIndex
                         let visuals = animator.visuals
 
-                        let _ = culling.sync(CullingKey(typography: typography,
+                        let _ = culling.sync(CullingKey(typography: typography, topInset: topInset, bottomInset: bottomInset,
                                                         translated: settings.translateLyrics && !settings.translationReplaces
                                                             ? player.translations.count : -1))
                         LazyVStack(alignment: .leading, spacing: typography.lineSpacing) {
@@ -127,7 +127,10 @@ struct LyricsView: View {
                         .padding(.horizontal, horizontalPadding)
                         .padding(.vertical, geometry.size.height * 0.6)
                         .contentShape(Rectangle())
-                        .onTapGesture { onBackgroundTap() }
+                        .onTapGesture(coordinateSpace: .scrollView) { point in
+                            guard inVisibleArea(point.y, viewport: geometry.size.height) else { return }
+                            onBackgroundTap()
+                        }
                         .onChange(of: focus) { _, newFocus in
                             guard shown.kind != .static, !userScrolling, Date() >= resumeAutoScrollAt else { return }
                             // After a seek or a gap (back from the background or PiP) jump to the
@@ -233,9 +236,15 @@ struct LyricsView: View {
 extension LyricsView {
     /// Lines this far (in screens) beyond the visible area are still drawn: a quick flick must not
     /// outrun them.
-    private static let cullMargin: CGFloat = 0.75
+    private static let cullMargin: CGFloat = 1.25
     /// The lines around the one being sung are always drawn.
     private static let alwaysDrawn = 3
+
+    /// A touch at this height (in the scroll view's own space) lands in the lyrics you can see,
+    /// not under the header or the controls.
+    private func inVisibleArea(_ y: CGFloat, viewport: CGFloat) -> Bool {
+        y >= topInset && y <= viewport - bottomInset
+    }
 
     /// One line. Far off screen it is an empty box of the same height (so nothing moves), and is
     /// drawn again before it scrolls into view.
@@ -251,7 +260,8 @@ extension LyricsView {
                                   ? player.translations[line.sourceText] : nil)
                     .equatable()
                     .contentShape(Rectangle())
-                    .onTapGesture {
+                    .onTapGesture(coordinateSpace: .scrollView) { point in
+                        guard inVisibleArea(point.y, viewport: viewport) else { return }
                         guard tapSeeks else { return onBackgroundTap() }
                         onInteraction()
                         guard shown.kind != .static else { return }
@@ -259,12 +269,17 @@ extension LyricsView {
                         player.seek(to: max(0, line.start - settings.timingOffsetMs / 1000))
                     }
                     .contextMenu { lineMenu(line) }
+                    // Entirely under the header or the controls: nobody sees it, so it is not
+                    // there for taps and long presses either (a scroll still passes through).
+                    .allowsHitTesting(culling.isTouchable(line.id))
             }
         }
         .onGeometryChange(for: LineSpot.self) { proxy in
             let frame = proxy.frame(in: .scrollView)
             let margin = viewport * Self.cullMargin
-            return LineSpot(height: proxy.size.height, near: frame.maxY > -margin && frame.minY < viewport + margin)
+            return LineSpot(height: proxy.size.height,
+                            near: frame.maxY > -margin && frame.minY < viewport + margin,
+                            touchable: frame.maxY > topInset && frame.minY < viewport - bottomInset)
         } action: { spot in
             culling.record(line.id, spot)
         }
@@ -303,12 +318,17 @@ private struct LineSpot: Equatable {
     var height: CGFloat
     /// Within (or close to) the visible area.
     var near: Bool
+    /// At least partly in the part of the screen the header and controls leave free.
+    var touchable: Bool
 }
 
 /// What the lines' heights depend on besides the text: when it changes, the remembered heights
 /// are stale and every line is drawn (and measured) again.
 private struct CullingKey: Equatable {
     var typography: LyricsTypography
+    /// Which lines are under the header and controls follows them.
+    var topInset: CGFloat
+    var bottomInset: CGFloat
     var translated: Int
 }
 
@@ -317,6 +337,7 @@ private struct CullingKey: Equatable {
 private final class LineCulling {
     private var heights: [Int: CGFloat] = [:]
     private var far: Set<Int> = []
+    private var hidden: Set<Int> = []
     private var key: CullingKey?
 
     func sync(_ key: CullingKey) {
@@ -324,12 +345,16 @@ private final class LineCulling {
         self.key = key
         heights.removeAll()
         far.removeAll()
+        hidden.removeAll()
     }
 
     func record(_ id: Int, _ spot: LineSpot) {
         heights[id] = spot.height
         if spot.near { far.remove(id) } else { far.insert(id) }
+        if spot.touchable { hidden.remove(id) } else { hidden.insert(id) }
     }
+
+    func isTouchable(_ id: Int) -> Bool { !hidden.contains(id) }
 
     /// The height to keep free for a line that is far away and measured; nil when it must be drawn.
     func hiddenHeight(of id: Int) -> CGFloat? {

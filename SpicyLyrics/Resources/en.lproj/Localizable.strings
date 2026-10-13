@@ -405,3 +405,6 @@
 "Файлы .ttf, .otf и .ttc из «Файлов». Шрифт остаётся в приложении и работает и в тексте, и в окне «картинка в картинке». Смахните влево, чтобы удалить." = "TTF, OTF and TTC files from Files. The font stays in the app and works in the lyrics and in the Picture in Picture window. Swipe left to delete.";
 "Это не шрифт или файл повреждён. Подойдут файлы .ttf, .otf и .ttc." = "That is not a font, or the file is damaged. TTF, OTF and TTC files work.";
 "«Обложка» берёт фон и цвета из песни. Остальные темы не зависят от песни, их фон не движется, а телефон греется меньше. Тема действует и в окне «картинка в картинке»." = "“Artwork” takes its background and colours from the song. The other themes do not depend on the song, their background does not move and the phone stays cooler. The theme applies in the Picture in Picture window too.";
+"Spotify сейчас не принимает подключения: он в фоне или закрыт. Нажмите «Открыть Spotify и подключиться»." = "Spotify is not accepting connections right now: it is in the background or closed. Tap “Open Spotify and Connect”.";
+"Spotify оборвал связь, подключаюсь заново." = "Spotify dropped the connection, reconnecting.";
+"Spotify не вернул подтверждение. Попробуйте ещё раз." = "Spotify did not come back with a confirmation. Try again.";

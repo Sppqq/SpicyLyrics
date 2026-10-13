@@ -89,7 +89,9 @@ final class PlayerModel {
     /// (seen in sync logs: the first pause, seek or stall afterwards showed the clock 0.5-1 s
     /// early, and everything after was exact). Until such an event re-bases it, the position of
     /// a fresh song is taken `startLead` seconds back. Learned from those events.
-    @ObservationIgnored private var startLead = 0.9
+    @ObservationIgnored private(set) var startLead: Double = UserDefaults.standard.object(forKey: "startLead") as? Double ?? 0.9 {
+        didSet { UserDefaults.standard.set(startLead, forKey: "startLead") }
+    }
     @ObservationIgnored private var leadActive = false
     @ObservationIgnored private var trackStartedAt: CFTimeInterval = 0
     /// Web API reports in a row that contradict App Remote (play state or song).

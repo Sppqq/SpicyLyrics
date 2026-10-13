@@ -79,6 +79,7 @@ struct SyncLogView: View {
             "Exported \(SyncLog.time(Date()))",
             "offset \(Int(settings.timingOffsetMs)) ms, headphone latency \(settings.compensateOutputLatency ? "on" : "off") "
                 + "(route \(Int(AudioRoute.outputLatency * 1000)) ms)",
+            "start lead \(Int(player.startLead * 1000)) ms (learned, kept between launches)",
             "App Remote \(settings.useAppRemote ? "on" : "off"): \(appRemote.status), keeps clock \(player.remoteConnected)",
             "web poll \(settings.webPollInterval)s, remote query \(settings.remoteQueryInterval)s, auto wake \(settings.autoWakeSpotify ? "on" : "off")",
             "PiP: opens itself \(settings.autoPictureInPicture ? "on" : "off"), closes on return \(settings.closePiPOnReturn ? "on" : "off"), "

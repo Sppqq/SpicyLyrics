@@ -41,6 +41,8 @@ final class SpotifyAppRemote: NSObject {
     @ObservationIgnored private var connectTimeout: Task<Void, Never>?
     /// Token handed back by Spotify after "wake Spotify", used for the next connection.
     @ObservationIgnored private var wakeToken: String?
+    /// Gives up on a wake that never came back with a token.
+    @ObservationIgnored private var wakeTimeout: Task<Void, Never>?
     @ObservationIgnored private var coverURI: String?
     /// Failed attempts in a row: retries back off from 8 s to a minute.
     @ObservationIgnored private var failures = 0
@@ -99,9 +101,19 @@ final class SpotifyAppRemote: NSObject {
             return
         }
         SyncLog.shared.add("remote", "waking Spotify")
+        status = .connecting
+        wakeTimeout?.cancel()
+        wakeTimeout = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(30))
+            guard !Task.isCancelled, let self, self.status == .connecting, self.remote?.isConnected != true else { return }
+            self.status = .unavailable
+            self.lastError = String(localized: "Spotify не вернул подтверждение. Попробуйте ещё раз.")
+            SyncLog.shared.add("remote", "Spotify never came back with a token")
+        }
         remote.authorizeAndPlayURI("") { [weak self] success in
             Task { @MainActor in
                 guard !success else { return }
+                self?.wakeTimeout?.cancel()
                 self?.status = .unavailable
                 self?.lastError = String(localized: "Не удалось открыть Spotify. Он установлен?")
                 SyncLog.shared.add("remote", "could not open Spotify")
@@ -112,6 +124,7 @@ final class SpotifyAppRemote: NSObject {
     /// The `spicylyrics-ios://callback` URL Spotify opens after `wakeSpotify()`.
     func handle(_ url: URL) {
         guard let parameters = remote?.authorizationParameters(from: url) else { return }
+        wakeTimeout?.cancel()
         if let token = parameters[SPTAppRemoteAccessTokenKey] {
             wakeToken = token
             failures = 0
@@ -210,6 +223,7 @@ final class SpotifyAppRemote: NSObject {
         }
         connectTimeout?.cancel()
         connectTimeout = nil
+        wakeTimeout?.cancel()
         status = .connected
         failures = 0
         autoWakePending = false
@@ -237,7 +251,8 @@ final class SpotifyAppRemote: NSObject {
         connectTimeout = nil
         player?.setRemoteConnected(false)
         let message = reason ?? error.map(Self.describe) ?? "disconnected"
-        lastError = message
+        // The sync log keeps the SDK's own words; the screen gets a plain explanation.
+        lastError = reason ?? error.flatMap(Self.explain) ?? message
         SyncLog.shared.add("remote", "no connection: \(message)")
         guard wanted else { return }
         status = .unavailable
@@ -262,6 +277,20 @@ final class SpotifyAppRemote: NSObject {
               let player, player.isPlaying, player.isPlayingOnThisPhone, !player.lyricsAreStatic
         else { return false }
         return CACurrentMediaTime() - lastAutoWakeAt > Self.autoWakeCooldown
+    }
+
+    /// What the usual App Remote refusals mean, in words (nil for the rest).
+    private static func explain(_ error: Error) -> String? {
+        let ns = error as NSError
+        guard ns.domain == "com.spotify.app-remote" else { return nil }
+        switch ns.code {
+        case -1000:
+            return String(localized: "Spotify сейчас не принимает подключения: он в фоне или закрыт. Нажмите «Открыть Spotify и подключиться».")
+        case -1002:
+            return String(localized: "Spotify оборвал связь, подключаюсь заново.")
+        default:
+            return nil
+        }
     }
 
     /// The SDK's errors say little on their own; the domain, code and the underlying error tell
