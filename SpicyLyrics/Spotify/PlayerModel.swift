@@ -508,6 +508,9 @@ final class PlayerModel {
             } else if sample.paused || abs(drift) > 0.02 {
                 setClock(measured, at: now)
                 decision = "set"
+                // The timeline may have jumped (a stall, a seek): the next query is not
+                // comparable with the one before, or it would look like queries stopped moving.
+                lastRemoteQuery = nil
             }
             log.add("remote", "\(summary) drift \(drift.signedMs) → \(decision)")
             log.synced("App Remote", drift: drift)

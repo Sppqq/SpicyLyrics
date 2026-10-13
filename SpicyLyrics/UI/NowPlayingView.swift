@@ -408,6 +408,16 @@ struct NowPlayingView: View {
                 horizontalPadding: 28
             )
 
+            // With the controls shown, the gaps between their buttons are not lyrics either: the
+            // text under them is faded out, so a tap there must not seek to a line nobody sees.
+            if chromeVisible {
+                VStack(spacing: 0) {
+                    chromeShield.frame(height: headerHeight + 24)
+                    Spacer(minLength: 0)
+                    chromeShield.frame(height: controlsHeight + 24)
+                }
+            }
+
             VStack(spacing: 0) {
                 header
                     .padding(.horizontal, 22)
@@ -451,6 +461,14 @@ struct NowPlayingView: View {
             .verticalSwipe(.up) { showChrome() }
             .accessibilityLabel(String(localized: "Показать элементы управления"))
             .accessibilityAddTraits(.isButton)
+    }
+
+    /// Swallows touches around the header and controls (nothing happens).
+    private var chromeShield: some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture {}
+            .accessibilityHidden(true)
     }
 
     // MARK: Landscape

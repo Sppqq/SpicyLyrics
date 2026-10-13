@@ -31,6 +31,8 @@ struct LyricsView: View {
     @State private var showResetSize = false
     @State private var resetSizeTick = 0
     @State private var frameCounter = FrameRateCounter()
+    /// Which lines are far enough off screen to skip drawing.
+    @State private var culling = LineCulling()
 
     init(lyrics: PreparedLyrics, player: PlayerModel, settings: AppSettings,
          topInset: CGFloat = 0, bottomInset: CGFloat = 0, horizontalPadding: CGFloat = 24,
@@ -109,21 +111,13 @@ struct LyricsView: View {
                         let focus = animator.focusIndex
                         let visuals = animator.visuals
 
+                        let _ = culling.sync(CullingKey(typography: typography,
+                                                        translated: settings.translateLyrics && !settings.translationReplaces
+                                                            ? player.translations.count : -1))
                         LazyVStack(alignment: .leading, spacing: typography.lineSpacing) {
                             ForEach(shown.lines) { line in
-                                LyricLineView(line: line, visual: visuals[line.id], typography: typography,
-                                              translation: settings.translateLyrics && !settings.translationReplaces
-                                                  ? player.translations[line.sourceText] : nil)
-                                    .equatable()
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        guard tapSeeks else { return onBackgroundTap() }
-                                        onInteraction()
-                                        guard shown.kind != .static else { return }
-                                        resumeAutoScrollAt = .distantPast
-                                        player.seek(to: max(0, line.start - settings.timingOffsetMs / 1000))
-                                    }
-                                    .contextMenu { lineMenu(line) }
+                                row(line, visual: visuals[line.id], typography: typography, focus: focus,
+                                    viewport: geometry.size.height)
                                     .id(line.id)
                             }
                             // Spicy Lyrics always credits the writers and whoever synced the lyrics.
@@ -237,6 +231,45 @@ struct LyricsView: View {
 }
 
 extension LyricsView {
+    /// Lines this far (in screens) beyond the visible area are still drawn: a quick flick must not
+    /// outrun them.
+    private static let cullMargin: CGFloat = 0.75
+    /// The lines around the one being sung are always drawn.
+    private static let alwaysDrawn = 3
+
+    /// One line. Far off screen it is an empty box of the same height (so nothing moves), and is
+    /// drawn again before it scrolls into view.
+    @ViewBuilder
+    private func row(_ line: PreparedLine, visual: LineVisual, typography: LyricsTypography,
+                     focus: Int, viewport: CGFloat) -> some View {
+        Group {
+            if abs(line.id - focus) > Self.alwaysDrawn, let height = culling.hiddenHeight(of: line.id) {
+                Color.clear.frame(height: height)
+            } else {
+                LyricLineView(line: line, visual: visual, typography: typography,
+                              translation: settings.translateLyrics && !settings.translationReplaces
+                                  ? player.translations[line.sourceText] : nil)
+                    .equatable()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard tapSeeks else { return onBackgroundTap() }
+                        onInteraction()
+                        guard shown.kind != .static else { return }
+                        resumeAutoScrollAt = .distantPast
+                        player.seek(to: max(0, line.start - settings.timingOffsetMs / 1000))
+                    }
+                    .contextMenu { lineMenu(line) }
+            }
+        }
+        .onGeometryChange(for: LineSpot.self) { proxy in
+            let frame = proxy.frame(in: .scrollView)
+            let margin = viewport * Self.cullMargin
+            return LineSpot(height: proxy.size.height, near: frame.maxY > -margin && frame.minY < viewport + margin)
+        } action: { spot in
+            culling.record(line.id, spot)
+        }
+    }
+
     /// Long press on a line.
     @ViewBuilder
     func lineMenu(_ line: PreparedLine) -> some View {
@@ -262,6 +295,45 @@ extension LyricsView {
                 Label(String(localized: "Поделиться строкой"), systemImage: "square.and.arrow.up")
             }
         }
+    }
+}
+
+/// Where a line is relative to the scroll view.
+private struct LineSpot: Equatable {
+    var height: CGFloat
+    /// Within (or close to) the visible area.
+    var near: Bool
+}
+
+/// What the lines' heights depend on besides the text: when it changes, the remembered heights
+/// are stale and every line is drawn (and measured) again.
+private struct CullingKey: Equatable {
+    var typography: LyricsTypography
+    var translated: Int
+}
+
+/// Remembers each line's height and whether it is near the screen, so far-away lines can be
+/// swapped for an empty box. Read once per frame by the lyrics view; not observable on purpose.
+private final class LineCulling {
+    private var heights: [Int: CGFloat] = [:]
+    private var far: Set<Int> = []
+    private var key: CullingKey?
+
+    func sync(_ key: CullingKey) {
+        guard key != self.key else { return }
+        self.key = key
+        heights.removeAll()
+        far.removeAll()
+    }
+
+    func record(_ id: Int, _ spot: LineSpot) {
+        heights[id] = spot.height
+        if spot.near { far.remove(id) } else { far.insert(id) }
+    }
+
+    /// The height to keep free for a line that is far away and measured; nil when it must be drawn.
+    func hiddenHeight(of id: Int) -> CGFloat? {
+        far.contains(id) ? heights[id] : nil
     }
 }
 
