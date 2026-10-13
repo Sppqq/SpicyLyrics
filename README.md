@@ -46,7 +46,7 @@ the popular Spicetify extension for Spotify on desktop. Made by
   extension. In duets each singer gets their own side, backing vocals sit under the main line,
   and instrumental breaks show three bouncing dots.
 - **Tap a line to jump to it.** Swipe sideways to change songs, pinch to make the text bigger,
-  long-press a line to copy or share it.
+  long-press a line to copy or share it (swipe and pinch need iOS 18).
 - **A background made from the album cover** that slowly flows like liquid.
 - **Big artwork mode**: the quote button at the bottom left swaps the lyrics for a large cover
   with the current line under it.
@@ -64,7 +64,8 @@ the popular Spicetify extension for Spotify on desktop. Made by
 
 - An **iPhone or iPad** on **iOS 17** or newer.
 - **Spotify Premium**: Spotify requires it for the sign-in the app uses.
-- A **Windows PC or Mac**, once, to set up AltStore or SideStore (see below).
+- A **Windows PC or Mac** to set up AltStore or SideStore (see below). With SideStore that is needed
+  once; AltStore keeps needing the computer (AltServer) to refresh the app.
 
 ## How to install
 

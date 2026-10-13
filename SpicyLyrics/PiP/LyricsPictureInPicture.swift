@@ -589,7 +589,7 @@ final class PiPFrameRenderer {
     private struct LayoutKey: Equatable {
         var revision: Int
         var style: PiPStyle
-        var translations: Int
+        var translations: [String: String]
     }
     /// One entry per lyric line; nil for interludes (drawn as dots).
     private var rows: [Row?] = []
@@ -881,7 +881,7 @@ final class PiPFrameRenderer {
     private func drawLyrics(_ lyrics: PreparedLyrics, _ snapshot: PiPSnapshot, width column: CGFloat,
                             now: CFTimeInterval, context: CGContext) {
         let style = snapshot.style
-        let key = LayoutKey(revision: snapshot.revision, style: style, translations: snapshot.translations.count)
+        let key = LayoutKey(revision: snapshot.revision, style: style, translations: snapshot.translations)
         if key != layoutKey || rows.count != lyrics.lines.count {
             leadSize = (Self.baseLeadSize * style.textScale).rounded()
             buildRows(lyrics, snapshot, width: column)

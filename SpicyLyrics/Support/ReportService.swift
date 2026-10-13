@@ -169,13 +169,13 @@ final class ReportService {
         guard let settings else { return }
         let interval: TimeInterval = Self.hasSentReports || !threads.isEmpty ? 600 : 6 * 3600
         guard force || Date().timeIntervalSince(lastThreadsFetch) > interval else { return }
-        lastThreadsFetch = Date()
         var request = URLRequest(url: Self.threadsURL, timeoutInterval: 20)
         request.setValue(settings.installID, forHTTPHeaderField: "X-Install-Id")
         struct Payload: Decodable { let threads: [Thread] }
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let payload = try? JSONDecoder().decode(Payload.self, from: data) else { return }
+        lastThreadsFetch = Date() // only an answer counts: a failed try is repeated sooner
         threads = payload.threads
         if !threads.isEmpty { Self.hasSentReports = true }
     }

@@ -19,13 +19,12 @@ These features work, but still need testing and refinement.
 | Skip songs without sync | Optionally skips songs that have no Spicy Lyrics sync (or no word-by-word sync). The next songs in the queue are looked up while the current one plays, so an unsynced song is skipped the moment it starts, together with any unsynced songs right after it; songs you pick or go back to are kept |
 | Lyrics ahead of time | The lyrics of the next songs in the queue are fetched while the current one plays, so they show the moment the song changes |
 | Lyrics sources | Spicy Lyrics API with [LRCLIB](https://lrclib.net) as a fallback |
-| Romanization | Supported when returned by the API (`TransliteratedText`) |
 | Seeking | Tap a lyric line to seek to it; requires Spotify Premium |
 | Track picker | Tap the track header (or the list button) to jump ahead in the queue, replay something from your history, or search; swipe the header sideways to skip. Requires Spotify Premium |
 | Own TTML files | Like the extension's Lyrics Manager: pick a `.ttml` file or paste TTML, apply it just once or save it to a library that wins over online sources (*••• → Свой текст (TTML)*) |
 | Apple Music style player | Controls fade away while a song plays; landscape and iPad put artwork and controls beside the lyrics |
 | Gestures | Swipe the lyrics sideways to change tracks, pinch to resize, long-press a line to seek / copy / share (iOS 18+) |
-| iPad | Side-by-side layout in both orientations, larger lyrics, pointer hover, keyboard shortcuts (space, ⌘← / ⌘→) |
+| iPad | Side-by-side layout in landscape (upright iPad uses the portrait layout: side by side the lyrics column was too narrow), larger lyrics, pointer hover, keyboard shortcuts (space, ⌘← / ⌘→) |
 | Floating lyrics (Picture in Picture) | The current line, word by word, in a PiP window over any app; wide, square, portrait or tall; opens out of the lyrics and closes back onto them; starts from *•••* or when leaving the app; play/pause and ±15 s from the window |
 | Romanization and translation | On-device: Japanese (with kanji readings), Chinese pinyin, Korean, Cyrillic, Greek; translation under or instead of each line, by Apple Translation on the device (iOS 18+), Google, Yandex or DeepL (your own key) |
 | Interface language | English and Russian; follows the phone's language (English otherwise), or pick one in *Settings → Interface* |
@@ -38,8 +37,11 @@ The app connects through the official **Spotify Web API**:
 - OAuth sign-in using Authorization Code + PKCE, without a client secret.
 - Requests to `/me/player` every 2 seconds while playing (sooner near the end of a track and
   right after a button press). Between requests, playback position is estimated locally; small
-  differences are blended in gradually (median of recent polls) so words never jump backwards,
-  and a position that stops moving is treated as paused even if Spotify still reports `is_playing`.
+  differences are blended in gradually so words never jump backwards. Some devices (Spotify's own
+  phone app) only refresh the position on play, pause and seek: when two reports in a row show a
+  playing position that did not move (`frozenReports`), the local clock keeps running and only a
+  changed `timestamp` (a seek) moves it. While App Remote is connected it keeps the clock instead and
+  the Web API only fills in details (cover, names) and checks that App Remote has not gone stale.
 - Transient connection failures (TLS handshake errors, dropped VPN connections) are retried
   on a fresh connection.
 - Play/pause, next/previous, and seeking through the Web API; these controls require
@@ -136,9 +138,16 @@ With a free account, the installation has to be refreshed every seven days.
 ```text
 SpicyLyrics/
   App/          Entry point and lifecycle; polling while the app is open
-  Spotify/      OAuth PKCE, Web API, player model, and playback clock
-  Lyrics/       Models, parsers (Spicy JSON, LRC), SLObjPack, service, and disk cache
+  Spotify/      OAuth PKCE, Web API, App Remote, player model, and playback clock
+  Lyrics/       Models, parsers (Spicy JSON, LRC, TTML), SLObjPack, service, disk cache,
+                translation and romanization
   Rendering/    Springs, splines, animator, lyric line rendering, and scrolling
   Background/   Kawarp background and visualizer (Metal)
+  PiP/          Floating lyrics window (frames drawn with Core Graphics)
+  Support/      Settings, sync log, error reports, update check, fonts, audio route
+  Resources/    Localizations (en, ru)
   UI/           Onboarding, now playing screen, playback controls, and settings
+cloudflare/     Report server (Worker, D1, R2): see cloudflare/README.md
+scripts/        AltStore source generator and tests, build-time key script
+.github/        Build and release workflow, report bot (workflow and prompt)
 ```

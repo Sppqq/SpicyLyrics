@@ -88,12 +88,12 @@ final class SpotifyAppRemote: NSObject {
 
     /// The setting or the login changed.
     func refresh() {
-        guard wanted, let player else { return }
+        guard let player else { return }
         if !settings.useAppRemote {
             stop()
-            self.player = player
             return
         }
+        // Switched back on: `stop()` cleared `wanted`, so start again right away.
         start(player: player)
     }
 

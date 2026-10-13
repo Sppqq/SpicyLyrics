@@ -94,7 +94,7 @@ struct RootView: View {
             Button(String(localized: "Разрешить")) { settings.reportConsent = 1 }
             Button(String(localized: "Не сейчас"), role: .cancel) { settings.reportConsent = 2 }
         } message: {
-            Text(String(localized: "Когда что-то ломается, приложение может анонимно отправлять разработчику журнал: версия приложения, модель телефона и iOS, названия треков и тайминги. Без аккаунта Spotify, ключей и токенов. Изменить это можно в Настройках → Отчёты об ошибках."))
+            Text(String(localized: "Когда что-то ломается, приложение может анонимно отправлять разработчику журнал: версия приложения, модель телефона и iOS, названия треков и тайминги. Без аккаунта Spotify, ключей и токенов. Отчёты разбирает разработчик вместе с ИИ-ассистентом (Claude, Anthropic). Изменить это можно в Настройках → Отчёты об ошибках."))
         }
         .alert(String(localized: "Вышла новая версия"), isPresented: updateNoticeShown, presenting: updates.pendingNotice) { release in
             Button(String(localized: "Обновить")) {

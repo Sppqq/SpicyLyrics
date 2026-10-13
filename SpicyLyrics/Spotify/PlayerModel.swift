@@ -121,6 +121,8 @@ final class PlayerModel {
     @ObservationIgnored private var autoSkipped = 0
     /// The song last checked, so each is judged (and skipped) once.
     @ObservationIgnored private var skipCheckedURI: String?
+    /// The auto-skip mode `skipCheckedURI` was judged under: another mode judges the song again.
+    @ObservationIgnored private var skipCheckedMode: String?
     /// A song the user picked or went back to: never skipped.
     @ObservationIgnored private var skipExemptURI: String?
     /// Until then the next new song counts as one the user went back to.
@@ -817,7 +819,9 @@ final class PlayerModel {
         })
     }
 
-    func seek(to seconds: Double) {
+    func seek(to requested: Double) {
+        // Never past the end: Spotify would refuse it or jump to the next song.
+        let seconds = min(max(0, requested), track.map { $0.duration > 0 ? $0.duration : .infinity } ?? .infinity)
         control({ [weak self, api] in
             if await self?.viaRemote(.seek(seconds)) == true { return }
             try await api.seek(to: seconds)
@@ -860,6 +864,7 @@ final class PlayerModel {
     /// the queue by hand); further down, the song is started inside the album or playlist
     /// instead of firing a dozen skips that each play for a moment.
     func playFromQueue(_ track: TrackSummary, at index: Int) {
+        skipExemptURI = track.uri
         if index < 3 || contextURI.map(Self.supportsOffset) != true {
             skipAhead(index + 1)
         } else {
@@ -960,7 +965,12 @@ final class PlayerModel {
     /// their lyrics are in. Runs on every song change and from the watchdog.
     private func checkAutoSkip() {
         guard let mode = AutoSkipMode(rawValue: settings.autoSkipMode), mode != .off,
-              isPlaying, let track, skipCheckedURI != track.uri else { return }
+              isPlaying, let track else { return }
+        if skipCheckedMode != settings.autoSkipMode {
+            skipCheckedMode = settings.autoSkipMode
+            skipCheckedURI = nil
+        }
+        guard skipCheckedURI != track.uri else { return }
         let qualifies: Bool
         switch lyricsState {
         case .loaded(let lyrics): qualifies = KnownLyrics(lyrics).qualifies(mode)

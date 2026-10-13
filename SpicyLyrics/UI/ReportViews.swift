@@ -11,7 +11,7 @@ struct ReportSettings: View {
             Section {
                 Toggle(String(localized: "Отправлять отчёты об ошибках"), isOn: $settings.sendsReports)
             } footer: {
-                Text(String(localized: "Когда что-то ломается, приложение анонимно отправит разработчику журнал: версия приложения, модель телефона и iOS, названия треков, тайминги и настройки. Без аккаунта Spotify, ключей, токенов и имён ваших устройств. Не чаще пяти раз в день, хранится 90 дней."))
+                Text(String(localized: "Когда что-то ломается, приложение анонимно отправит разработчику журнал: версия приложения, модель телефона и iOS, названия треков, тайминги и настройки. Без аккаунта Spotify, ключей, токенов и имён ваших устройств. Не чаще пяти раз в день. Отчёты разбирает разработчик вместе с ИИ-ассистентом (Claude, Anthropic): он читает их через GitHub. Хранятся до 90 дней после последнего сообщения."))
             }
 
             Section {
@@ -24,7 +24,7 @@ struct ReportSettings: View {
                     Label(String(localized: "Сообщить о проблеме"), systemImage: "exclamationmark.bubble")
                 }
             } footer: {
-                Text(String(localized: "Опишите, что не так, приложите фото и журнал. Это увидит только разработчик."))
+                Text(String(localized: "Опишите, что не так, приложите фото и журнал. Отчёт увидят разработчик и его ИИ-ассистент (Claude)."))
             }
 
             if !reports.threads.isEmpty {
@@ -281,7 +281,7 @@ struct ReportComposeView: View {
             } header: {
                 Text(String(localized: "Фото"))
             } footer: {
-                Text(String(localized: "До трёх фото, например скриншот. Их увидит только разработчик."))
+                Text(String(localized: "До трёх фото, например скриншот. Их увидят разработчик и его ИИ-ассистент (Claude)."))
             }
 
             Section {

@@ -269,7 +269,6 @@
 "Связь с приложением Spotify" = "Link to the Spotify App";
 "Откуда брать время песни" = "Where Song Timing Comes From";
 "Состояние" = "Status";
-"Войти заново" = "Sign In Again";
 "Открыть Spotify и подключиться" = "Open Spotify and Connect";
 "Включено: когда Spotify играет на этом iPhone, время песни берётся прямо из приложения Spotify — точно в такт и даже без интернета. Выключено или Spotify играет на другом устройстве (компьютер, колонка): время узнаётся у Spotify через интернет, чуть менее точно." = "On: when Spotify plays on this iPhone, the song's timing comes straight from the Spotify app, right on the beat and even offline. Off, or Spotify plays on another device (a computer, a speaker): the timing is asked from Spotify over the internet, a little less exact.";
 "Вести журнал" = "Keep a Log";
@@ -316,7 +315,6 @@
 "Меньше кадров — меньше нагрев. На паузе текст рисуется 15 раз в секунду, в режиме экономии — не больше 30. Счётчик показывает реальные кадры / цель. Частота и счётчик PiP — в «Картинке в картинке»." = "Fewer frames, less heat. While paused the lyrics draw 15 times a second, with Power Saver at most 30. The counter shows actual frames / target. The PiP frame rate and counter are under Picture in Picture.";
 "Если не подключается" = "If It Won't Connect";
 "1. Включите музыку в Spotify на этом iPhone. 2. На developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте Bundle ID и Redirect URI отсюда (нажатие копирует Bundle ID; AltStore меняет его при установке). 3. Нажмите «Открыть Spotify и подключиться». Если пишет «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify." = "1. Play music in Spotify on this iPhone. 2. On developer.spotify.com → your app → Settings, tick “iOS” and add the Bundle ID and Redirect URI from here (a tap copies the Bundle ID; AltStore changes it when installing). 3. Tap “Open Spotify and Connect”. If it says “Sign in again”, sign in again: the old login had no access to the Spotify app.";
-"Скопировано" = "Copied";
 "Нет Client ID" = "No Client ID";
 "Не удалось открыть Spotify. Он установлен?" = "Couldn't open Spotify. Is it installed?";
 "Spotify не ответил за 15 секунд" = "Spotify didn't answer within 15 seconds";
@@ -410,13 +408,13 @@
 "Сервер не принял отчёт (%lld)." = "The server did not accept the report (%lld).";
 "Отчёты об ошибках" = "Error Reports";
 "Отправлять отчёты об ошибках" = "Send Error Reports";
-"Когда что-то ломается, приложение анонимно отправит разработчику журнал: версия приложения, модель телефона и iOS, названия треков, тайминги и настройки. Без аккаунта Spotify, ключей, токенов и имён ваших устройств. Не чаще пяти раз в день, хранится 90 дней." = "When something breaks, the app sends the developer a log anonymously: app version, phone model and iOS, track titles, timings and settings. No Spotify account, keys, tokens or your devices' names. At most five a day, kept for 90 days.";
+"Когда что-то ломается, приложение анонимно отправит разработчику журнал: версия приложения, модель телефона и iOS, названия треков, тайминги и настройки. Без аккаунта Spotify, ключей, токенов и имён ваших устройств. Не чаще пяти раз в день. Отчёты разбирает разработчик вместе с ИИ-ассистентом (Claude, Anthropic): он читает их через GitHub. Хранятся до 90 дней после последнего сообщения." = "When something breaks, the app sends the developer a log anonymously: app version, phone model and iOS, track titles, timings and settings. No Spotify account, keys, tokens or your devices' names. At most five a day. The developer goes through reports with an AI assistant (Claude, Anthropic) that reads them through GitHub. Kept for up to 90 days after the last message.";
 "Сообщить о проблеме" = "Report a Problem";
-"Опишите, что не так, приложите фото и журнал. Это увидит только разработчик." = "Describe what's wrong, attach photos and the log. Only the developer sees it.";
+"Опишите, что не так, приложите фото и журнал. Отчёт увидят разработчик и его ИИ-ассистент (Claude)." = "Describe what's wrong, attach photos and the log. The developer and their AI assistant (Claude) see it.";
 "Что случилось" = "What Happened";
 "Добавить фото" = "Add Photos";
 "Фото" = "Photos";
-"До трёх фото, например скриншот. Их увидит только разработчик." = "Up to three photos, such as a screenshot. Only the developer sees them.";
+"До трёх фото, например скриншот. Их увидят разработчик и его ИИ-ассистент (Claude)." = "Up to three photos, such as a screenshot. The developer and their AI assistant (Claude) see them.";
 "Приложить журнал" = "Attach the Log";
 "В журнале тайминги, ошибки, названия треков и настройки, без ключей, токенов и имён ваших устройств." = "The log has timings, errors, track titles and settings, without keys, tokens or your devices' names.";
 "Отправить" = "Send";
@@ -426,7 +424,7 @@
 "Помочь улучшить приложение?" = "Help Improve the App?";
 "Разрешить" = "Allow";
 "Не сейчас" = "Not Now";
-"Когда что-то ломается, приложение может анонимно отправлять разработчику журнал: версия приложения, модель телефона и iOS, названия треков и тайминги. Без аккаунта Spotify, ключей и токенов. Изменить это можно в Настройках → Отчёты об ошибках." = "When something breaks, the app can send the developer a log anonymously: app version, phone model and iOS, track titles and timings. No Spotify account, keys or tokens. You can change this in Settings → Error Reports.";
+"Когда что-то ломается, приложение может анонимно отправлять разработчику журнал: версия приложения, модель телефона и iOS, названия треков и тайминги. Без аккаунта Spotify, ключей и токенов. Отчёты разбирает разработчик вместе с ИИ-ассистентом (Claude, Anthropic). Изменить это можно в Настройках → Отчёты об ошибках." = "When something breaks, the app can send the developer a log anonymously: app version, phone model and iOS, track titles and timings. No Spotify account, keys or tokens. The developer goes through reports with an AI assistant (Claude, Anthropic). You can change this in Settings → Error Reports.";
 
 /* Added in the audit fixes. */
 "%@ из %@" = "%@ of %@";

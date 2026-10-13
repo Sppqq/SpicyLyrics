@@ -16,6 +16,8 @@ const LIMITS = { installPerHour: 12, ipPerHour: 40, ipPerDay: 200 };
 const UUID = /^[0-9a-fA-F-]{36}$/;
 const STATUSES = ["open", "in_progress", "closed"];
 const MAX_REPLY = 4_000;
+// An in-progress report nobody touched for this long goes back to the bot (has the fix been released?).
+const RECHECK_DAYS = 2;
 // Replies from one install per hour.
 const MESSAGES_PER_HOUR = 20;
 
@@ -41,9 +43,12 @@ export default {
     const old = await env.DB.prepare(
       "SELECT id, photos, photo_exts FROM reports WHERE MAX(created_at, updated_at) < ?").bind(cutoff).all();
     for (const row of old.results) {
+      // A reply may have arrived since the SELECT: the report goes only if it is still old.
+      const gone = await env.DB.prepare("DELETE FROM reports WHERE id = ? AND MAX(created_at, updated_at) < ?")
+        .bind(row.id, cutoff).run();
+      if (!gone.meta?.changes) continue;
       await deletePhotos(env, row);
       await env.DB.prepare("DELETE FROM messages WHERE report_id = ?").bind(row.id).run();
-      await env.DB.prepare("DELETE FROM reports WHERE id = ?").bind(row.id).run();
     }
   },
 };
@@ -72,6 +77,7 @@ async function receive(request, env) {
   } catch {
     return json({ error: "meta" }, 400);
   }
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return json({ error: "meta" }, 400);
   const kind = meta.kind === "auto" ? "auto" : meta.kind === "manual" ? "manual" : null;
   const installId = String(meta.installId || "");
   if (!kind || !UUID.test(installId)) return json({ error: "meta" }, 400);
@@ -151,6 +157,7 @@ async function threads(request, env, url) {
       `SELECT COUNT(*) AS n FROM messages m JOIN reports r ON r.id = m.report_id
        WHERE r.install_id = ? AND m.author = 'user' AND m.created_at > ?`).bind(installId, now - 3600).first();
     if ((recent?.n || 0) >= MESSAGES_PER_HOUR) return json({ error: "slow down" }, 429);
+    if (Number(request.headers.get("content-length") || 0) > 3 * MAX_REPLY * 4) return json({ error: "too big" }, 413);
     let body;
     try { body = await request.json(); } catch { return json({ error: "body" }, 400); }
     const value = String(body?.text || "").trim().slice(0, MAX_REPLY);
@@ -172,14 +179,21 @@ async function bot(request, env, url) {
   if (!(await bearer(request, env.BOT_TOKEN))) return json({ error: "auth" }, 401);
   const parts = url.pathname.split("/").filter(Boolean); // v1, bot, ...
 
-  // What needs an answer: reports not closed whose last word is not the developer's.
+  // What needs a look: open reports whose last word is not the developer's, in-progress ones the
+  // sender wrote to, and in-progress ones untouched for RECHECK_DAYS (is the fix out yet?).
+  // Setting a status touches the report, which starts that wait again. Filtered in SQL, before the LIMIT.
   if (parts[2] === "inbox" && request.method === "GET") {
+    const recheck = Math.floor(Date.now() / 1000) - RECHECK_DAYS * 86400;
     const rows = (await env.DB.prepare(
-      `SELECT r.id, r.created_at, r.updated_at, r.status, r.kind, r.error_kind, r.message, r.app_version, r.build,
-              r.channel, r.os, r.device, r.locale, r.photos,
-              (SELECT author FROM messages m WHERE m.report_id = r.id ORDER BY m.id DESC LIMIT 1) AS last_author
-       FROM reports r WHERE r.status != 'closed' ORDER BY r.created_at LIMIT 100`).all()).results;
-    return json({ reports: rows.filter((r) => r.last_author !== "dev") });
+      `SELECT * FROM (
+         SELECT r.id, r.created_at, r.updated_at, r.status, r.kind, r.error_kind, r.message, r.app_version, r.build,
+                r.channel, r.os, r.device, r.locale, r.photos,
+                (SELECT author FROM messages m WHERE m.report_id = r.id ORDER BY m.id DESC LIMIT 1) AS last_author
+         FROM reports r WHERE r.status != 'closed')
+       WHERE (status = 'open' AND COALESCE(last_author, '') != 'dev')
+          OR (status = 'in_progress' AND (last_author = 'user' OR MAX(created_at, updated_at) < ?))
+       ORDER BY created_at LIMIT 100`).bind(recheck).all()).results;
+    return json({ reports: rows });
   }
 
   const row = parts[2] === "report" && parts[3]
@@ -370,7 +384,8 @@ function page(title, body) {
         "content-type": "text/html; charset=utf-8",
         "cache-control": "no-store",
         "x-robots-tag": "noindex",
-        "content-security-policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; script-src 'unsafe-inline'",
+        "content-security-policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; script-src 'unsafe-inline'; frame-ancestors 'none'",
+        "x-frame-options": "DENY",
       },
     },
   );

@@ -1,11 +1,16 @@
 # Report collector (Cloudflare Worker)
 
 Receives the reports the app sends (Settings → Error Reports): a note, up to three photos and the sync
-log. Text goes to D1, photos to R2. Reports are deleted after 90 days (nightly cron).
+log. Text goes to D1, photos to R2. Every report is a thread: the developer (or the bot) answers, the
+app shows the answers and the sender can reply. A report is deleted 90 days after its last message or
+status change (nightly cron), so a thread still being talked in stays.
 
 - `POST /v1/report`: multipart form: `meta` (JSON), `log` (text), `photo` (up to 3 JPEG/PNG, 2 MB each).
   Limits: 8 MB per request, 12 reports per hour per install, 40 per hour / 200 per day per network.
-- `/admin`: the list, a report with its photos and log, delete. HTTP Basic: any user name, the password
+- `GET /v1/threads`, `POST /v1/threads/{id}/messages`: the sender's side, header `X-Install-Id`.
+- `/v1/bot/…` (`inbox`, `report/{id}`, `reply`, `status`): the report bot, `Authorization: Bearer
+  $BOT_TOKEN`. Used by `.github/workflows/report-bot.yml`.
+- `/admin`: the list, a report with its photos and log, answer, set the status, delete. HTTP Basic: any user name, the password
   is the `ADMIN_TOKEN` secret.
 
 Only a random per-install id, the app and iOS version and the phone model are stored with a report. The
@@ -22,7 +27,19 @@ npx wrangler r2 bucket create sweet-lyrics-report-photos
 npx wrangler d1 execute sweet-lyrics-reports --remote --file=schema.sql
 npx wrangler secret put ADMIN_TOKEN                  # the admin password
 npx wrangler secret put IP_SALT                      # any long random string, never changed
+npx wrangler secret put BOT_TOKEN                    # the report bot's password (see below)
 npx wrangler deploy
 ```
+
+`schema.sql` is the whole current schema: run it alone on a new database. `migrations/` only brings a
+database made before threads existed up to date (`wrangler d1 execute … --file=migrations/0001_threads.sql`);
+never run it on a database made from the current `schema.sql` (the columns already exist).
+
+## Report bot
+
+Every hour `.github/workflows/report-bot.yml` asks `/v1/bot/inbox`; if something is waiting, Claude Code
+works through it (`.github/report-bot-prompt.md`). Repository secrets: `REPORT_BOT_TOKEN` (the same value as
+the Worker's `BOT_TOKEN`) and `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`). Protect `main` (pull request
+required): report text comes from anyone and the bot can push branches.
 
 The app posts to the URL in `SpicyLyrics/Support/ReportService.swift` (`endpoint`).

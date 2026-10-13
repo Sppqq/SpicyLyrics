@@ -22,7 +22,7 @@ struct SyncLogView: View {
                     }
                 }
                 Button {
-                    UIPasteboard.general.string = (header() + [""] + lines()).joined(separator: "\n")
+                    UIPasteboard.general.string = ReportService.sanitize((header() + [""] + lines()).joined(separator: "\n"))
                     copied = true
                 } label: {
                     Label(copied ? String(localized: "Скопировано") : String(localized: "Скопировать журнал"),
@@ -62,9 +62,9 @@ struct SyncLogView: View {
             }
         }
         .onAppear(perform: refreshFile)
-        .onChange(of: log.entries.count) { _, _ in copied = false }
+        .onChange(of: log.entries.last?.id) { _, _ in copied = false }
         // The file to send keeps up with new entries (written once they pause for a moment).
-        .task(id: log.entries.count) {
+        .task(id: log.entries.last?.id) {
             try? await Task.sleep(for: .seconds(1.5))
             guard !Task.isCancelled else { return }
             refreshFile()

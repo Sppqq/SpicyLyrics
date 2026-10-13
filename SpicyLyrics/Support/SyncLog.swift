@@ -74,7 +74,7 @@ final class SyncLog {
         // One file, rewritten: the log screen refreshes it as entries come in.
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("SweetLyrics-log.txt")
         do {
-            try text(header: header).write(to: url, atomically: true, encoding: .utf8)
+            try ReportService.sanitize(text(header: header)).write(to: url, atomically: true, encoding: .utf8)
             return url
         } catch {
             return nil

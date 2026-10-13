@@ -133,6 +133,11 @@ enum TTMLParser {
 
     /// `convertTimeToSeconds`: clock time `[hh:]mm:ss[.fff]` or offset time `12.5s` / `300ms` / `2m` / `1.5h`.
     static func seconds(_ raw: String) -> Double? {
+        guard let value = clockSeconds(raw), value.isFinite, value >= 0 else { return nil }
+        return value
+    }
+
+    private static func clockSeconds(_ raw: String) -> Double? {
         let value = raw.trimmed
         guard !value.isEmpty else { return nil }
         if value.contains(":") {
@@ -199,16 +204,21 @@ final class XMLTree {
 
     /// Text of a line without background vocals or translations, whitespace collapsed.
     var vocalText: String {
+        rawVocalText.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    /// `vocalText` before whitespace is collapsed, so `<span>Hello </span><span>world</span>` keeps its gap.
+    private var rawVocalText: String {
         let parts = children.map { child -> String in
             switch child {
             case .text(let string): return string
             case .element(let node):
                 if node.name == "span", let role = node.attributes["ttm:role"],
                    ["x-bg", "x-translation", "x-roman"].contains(role) { return " " }
-                return node.vocalText
+                return node.rawVocalText
             }
         }
-        return parts.joined().split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return parts.joined()
     }
 
     func first(named name: String) -> XMLTree? {
