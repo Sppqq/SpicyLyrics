@@ -21,8 +21,11 @@ struct SpicyLyricsApp: App {
         let lyrics = LyricsService(settings: settings, auth: auth, local: localLyrics)
         _settings = State(initialValue: settings)
         _auth = StateObject(wrappedValue: auth)
-        _appRemote = State(initialValue: SpotifyAppRemote(auth: auth, settings: settings))
-        _player = State(initialValue: PlayerModel(api: api, lyrics: lyrics, settings: settings, localLyrics: localLyrics))
+        let appRemote = SpotifyAppRemote(auth: auth, settings: settings)
+        let player = PlayerModel(api: api, lyrics: lyrics, settings: settings, localLyrics: localLyrics)
+        ReportService.shared.attach(settings: settings, player: player, appRemote: appRemote)
+        _appRemote = State(initialValue: appRemote)
+        _player = State(initialValue: player)
     }
 
     var body: some Scene {
@@ -50,6 +53,8 @@ struct RootView: View {
     /// Letting go of Spotify after the app went to the background, unless the floating window
     /// turns up meanwhile.
     @State private var stopTask: Task<Void, Never>?
+    /// The one-time question about sending error reports, after an update.
+    @State private var askAboutReports = false
 
     var body: some View {
         Group {
@@ -70,11 +75,29 @@ struct RootView: View {
         .onChange(of: settings.useAppRemote) { _, _ in appRemote.refresh() }
         .onChange(of: settings.syncLogEnabled) { _, enabled in SyncLog.shared.enabled = enabled }
         .onOpenURL { url in appRemote.handle(url) }
+        .task { askAboutReportsAfterUpdate() }
+        .alert(String(localized: "Помочь улучшить приложение?"), isPresented: $askAboutReports) {
+            Button(String(localized: "Разрешить")) { settings.reportConsent = 1 }
+            Button(String(localized: "Не сейчас"), role: .cancel) { settings.reportConsent = 2 }
+        } message: {
+            Text(String(localized: "Когда что-то ломается, приложение может анонимно отправлять разработчику журнал: версия приложения, модель телефона и iOS, названия треков и тайминги. Без аккаунта Spotify, ключей и токенов. Изменить это можно в Настройках → Отчёты об ошибках."))
+        }
         #if DEBUG
         .task {
             if let demo = DemoTrack.current { player.startDemo(demo) }
         }
         #endif
+    }
+
+    /// Once, the first time the app runs after an update (not on a fresh install), while nothing
+    /// has been decided yet.
+    private func askAboutReportsAfterUpdate() {
+        let current = "\(AppVersion.marketing)/\(AppVersion.build)"
+        let seen = settings.lastSeenVersion
+        guard seen != current else { return }
+        // An install from before this question existed has no version stored but is signed in.
+        if settings.reportConsent == 0, !seen.isEmpty || auth.isLoggedIn { askAboutReports = true }
+        settings.lastSeenVersion = current
     }
 
     private var isDemo: Bool {

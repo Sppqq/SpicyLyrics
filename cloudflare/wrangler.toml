@@ -1,0 +1,19 @@
+name = "sweet-lyrics-reports"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sweet-lyrics-reports"
+database_id = "31822868-fd3f-4d61-8530-7299c244b398"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "sweet-lyrics-report-photos"
+
+# Old reports are deleted every night.
+[triggers]
+crons = ["17 3 * * *"]
+
+[observability]
+enabled = true

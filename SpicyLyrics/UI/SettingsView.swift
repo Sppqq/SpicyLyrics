@@ -57,6 +57,8 @@ struct SettingsView: View {
                     }
                     category(String(localized: "Журнал"), "list.bullet.rectangle.fill", .gray,
                              value: settings.syncLogEnabled ? nil : String(localized: "Выкл.")) { SyncLogView() }
+                    category(String(localized: "Отчёты об ошибках"), "paperplane.fill", .mint,
+                             value: settings.sendsReports ? String(localized: "Вкл.") : nil) { ReportSettings() }
                     category(String(localized: "Источники текстов"), "doc.text.fill", .brown) { SourceSettings() }
                     category("Spotify", "music.note", Color(red: 0.12, green: 0.84, blue: 0.38),
                              value: settings.hasValidClientID ? "…" + String(settings.spotifyClientID.suffix(4)) : String(localized: "Не настроен")) { SpotifySettings() }

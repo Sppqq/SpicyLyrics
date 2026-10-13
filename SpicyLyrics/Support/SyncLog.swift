@@ -32,6 +32,7 @@ final class SyncLog {
         entries.append(Entry(id: nextID, date: date, media: CACurrentMediaTime(), source: source, message: message))
         nextID += 1
         if entries.count > Self.limit { entries.removeFirst(entries.count - Self.limit) }
+        ReportService.shared.noteError(source: source, message: message)
     }
 
     /// From any thread.
@@ -59,16 +60,20 @@ final class SyncLog {
     static func time(_ date: Date) -> String { timeFormat.string(from: date) }
 
     /// The whole log as text, with a header describing the device and the sync settings.
-    func export(header: [String]) -> URL? {
+    func text(header: [String]) -> String {
         var lines = header
         lines.append("")
         for entry in entries {
             lines.append("\(Self.time(entry.date)) [\(entry.source)] \(entry.message)")
         }
+        return lines.joined(separator: "\n")
+    }
+
+    func export(header: [String]) -> URL? {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("SpicyLyrics-sync-\(Int(Date().timeIntervalSince1970)).txt")
         do {
-            try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+            try text(header: header).write(to: url, atomically: true, encoding: .utf8)
             return url
         } catch {
             return nil

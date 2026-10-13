@@ -21,3 +21,9 @@ SpicyLyrics/Generated/
 *.log
 build-check/
 __pycache__/
+
+# Cloudflare Worker
+cloudflare/node_modules/
+cloudflare/.wrangler/
+cloudflare/.admin-token
+cloudflare/.dev.vars

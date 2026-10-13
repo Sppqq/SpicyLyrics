@@ -28,6 +28,13 @@ struct SyncLogView: View {
                     Label(copied ? String(localized: "Скопировано") : String(localized: "Скопировать журнал"),
                           systemImage: copied ? "checkmark" : "doc.on.doc")
                 }
+                NavigationLink {
+                    ReportComposeView().settingsPage()
+                        .navigationTitle(String(localized: "Сообщить о проблеме"))
+                        .navigationBarTitleDisplayMode(.inline)
+                } label: {
+                    Label(String(localized: "Сообщить разработчику"), systemImage: "paperplane")
+                }
                 Button(role: .destructive) {
                     log.clear()
                     refreshFile()
@@ -72,6 +79,13 @@ struct SyncLogView: View {
     }
 
     private func header() -> [String] {
+        log.header(settings: settings, player: player, appRemote: appRemote)
+    }
+}
+
+extension SyncLog {
+    /// The device and settings lines on top of every exported or reported log.
+    func header(settings: AppSettings, player: PlayerModel, appRemote: SpotifyAppRemote) -> [String] {
         let device = UIDevice.current
         return [
             "Sweet Lyrics \(AppVersion.display)",

@@ -141,6 +141,17 @@ final class AppSettings {
     var pipShowFPS: Bool { didSet { defaults.set(pipShowFPS, forKey: Keys.pipShowFPS) } }
     /// Open Spotify once by itself when it keeps refusing the SDK connection.
     var autoWakeSpotify: Bool { didSet { defaults.set(autoWakeSpotify, forKey: Keys.autoWakeSpotify) } }
+    /// May errors be sent to the developer by themselves (anonymously)? 0 = not asked yet, 1 = yes, 2 = no.
+    var reportConsent: Int { didSet { defaults.set(reportConsent, forKey: Keys.reportConsent) } }
+    /// The app version that last ran, to ask about reports once after an update.
+    var lastSeenVersion: String { didSet { defaults.set(lastSeenVersion, forKey: Keys.lastSeenVersion) } }
+    /// Random, made once per install: tells reports from one phone apart, and nothing else.
+    let installID: String
+
+    var sendsReports: Bool {
+        get { reportConsent == 1 }
+        set { reportConsent = newValue ? 1 : 2 }
+    }
 
     /// Keys baked in at build time from `Config/Secrets.xcconfig` or CI secrets (may be empty).
     /// When present they are fixed: the app ignores anything typed in settings.
@@ -202,6 +213,8 @@ final class AppSettings {
             Keys.showLyricsFPS: false,
             Keys.pipShowFPS: false,
             Keys.autoWakeSpotify: false,
+            Keys.reportConsent: 0,
+            Keys.lastSeenVersion: "",
             Keys.closePiPOnReturn: true,
         ])
         spotifyClientID = defaults.string(forKey: Keys.clientID) ?? ""
@@ -271,6 +284,11 @@ final class AppSettings {
         showLyricsFPS = defaults.bool(forKey: Keys.showLyricsFPS)
         pipShowFPS = defaults.bool(forKey: Keys.pipShowFPS)
         autoWakeSpotify = defaults.bool(forKey: Keys.autoWakeSpotify)
+        reportConsent = defaults.integer(forKey: Keys.reportConsent)
+        lastSeenVersion = defaults.string(forKey: Keys.lastSeenVersion) ?? ""
+        let install = defaults.string(forKey: Keys.installID) ?? UUID().uuidString
+        defaults.set(install, forKey: Keys.installID)
+        installID = install
     }
 
     /// The Client ID to sign in with: always the user's own.
@@ -419,6 +437,9 @@ final class AppSettings {
         static let showLyricsFPS = "showLyricsFPS"
         static let pipShowFPS = "pipShowFPS"
         static let autoWakeSpotify = "autoWakeSpotify"
+        static let reportConsent = "reportConsent"
+        static let lastSeenVersion = "lastSeenVersion"
+        static let installID = "installID"
     }
 }
 
