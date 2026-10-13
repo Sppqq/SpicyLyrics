@@ -44,8 +44,11 @@ final class SpotifyAppRemote: NSObject {
     @ObservationIgnored private var coverURI: String?
     /// Failed attempts in a row: retries back off from 8 s to a minute.
     @ObservationIgnored private var failures = 0
-    /// Spotify was already woken automatically this launch (only ever once).
-    @ObservationIgnored private var autoWoke = false
+    /// When Spotify was last woken automatically, and whether that wake is still waiting for a
+    /// connection (another one only follows a connection that worked).
+    @ObservationIgnored private var lastAutoWakeAt: CFTimeInterval = -.infinity
+    @ObservationIgnored private var autoWakePending = false
+    private static let autoWakeCooldown: CFTimeInterval = 120
 
     static let scope = "app-remote-control"
 
@@ -209,6 +212,7 @@ final class SpotifyAppRemote: NSObject {
         connectTimeout = nil
         status = .connected
         failures = 0
+        autoWakePending = false
         lastError = nil
         SyncLog.shared.add("remote", "connected")
         player?.setRemoteConnected(true)
@@ -238,14 +242,26 @@ final class SpotifyAppRemote: NSObject {
         guard wanted else { return }
         status = .unavailable
         failures += 1
-        // Spotify refuses apps it was not woken by: after two refusals, wake it once (if allowed).
-        if failures == 2, settings.autoWakeSpotify, !autoWoke, UIApplication.shared.applicationState == .active {
-            autoWoke = true
-            SyncLog.shared.add("remote", "refused twice, waking Spotify")
+        // Spotify refuses apps it was not woken by: after two refusals, wake it (if allowed).
+        if failures >= 2, autoWakeAllowed {
+            autoWakePending = true
+            lastAutoWakeAt = CACurrentMediaTime()
+            SyncLog.shared.add("remote", "refused \(failures)×, waking Spotify")
             wakeSpotify()
             return
         }
         scheduleRetry(after: min(60, 8 * pow(2, Double(min(failures, 4) - 1))))
+    }
+
+    /// Waking Spotify takes the user over to it and back, and starts its playback: only when they
+    /// asked for it, a song is playing on this phone and its timing is needed, not more than once
+    /// per cooldown, and not again until a wake has led to a connection.
+    private var autoWakeAllowed: Bool {
+        guard settings.autoWakeSpotify, !autoWakePending,
+              UIApplication.shared.applicationState == .active,
+              let player, player.isPlaying, player.isPlayingOnThisPhone, !player.lyricsAreStatic
+        else { return false }
+        return CACurrentMediaTime() - lastAutoWakeAt > Self.autoWakeCooldown
     }
 
     /// The SDK's errors say little on their own; the domain, code and the underlying error tell
