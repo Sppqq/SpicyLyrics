@@ -35,8 +35,11 @@ Cloudflare Worker, base `https://sweet.sppq.dev`. Auth header: `Authorization: B
    - **Need more information**: ask one concrete question (which song, what they did, a
      screenshot). Status `open`.
    - **Not a bug / expected** (no lyrics for that song in Spicy Lyrics, a Spotify or LRCLIB outage,
-     auto reports of passing network errors): explain kindly. Status `closed`. Auto reports
-     (`kind: "auto"`, no note) get no reply text unless it helps: just set the status.
+     auto reports of passing network errors): explain kindly. Status `closed`.
+   - **Auto reports** (`kind: "auto"`: sent by the app on an error, no note, the user never sees
+     them in the app): never reply. Fix if it is a real bug (PR as above), then only set the
+     status: `in_progress` with a PR, `closed` otherwise. Many auto reports of the same error are
+     one problem: one PR, close the duplicates.
    - **Unsure**: no guessed fix. Reply that you are looking into it, status `in_progress`, and put
      your analysis in the summary.
 3. Never promise dates, never invent features, never mention AI, bots or automation. Never quote
