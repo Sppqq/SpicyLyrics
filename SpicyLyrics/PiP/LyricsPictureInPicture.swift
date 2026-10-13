@@ -822,6 +822,16 @@ final class PiPFrameRenderer {
                 runs = [.line]
                 font = still
             }
+            // A word wider than the window's narrow column was broken mid-word ("замечательн / о"):
+            // that row gets a smaller font instead, down to 70 %.
+            let rowWidth = max(1, column - left - right)
+            let longest = texts.joined().split(whereSeparator: \.isWhitespace).map { word in
+                CGFloat(CTLineGetTypographicBounds(CTLineCreateWithAttributedString(NSAttributedString(
+                    string: String(word), attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font])), nil, nil, nil))
+            }.max() ?? 0
+            if longest > rowWidth {
+                font = CTFontCreateCopyWithAttributes(font, CTFontGetSize(font) * max(0.7, rowWidth / longest * 0.98), nil, nil)
+            }
             var blocks = [PiPTextBlock(runs: texts, font: font, alignment: alignment)]
             if !extra.isEmpty {
                 let text = extra.map { $0.syllables.map(\.text).joined() }.joined(separator: " ")
@@ -834,7 +844,7 @@ final class PiPFrameRenderer {
                                            gray: line.isBackground ? 0.45 : 0.6, alignment: alignment,
                                            spacing: size * 0.1))
             }
-            return Row(layout: PiPTextLayout(blocks: blocks, width: max(1, column - left - right)), x: left,
+            return Row(layout: PiPTextLayout(blocks: blocks, width: rowWidth), x: left,
                        runs: runs, fontSize: CTFontGetSize(font), anchor: alignment, isBackground: line.isBackground)
         }
         lastLyricEnd = lyrics.kind == .static ? 0 : lyrics.lines.map(\.end).max() ?? 0
@@ -958,6 +968,7 @@ final class PiPFrameRenderer {
                         origin: CGPoint(x: Self.inset + row.x, y: top), opacity: opacity, style: style, context: context)
             } else {
                 drawDots(visual, top: top, height: height, column: column, centered: style.centered,
+                         opposite: lyrics.lines[index].oppositeAligned,
                          opacity: CGFloat(visual.opacity) * edgeFade(top: top, height: height), style: style,
                          context: context)
             }
@@ -1154,7 +1165,7 @@ final class PiPFrameRenderer {
     }
 
     /// Interlude dots, as the app's `InterludeDotsView`.
-    private func drawDots(_ visual: LineVisual, top: CGFloat, height: CGFloat, column: CGFloat, centered: Bool,
+    private func drawDots(_ visual: LineVisual, top: CGFloat, height: CGFloat, column: CGFloat, centered: Bool, opposite: Bool,
                           opacity: CGFloat, style: PiPStyle, context: CGContext) {
         let reduceMotion = UIAccessibility.isReduceMotionEnabled
         let groupScale = reduceMotion ? 1 : CGFloat(visual.dotGroupScale)
@@ -1164,7 +1175,8 @@ final class PiPFrameRenderer {
         let diameter = dotFont * 0.348
         let advance = dotFont * 0.485 + 2.88
         let groupWidth = advance * CGFloat(visual.dots.count)
-        let left = Self.inset + (centered ? (column - groupWidth) / 2 : 0)
+        // On the side of the singer who comes next, as in the app (a duet partner: the right).
+        let left = Self.inset + (centered ? (column - groupWidth) / 2 : (opposite ? column - groupWidth : 0))
         context.saveGState()
         context.translateBy(x: left + groupWidth / 2, y: top + height / 2)
         context.scaleBy(x: groupScale, y: groupScale)
