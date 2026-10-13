@@ -249,7 +249,7 @@ async function admin(request, env, url) {
   if (parts.length === 1) {
     const kind = url.searchParams.get("kind");
     const status = url.searchParams.get("status");
-    const page = Math.max(0, Number(url.searchParams.get("page")) || 0);
+    const pageIndex = Math.max(0, Number(url.searchParams.get("page")) || 0);
     const where = [], binds = [];
     if (kind) { where.push("kind = ?"); binds.push(kind); }
     if (status) { where.push("status = ?"); binds.push(status); }
@@ -258,10 +258,10 @@ async function admin(request, env, url) {
               (SELECT COUNT(*) FROM messages m WHERE m.report_id = reports.id) AS messages
        FROM reports ${where.length ? "WHERE " + where.join(" AND ") : ""}
        ORDER BY MAX(created_at, updated_at) DESC LIMIT 100 OFFSET ?`
-    ).bind(...binds, page * 100).all();
+    ).bind(...binds, pageIndex * 100).all();
     const query = (extra) => "?" + new URLSearchParams({ ...(kind ? { kind } : {}), ...(status ? { status } : {}), ...extra });
-    const pager = (page ? `<a href="/admin${query({ page: page - 1 })}">← newer</a> ` : "") +
-      (rows.results.length === 100 ? `<a href="/admin${query({ page: page + 1 })}">older →</a>` : "");
+    const pager = (pageIndex ? `<a href="/admin${query({ page: pageIndex - 1 })}">← newer</a> ` : "") +
+      (rows.results.length === 100 ? `<a href="/admin${query({ page: pageIndex + 1 })}">older →</a>` : "");
     const body = rows.results.map((r) =>
       `<tr><td><a href="/admin/r/${r.id}">${esc(when(r.created_at))}</a></td>` +
       `<td>${esc(r.status)}${r.messages ? " · " + r.messages + " msg" : ""}</td><td>${esc(r.kind)}</td>` +
