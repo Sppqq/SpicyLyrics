@@ -22,7 +22,8 @@
 "Анимированный фон" = "Animated background";
 "Батарея и нагрев" = "Battery & Heat";
 "Библиотека" = "Library";
-"В **Which API/SDKs are you planning to use?** отметьте **Web API**." = "Under **Which API/SDKs are you planning to use?** tick **Web API**.";
+"В **Which API/SDKs are you planning to use?** отметьте **Web API** и **iOS**." = "Under **Which API/SDKs are you planning to use?** tick **Web API** and **iOS**.";
+"Для **iOS** вставьте в **iOS app bundles** этот Bundle ID (так текст идёт точно в такт прямо из приложения Spotify):" = "For **iOS**, paste this Bundle ID into **iOS app bundles** (so the lyrics keep exact time straight from the Spotify app):";
 "В Simple Lyrics Mode слова не светятся." = "Words don't glow in Simple Lyrics Mode.";
 "В TTML не нашлось строк с текстом." = "The TTML has no lines with lyrics.";
 "В библиотеку" = "To library";
@@ -90,7 +91,7 @@
 "Название и исполнитель" = "Title and Artist";
 "Название песни" = "Song Title";
 "Найдите трек по названию или исполнителю" = "Find a track by title or artist";
-"Настроить доступ к Spotify (5 минут)" = "Set Up Spotify Access (5 minutes)";
+"Настроить доступ к Spotify" = "Set Up Spotify Access";
 "Настройки" = "Settings";
 "Не гасить экран" = "Keep Screen On";
 "Не настроен" = "Not set up";
@@ -156,7 +157,6 @@
 "Прятать кнопки во время песни" = "Hide Controls While Playing";
 "Прячет весь интерфейс: текст занимает весь экран, а кнопки появляются по касанию на несколько секунд." = "Hides the whole interface: the lyrics fill the screen and the controls appear for a few seconds when you tap.";
 "Работа" = "General";
-"Раздел" = "Section";
 "Размер" = "Size";
 "Размер можно менять и щипком двумя пальцами прямо по тексту. После этого на пару секунд появится кнопка «Сбросить размер»." = "You can also pinch the lyrics with two fingers to resize them. A “Reset Size” button then shows for a couple of seconds.";
 "Размер перевода" = "Translation size";
@@ -209,10 +209,8 @@
 "Строки размываются тем сильнее, чем дальше они от текущей." = "Lines blur more the farther they are from the current one.";
 "Так же можно добавить ещё до четырёх друзей, и они войдут с вашим Client ID." = "You can add up to four friends the same way, and they can sign in with your Client ID.";
 "Текст" = "Lyrics";
-"Текст без синхронизации" = "Unsynced lyrics";
 "Текст не найден" = "No lyrics found";
 "Текст недоступен" = "Lyrics unavailable";
-"Текст поверх других приложений. Вручную окно открывается из меню «•••» в плеере." = "Lyrics over other apps. To open the window manually, use the “•••” menu in the player.";
 "Текст покажется только сейчас, до закрытия приложения." = "The lyrics show only now, until the app is closed.";
 "Текст сохранится в библиотеке и будет показываться для этого трека вместо текстов из сети." = "The lyrics are saved to the library and shown for this track instead of online lyrics.";
 "Текущий трек" = "Current Track";
@@ -235,11 +233,11 @@
 "Чтобы приложение видело, что играет в Spotify, нужно своё приложение в бесплатном кабинете разработчика Spotify и его Client ID. Это обязательно и занимает около 5 минут (нужен Spotify Premium). Пошаговая инструкция — по кнопке ниже." = "To see what's playing on Spotify, the app needs your own app in Spotify's free developer dashboard and its Client ID. It's required and takes about 5 minutes (Spotify Premium needed). Step-by-step guide below.";
 "Шрифт" = "Font";
 "Щипок двумя пальцами" = "Pinch with two fingers";
-"Экономия" = "Saving";
-"Экономия (авто)" = "Saving (auto)";
-"Экономия батареи" = "Battery Saving";
-"Экономия включается сама в режиме энергосбережения iOS и когда телефон сильно нагревается." = "Saving turns on by itself in iOS Low Power Mode and when the phone gets hot.";
-"Экономия включена" = "Saving on";
+"Экономия" = "Power Saver";
+"Экономия (авто)" = "Power Saver (auto)";
+"Экономия батареи" = "Power Saver";
+"Экономия включается сама в режиме энергосбережения iOS и когда телефон сильно нагревается." = "Power Saver turns on by itself in iOS Low Power Mode and when the phone gets hot.";
+"Экономия включена" = "Power Saver on";
 "Экран плеера" = "Player Screen";
 "Это секретный ключ. Нужен клиентский ключ sl_pk_…" = "That's a secret key. A client key sl_pk_… is needed.";
 "Этот аккаунт Spotify не добавлен в ваше приложение Spotify. В developer.spotify.com откройте приложение → Settings → User Management и добавьте e-mail этого аккаунта." = "This Spotify account isn't added to your Spotify app. On developer.spotify.com open the app → Settings → User Management and add this account's email.";
@@ -274,7 +272,6 @@
 "Войти заново" = "Sign In Again";
 "Открыть Spotify и подключиться" = "Open Spotify and Connect";
 "Включено: когда Spotify играет на этом iPhone, время песни берётся прямо из приложения Spotify — точно в такт и даже без интернета. Выключено или Spotify играет на другом устройстве (компьютер, колонка): время узнаётся у Spotify через интернет, чуть менее точно." = "On: when Spotify plays on this iPhone, the song's timing comes straight from the Spotify app, right on the beat and even offline. Off, or Spotify plays on another device (a computer, a speaker): the timing is asked from Spotify over the internet, a little less exact.";
-"Журнал синхронизации" = "Sync Log";
 "Вести журнал" = "Keep a Log";
 "Отправить файл журнала" = "Share Log File";
 "Скопировать журнал" = "Copy Log";
@@ -315,9 +312,8 @@
 "Показывать FPS" = "Show FPS";
 "Частота кадров текста" = "Lyrics Frame Rate";
 "Показывать FPS в плеере" = "Show FPS in Player";
-"Показывать FPS в PiP" = "Show FPS in PiP";
 "Кадры" = "Frames";
-"Меньше кадров — меньше нагрев. На паузе текст рисуется 15 раз в секунду, в режиме экономии — не больше 30. Счётчик показывает реальные кадры / цель. Частота PiP настраивается в «Картинке в картинке»." = "Fewer frames, less heat. While paused the lyrics draw 15 times a second, with battery saver at most 30. The counter shows actual frames / target. The PiP frame rate is set under Picture in Picture.";
+"Меньше кадров — меньше нагрев. На паузе текст рисуется 15 раз в секунду, в режиме экономии — не больше 30. Счётчик показывает реальные кадры / цель. Частота и счётчик PiP — в «Картинке в картинке»." = "Fewer frames, less heat. While paused the lyrics draw 15 times a second, with Power Saver at most 30. The counter shows actual frames / target. The PiP frame rate and counter are under Picture in Picture.";
 "Если не подключается" = "If It Won't Connect";
 "1. Включите музыку в Spotify на этом iPhone. 2. На developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте Bundle ID и Redirect URI отсюда (нажатие копирует Bundle ID; AltStore меняет его при установке). 3. Нажмите «Открыть Spotify и подключиться». Если пишет «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify." = "1. Play music in Spotify on this iPhone. 2. On developer.spotify.com → your app → Settings, tick “iOS” and add the Bundle ID and Redirect URI from here (a tap copies the Bundle ID; AltStore changes it when installing). 3. Tap “Open Spotify and Connect”. If it says “Sign in again”, sign in again: the old login had no access to the Spotify app.";
 "Скопировано" = "Copied";
@@ -358,7 +354,7 @@
 "Последняя ошибка: %@" = "Last error: %@";
 "Перевод заменяет оригинал, а слова подсвечиваются по ритму исходной строки: время каждой строки делится между новыми словами по их длине." = "The translation replaces the original and its words light up to the rhythm of the original line: each line's time is split between the new words by their length.";
 "Apple переводит прямо на телефоне (iOS 18 и новее), без интернета. Строки, которые уже на выбранном языке, не переводятся. При первом использовании iOS предложит скачать языковую модель." = "Apple translates right on the phone (iOS 18 and later), no internet needed. Lines already in the chosen language aren't translated. The first time, iOS offers to download the language model.";
-"Строки текста отправляются в онлайн-переводчик. Нужен интернет; переводы запоминаются до перезапуска приложения. Строки, которые уже на выбранном языке, не переводятся." = "The lyric lines are sent to an online translator. Needs the internet; translations are remembered until the app restarts. Lines already in the chosen language aren't translated.";
+"Строки текста отправляются в онлайн-переводчик. Нужен интернет; переводы запоминаются на телефоне, повторно песня не переводится. Строки, которые уже на выбранном языке, не переводятся." = "The lyric lines are sent to an online translator. Needs the internet; translations are kept on the phone, so a song is translated only once. Lines already in the chosen language aren't translated.";
 "DeepL переводит лучше всех, но нужен свой ключ API: бесплатного тарифа (500 000 символов в месяц) хватает с запасом. Ключ хранится в связке ключей iOS." = "DeepL translates best but needs your own API key: the free plan (500,000 characters a month) is plenty. The key is kept in the iOS Keychain.";
 "Широкое окно показывает одну-две строки, вертикальное — больше строк, как в плеере. Анимированный фон — плавающая обложка, как в приложении. На слабых устройствах выключите его; в режиме экономии он и так неподвижен." = "A wide window shows a line or two, a portrait one shows more, like the player. The animated background is the drifting cover, as in the app. Turn it off on slower devices; in battery saving it is still anyway.";
 "Туманность" = "Nebula";
@@ -384,7 +380,7 @@
 "Как у текста" = "Same as Lyrics";
 "Трек" = "Track";
 "Без перевода" = "No Translation";
-"Поверх" = "Float";
+"Поверх" = "Pop Out";
 "Закрыть окно" = "Close Window";
 "Ещё" = "More";
 "Закрывать при возврате в приложение" = "Close when returning to the app";
@@ -431,3 +427,16 @@
 "Разрешить" = "Allow";
 "Не сейчас" = "Not Now";
 "Когда что-то ломается, приложение может анонимно отправлять разработчику журнал: версия приложения, модель телефона и iOS, названия треков и тайминги. Без аккаунта Spotify, ключей и токенов. Изменить это можно в Настройках → Отчёты об ошибках." = "When something breaks, the app can send the developer a log anonymously: app version, phone model and iOS, track titles and timings. No Spotify account, keys or tokens. You can change this in Settings → Error Reports.";
+
+/* Added in the audit fixes. */
+"%@ из %@" = "%@ of %@";
+"Spotify вернул ошибку %lld." = "Spotify returned error %lld.";
+"Spotify вернул ошибку %lld: %@" = "Spotify returned error %lld: %@";
+"Spotify сейчас не отвечает (ошибка %lld). Попробуйте чуть позже." = "Spotify isn't responding right now (error %lld). Try again a bit later.";
+"В очереди: %@" = "Queued: %@";
+"Вернуть вид перевода" = "Reset Translation Look";
+"Выбрать трек." = "Choose a track.";
+"Для этого трека пока нет текста в Spicy Lyrics." = "Spicy Lyrics has no lyrics for this track yet.";
+"Например: на этой песне текст отстаёт на секунду, после паузы всё нормально." = "For example: on this song the lyrics lag by a second, after a pause it's fine.";
+"Не удалось прочитать фото: %lld" = "Couldn't read photos: %lld";
+"Позиция в треке" = "Track position";

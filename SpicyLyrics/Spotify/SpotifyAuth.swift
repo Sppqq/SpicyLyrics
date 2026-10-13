@@ -26,9 +26,17 @@ enum SpotifyAuthError: LocalizedError {
         case .missingClientID: return String(localized: "Укажите Client ID приложения Spotify в настройках.")
         case .cancelled: return String(localized: "Вход отменён.")
         case .badCallback(let reason): return String(localized: "Spotify вернул ошибку: \(reason)")
-        case .tokenEndpoint(let code, let body): return String(localized: "Не удалось получить токен (HTTP \(code)): \(body)")
+        case .tokenEndpoint(let code, let body): return String(localized: "Не удалось получить токен (HTTP \(code)): \(Self.readable(body))")
         case .notLoggedIn: return String(localized: "Нужно войти в Spotify.")
         }
+    }
+
+    /// `{"error":"invalid_grant","error_description":"Invalid refresh token"}` → the description.
+    private static func readable(_ body: String) -> String {
+        guard let data = body.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return String(body.prefix(200)) }
+        return (object["error_description"] as? String) ?? (object["error"] as? String) ?? String(body.prefix(200))
     }
 }
 
@@ -73,8 +81,10 @@ final class SpotifyAuth: NSObject, ObservableObject {
 
     // MARK: Login
 
-    func logIn() async throws {
-        let clientID = settings.effectiveSpotifyClientID
+    /// Signs in with `clientID` (the saved one by default). A new Client ID is saved only once
+    /// sign-in worked: until then the current session keeps running on the old one.
+    func logIn(clientID newClientID: String? = nil) async throws {
+        let clientID = newClientID?.trimmingCharacters(in: .whitespacesAndNewlines) ?? settings.effectiveSpotifyClientID
         guard !clientID.isEmpty else { throw SpotifyAuthError.missingClientID }
 
         let verifier = Self.randomVerifier()
@@ -108,6 +118,7 @@ final class SpotifyAuth: NSObject, ObservableObject {
             "client_id": clientID,
             "code_verifier": verifier,
         ], previousRefresh: nil)
+        if settings.effectiveSpotifyClientID != clientID { settings.spotifyClientID = clientID }
         store(newTokens)
     }
 

@@ -28,6 +28,8 @@ final class LyricsService {
         config.timeoutIntervalForRequest = 15
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         session = URLSession(configuration: config)
+        let cache = cache
+        Task.detached(priority: .background) { cache.prune() }
     }
 
     func lyrics(for track: TrackInfo, ignoreCache: Bool = false) async -> LyricsLookupResult {
@@ -35,7 +37,9 @@ final class LyricsService {
         if let document = local.document(for: track.id) { return .found(document) }
         if !ignoreCache {
             if let hit = memory[track.id] { return .found(hit) }
-            switch cache.read(track.id) {
+            // Off the main thread: a big document takes a moment to decode.
+            let cache = cache, id = track.id
+            switch await Task.detached(priority: .userInitiated, operation: { cache.read(id) }).value {
             case .hit(let document):
                 memory[track.id] = document
                 return .found(document)
@@ -80,7 +84,8 @@ final class LyricsService {
         }
 
         if failures.isEmpty {
-            cache.writeMiss(track.id)
+            let cache = cache, id = track.id
+            Task.detached(priority: .utility) { cache.writeMiss(id) }
             return .notFound
         }
         return .failed(failures.joined(separator: "\n"))
@@ -93,7 +98,8 @@ final class LyricsService {
 
     private func remember(_ document: LyricsDocument, for id: String) {
         memory[id] = document
-        cache.write(document, for: id)
+        let cache = cache
+        Task.detached(priority: .utility) { cache.write(document, for: id) }
     }
 
     // MARK: Spicy Lyrics
@@ -257,7 +263,8 @@ final class LyricsService {
     }
 }
 
-/// Lyrics on disk, keyed by Spotify track ID. Hits live a week, misses a day.
+/// Lyrics on disk, keyed by Spotify track ID. Spicy Lyrics hits live a week; misses and LRCLIB
+/// stand-ins a day, so a sync added to Spicy Lyrics meanwhile shows up soon.
 struct LyricsDiskCache {
     enum Entry {
         case hit(LyricsDocument)
@@ -287,9 +294,23 @@ struct LyricsDiskCache {
         else { return nil }
         let age = -record.savedAt.timeIntervalSinceNow
         if let document = record.document {
-            return age < 7 * 86_400 ? .hit(document) : nil
+            let lifetime: TimeInterval = document.sourceName.hasPrefix("LRCLIB") ? 86_400 : Self.hitLifetime
+            return age < lifetime ? .hit(document) : nil
         }
         return age < 86_400 ? .miss : nil
+    }
+
+    private static let hitLifetime: TimeInterval = 7 * 86_400
+
+    /// Deletes entries nothing would read any more, so the cache does not grow forever.
+    func prune() {
+        let manager = FileManager.default
+        guard let files = try? manager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey])
+        else { return }
+        for file in files {
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+            if -modified.timeIntervalSinceNow > Self.hitLifetime { try? manager.removeItem(at: file) }
+        }
     }
 
     func write(_ document: LyricsDocument, for id: String) {

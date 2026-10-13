@@ -557,21 +557,25 @@ struct NowPlayingView: View {
         .gesture(
             DragGesture(minimumDistance: 28)
                 .onChanged { value in
-                    guard abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }
+                    guard settings.gesturesEnabled,
+                          abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }
                     headerSwipe = value.translation.width * 0.5
                 }
                 .onEnded { value in
                     let width = value.translation.width
                     // A deliberate, mostly horizontal swipe: a sloppy tap near "•••" must not skip.
-                    if abs(width) > 110, abs(width) > abs(value.translation.height) * 2 {
-                        if width < 0 { player.next() } else { player.previous() }
+                    if settings.gesturesEnabled, player.track != nil,
+                       abs(width) > 110, abs(width) > abs(value.translation.height) * 2 {
+                        skip(width < 0 ? .next : .previous)
                     }
                     showChrome()
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { headerSwipe = 0 }
                 }
         )
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint(String(localized: "Выбрать трек. Смахните влево или вправо, чтобы переключить трек."))
+        .accessibilityHint(settings.gesturesEnabled
+                           ? String(localized: "Выбрать трек. Смахните влево или вправо, чтобы переключить трек.")
+                           : String(localized: "Выбрать трек."))
     }
 
     private var titleBlock: some View {
@@ -828,7 +832,9 @@ struct NowPlayingView: View {
                 .frame(maxHeight: .infinity, alignment: .top)
         case .notFound:
             message(icon: "text.badge.xmark", title: String(localized: "Текст не найден"),
-                    detail: String(localized: "Для этого трека пока нет текста ни в Spicy Lyrics, ни в LRCLIB."),
+                    detail: settings.useLRCLibFallback
+                        ? String(localized: "Для этого трека пока нет текста ни в Spicy Lyrics, ни в LRCLIB.")
+                        : String(localized: "Для этого трека пока нет текста в Spicy Lyrics."),
                     retry: true)
         case .failed(let reason):
             message(icon: "wifi.exclamationmark", title: String(localized: "Не удалось загрузить текст"), detail: reason, retry: true)
@@ -905,7 +911,9 @@ private struct NowPlayingAlerts: ViewModifier {
     let player: PlayerModel
 
     private var pipErrorShown: Binding<Bool> {
-        Binding(get: { pip.lastError != nil && !pip.isActive }, set: { _ in })
+        Binding(get: { pip.lastError != nil && !pip.isActive }, set: { shown in
+            if !shown { pip.clearError() }
+        })
     }
 
     private var transientErrorShown: Binding<Bool> {

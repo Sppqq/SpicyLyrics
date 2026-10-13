@@ -63,6 +63,12 @@ struct SyncLogView: View {
         }
         .onAppear(perform: refreshFile)
         .onChange(of: log.entries.count) { _, _ in copied = false }
+        // The file to send keeps up with new entries (written once they pause for a moment).
+        .task(id: log.entries.count) {
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            refreshFile()
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(String(localized: "Обновить"), systemImage: "arrow.clockwise", action: refreshFile)

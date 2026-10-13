@@ -64,6 +64,7 @@ final class SpotifyAppRemote: NSObject {
         self.player = player
         player.onRemoteStale = { [weak self] in self?.reconnect() }
         player.onRemoteQueryNow = { [weak self] in self?.query() }
+        player.onRemoteCommand = { [weak self] command in await self?.run(command) ?? false }
         wanted = true
         // Called on every scene change; a second `connect()` mid-attempt cancels the first.
         guard remote?.isConnected != true, status != .connecting else { return }
@@ -316,6 +317,33 @@ final class SpotifyAppRemote: NSObject {
         }
     }
 
+    /// A playback control for the Spotify app on this phone.
+    enum Command: Sendable {
+        case play, pause, next, previous
+        case seek(Double)
+    }
+
+    /// Sends `command` straight to the Spotify app (no internet, no Web API quota). False when
+    /// not connected or Spotify refused it: the caller then goes through the Web API.
+    func run(_ command: Command) async -> Bool {
+        guard status == .connected, let remote, remote.isConnected, let playerAPI = remote.playerAPI else { return false }
+        let ok = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            let once = ResumeOnce(continuation)
+            let done: SPTAppRemoteCallback = { _, error in once.resume(error == nil) }
+            switch command {
+            case .play: playerAPI.resume(done)
+            case .pause: playerAPI.pause(done)
+            case .next: playerAPI.skip(toNext: done)
+            case .previous: playerAPI.skip(toPrevious: done)
+            case .seek(let seconds): playerAPI.seek(toPosition: max(0, Int(seconds * 1000)), callback: done)
+            }
+            // No answer: it most likely went through (sending it again could skip twice).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { once.resume(true) }
+        }
+        SyncLog.shared.add("remote", "control \(command) → \(ok ? "done" : "refused, using the Web API")")
+        return ok
+    }
+
     /// The cover straight from the Spotify app (works offline), once per track.
     private func fetchCover(_ track: SPTAppRemoteTrack, uri: String) {
         guard coverURI != uri, let imageAPI = remote?.imageAPI else { return }
@@ -392,6 +420,24 @@ extension SpotifyAppRemote: SPTAppRemotePlayerStateDelegate {
             self.player?.applyRemote(sample)
             self.fetchCover(track, uri: sample.uri)
         }
+    }
+}
+
+/// Resumes a continuation once: whichever comes first, Spotify's answer or the timeout.
+private final class ResumeOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Bool, Never>?
+
+    init(_ continuation: CheckedContinuation<Bool, Never>) {
+        self.continuation = continuation
+    }
+
+    func resume(_ value: Bool) {
+        lock.lock()
+        let pending = continuation
+        continuation = nil
+        lock.unlock()
+        pending?.resume(returning: value)
     }
 }
 

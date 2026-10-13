@@ -178,6 +178,9 @@ struct LyricLineView: View, Equatable {
                                  alignment: horizontalAlignment)
                 }
             }
+            // VoiceOver reads the line, not syllable by syllable.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(line.plainText)
 
         case .line(let text):
             Text(text)

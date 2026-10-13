@@ -43,6 +43,8 @@ async function receive(request, env) {
   if (!(request.headers.get("content-type") || "").startsWith("multipart/form-data")) return json({ error: "type" }, 415);
 
   const now = Math.floor(Date.now() / 1000);
+  // Its own secret: tied to the admin password, changing that password would reset every limit.
+  // ADMIN_TOKEN stays the fallback only for deployments made before IP_SALT existed.
   const ipHash = await sha256Hex((request.headers.get("cf-connecting-ip") || "?") + (env.IP_SALT || env.ADMIN_TOKEN || "sl"));
   const byIp = await env.DB.prepare(
     "SELECT SUM(created_at > ?) AS hour, COUNT(*) AS day FROM reports WHERE ip_hash = ? AND created_at > ?"

@@ -87,7 +87,8 @@ final class CoverBlobsView: UIView {
         LayerSpec(size: 0.75, center: CGPoint(x: 0.3, y: 0.86), rotationPeriod: -50, drift: CGSize(width: 0.15, height: 0.1), driftPeriod: 27, isBlob: true),
     ]
 
-    private static let ciContext = CIContext(options: [.cacheIntermediates: false])
+    /// CIContext is thread-safe; renders run off the main thread.
+    nonisolated private static let ciContext = CIContext(options: [.cacheIntermediates: false])
 
     private let container = CALayer()
     private var coverLayers: [CALayer] = []

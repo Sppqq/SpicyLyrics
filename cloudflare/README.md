@@ -9,7 +9,8 @@ log. Text goes to D1, photos to R2. Reports are deleted after 90 days (nightly c
   is the `ADMIN_TOKEN` secret.
 
 Only a random per-install id, the app and iOS version and the phone model are stored with a report. The
-network address is stored only as a salted hash, for the limits above.
+network address is stored only as a salted hash (salt: the `IP_SALT` secret), for the limits above.
+Without `IP_SALT` the admin password is the salt, and changing it resets the limits.
 
 ## Set up
 
@@ -20,6 +21,7 @@ npx wrangler d1 create sweet-lyrics-reports          # put the id in wrangler.to
 npx wrangler r2 bucket create sweet-lyrics-report-photos
 npx wrangler d1 execute sweet-lyrics-reports --remote --file=schema.sql
 npx wrangler secret put ADMIN_TOKEN                  # the admin password
+npx wrangler secret put IP_SALT                      # any long random string, never changed
 npx wrangler deploy
 ```
 

@@ -47,10 +47,17 @@ final class AppSettings {
     /// The user's own DeepL API key (kept in the Keychain).
     var deeplKey: String {
         didSet {
+            // Saved once typing pauses, not on every keystroke.
+            deeplSave?.cancel()
             let key = deeplKey.trimmingCharacters(in: .whitespacesAndNewlines)
-            if key.isEmpty { Keychain.delete(Self.deeplKeychainKey) } else { Keychain.write(Self.deeplKeychainKey, data: Data(key.utf8)) }
+            let save = DispatchWorkItem {
+                if key.isEmpty { Keychain.delete(Self.deeplKeychainKey) } else { Keychain.write(Self.deeplKeychainKey, data: Data(key.utf8)) }
+            }
+            deeplSave = save
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: save)
         }
     }
+    @ObservationIgnored private var deeplSave: DispatchWorkItem?
     /// Interface language: "system", "en" or "ru". Applied through `AppleLanguages` on the next launch.
     var appLanguage: String {
         didSet {
@@ -180,7 +187,7 @@ final class AppSettings {
             Keys.translate: false,
             Keys.appLanguage: "system",
             Keys.translationReplaces: false,
-            Keys.translationLanguage: Locale.current.language.languageCode?.identifier ?? "en",
+            Keys.translationLanguage: Self.defaultTranslationLanguage,
             Keys.translationProvider: TranslationProvider.defaultProvider.rawValue,
             Keys.pipFormat: PiPFormat.wide.rawValue,
             Keys.centerLyrics: false,
@@ -247,7 +254,8 @@ final class AppSettings {
         pipAnimatedBackground = defaults.bool(forKey: Keys.pipAnimatedBackground)
         pipShowTitle = defaults.bool(forKey: Keys.pipShowTitle)
         translateLyrics = defaults.bool(forKey: Keys.translate)
-        translationLanguage = defaults.string(forKey: Keys.translationLanguage) ?? "en"
+        let language = defaults.string(forKey: Keys.translationLanguage) ?? ""
+        translationLanguage = Self.translationLanguages.contains(language) ? language : Self.defaultTranslationLanguage
         translationReplaces = defaults.bool(forKey: Keys.translationReplaces)
         translationProvider = defaults.string(forKey: Keys.translationProvider) ?? TranslationProvider.defaultProvider.rawValue
         deeplKey = Keychain.read(Self.deeplKeychainKey).flatMap { String(data: $0, encoding: .utf8) } ?? ""
@@ -327,6 +335,16 @@ final class AppSettings {
         }
     }
 
+    /// The ids of `LyricsTranslation.languages`.
+    static let translationLanguages: Set<String> = ["ru", "en", "uk", "de", "fr", "es", "it", "pt", "pl", "tr", "ja", "ko", "zh-Hans"]
+
+    /// The phone's language if the translators offer it, else English.
+    private static var defaultTranslationLanguage: String {
+        let code = Locale.current.language.languageCode?.identifier ?? "en"
+        let id = code == "zh" ? "zh-Hans" : code
+        return translationLanguages.contains(id) ? id : "en"
+    }
+
     /// Lyric font size limits (settings slider and pinch).
     static let fontRange: ClosedRange<CGFloat> = 22...56
     static let defaultFontSize = 32.0
@@ -347,11 +365,29 @@ final class AppSettings {
         lyricsFont = LyricsFont.standard.rawValue
         centerLyrics = false
         lineSpacingScale = 1
-        translationScale = 1
         lyricsWeight = LyricsWeight.bold.rawValue
         activeLinePosition = 0.5
         scrollSpeed = 1
+    }
+
+    /// The translation's own look (its page in settings).
+    func resetTranslationLook() {
+        translationReplaces = false
+        translationScale = 1
         translationBrightness = 1
+    }
+
+    /// The floating window's look (its page in settings).
+    func resetPictureInPicture() {
+        pipFormat = PiPFormat.wide.rawValue
+        pipAnimatedBackground = true
+        pipShowTitle = true
+        pipTextScale = 1
+        pipBackgroundDim = 0.42
+        pipFrameRate = 30
+        pipBlurLines = true
+        pipShowTranslation = true
+        pipShowFPS = false
     }
 
     func resetEffects() {

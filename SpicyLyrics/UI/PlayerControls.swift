@@ -121,8 +121,9 @@ private struct Scrubber: View {
                     .frame(height: dragging ? 12 : 7)
                     .frame(maxHeight: .infinity)
                     .contentShape(Rectangle())
+                    // A drag seeks; a stray tap (reaching for the controls) does not.
                     .gesture(
-                        DragGesture(minimumDistance: 0)
+                        DragGesture(minimumDistance: 6)
                             .onChanged { value in
                                 onInteraction()
                                 dragFraction = Double(clamp(value.location.x / max(geometry.size.width, 1), 0, 1))
@@ -145,6 +146,14 @@ private struct Scrubber: View {
                 }
                 .font(.system(size: 12, weight: .semibold).monospacedDigit())
                 .foregroundStyle(.white.opacity(dragging ? 0.85 : 0.5))
+            }
+            // VoiceOver: one slider, swipe up / down to move 10 seconds.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(String(localized: "Позиция в треке"))
+            .accessibilityValue(String(localized: "\(PlaybackBar.format(position)) из \(PlaybackBar.format(duration))"))
+            .accessibilityAdjustableAction { direction in
+                let step: Double = direction == .increment ? 10 : -10
+                player.seek(to: clamp(position + step, 0, duration))
             }
         }
         .disabled(player.track == nil)

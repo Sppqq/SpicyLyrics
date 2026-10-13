@@ -224,8 +224,8 @@ private struct OnlineTranslationDriver: ViewModifier {
 }
 
 /// Google and Yandex through their free web endpoints, DeepL with the user's key. Lines go in
-/// batches; answers are cached for the session, so switching modes or coming back to a song
-/// costs no requests.
+/// batches; answers are kept on disk (Caches), so switching modes, coming back to a song or
+/// the next launch costs no requests.
 actor OnlineTranslator {
     static let shared = OnlineTranslator()
 
@@ -258,7 +258,11 @@ actor OnlineTranslator {
         }
     }
 
-    private var cache: [String: String] = [:]
+    private lazy var cache: [String: String] = Self.loadCache()
+    private var saveTask: Task<Void, Never>?
+    private static let cacheLimit = 5000
+    private static let cacheFile = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("translations-v1.json")
     /// Yandex wants a session id with every request.
     private let yandexSession = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
 
@@ -279,12 +283,31 @@ actor OnlineTranslator {
         case .deepl: fresh = try await deepl(missing, target: target, key: deeplKey)
         case .apple: fresh = [:]
         }
-        if cache.count > 5000 { cache.removeAll() }
+        if cache.count > Self.cacheLimit { cache.removeAll() }
         for (text, translation) in fresh {
             cache[prefix + text] = translation
             result[text] = translation
         }
+        if !fresh.isEmpty { scheduleSave() }
         return result
+    }
+
+    private static func loadCache() -> [String: String] {
+        guard let data = try? Data(contentsOf: cacheFile),
+              let stored = try? JSONDecoder().decode([String: String].self, from: data),
+              stored.count <= cacheLimit
+        else { return [:] }
+        return stored
+    }
+
+    /// Written a moment after the last translation, once per song rather than per batch.
+    private func scheduleSave() {
+        saveTask?.cancel()
+        saveTask = Task {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled, let data = try? JSONEncoder().encode(cache) else { return }
+            try? data.write(to: Self.cacheFile, options: .atomic)
+        }
     }
 
     // MARK: Google

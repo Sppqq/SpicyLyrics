@@ -88,7 +88,11 @@ enum SpotifyAPIError: LocalizedError {
             default:
                 return String(localized: "Не удалось связаться со Spotify: \(error.localizedDescription)")
             }
-        case .http(let code, let message): return "Spotify API: HTTP \(code) \(message)"
+        case .http(let code, _) where code >= 500:
+            return String(localized: "Spotify сейчас не отвечает (ошибка \(code)). Попробуйте чуть позже.")
+        case .http(let code, let message):
+            return message.isEmpty ? String(localized: "Spotify вернул ошибку \(code).")
+                                   : String(localized: "Spotify вернул ошибку \(code): \(message)")
         }
     }
 }

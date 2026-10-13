@@ -1,9 +1,9 @@
 name: Build iOS app
 
 # Channels:
-#   pull_request        в†’ "pr" build: compile check + IPA artifact, nothing is published.
-#   push to main        в†’ "alpha": pre-release vX.Y.Z-alpha.N (X.Y.Z = the next patch release).
-#   manual run on main  в†’ "release": stable release vX.Y.Z, bumped from the latest stable tag.
+#   pull_request        → "pr" build: compile check + IPA artifact, nothing is published.
+#   push to main        → "alpha": pre-release vX.Y.Z-alpha.N (X.Y.Z = the next patch release).
+#   manual run on main  → "release": stable release vX.Y.Z, bumped from the latest stable tag.
 #
 # Versions live in git tags (vX.Y.Z). MARKETING_VERSION in project.yml is the floor: raise it
 # there to jump to a new version line (e.g. 1.0.0). The build number is the workflow run number,

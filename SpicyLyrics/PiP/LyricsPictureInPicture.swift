@@ -20,6 +20,9 @@ final class LyricsPictureInPicture: NSObject {
     private(set) var isPossible = false
     private(set) var lastError: String?
 
+    /// The error alert was dismissed.
+    func clearError() { lastError = nil }
+
     /// The window is up, or about to be, or on its way out.
     var keepsAppRunning: Bool { isActive || isTransitioning }
 

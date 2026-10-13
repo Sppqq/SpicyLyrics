@@ -12,6 +12,7 @@ struct SpotifySetupGuideView: View {
     @State private var busy = false
     @State private var error: String?
     @State private var copied = false
+    @State private var bundleCopied = false
 
     private static let dashboard = URL(string: "https://developer.spotify.com/dashboard")!
 
@@ -44,7 +45,9 @@ struct SpotifySetupGuideView: View {
                     bullet("**Website** — можно оставить пустым.")
                     bullet("**Redirect URIs** — вставьте адрес ниже и нажмите **Add**:")
                     redirectURIBox
-                    bullet("В **Which API/SDKs are you planning to use?** отметьте **Web API**.")
+                    bullet("В **Which API/SDKs are you planning to use?** отметьте **Web API** и **iOS**.")
+                    bullet("Для **iOS** вставьте в **iOS app bundles** этот Bundle ID (так текст идёт точно в такт прямо из приложения Spotify):")
+                    copyBox(Bundle.main.bundleIdentifier ?? "", copied: $bundleCopied)
                     bullet("Поставьте галочку согласия с условиями и нажмите **Save**.")
                 }
 
@@ -117,16 +120,23 @@ struct SpotifySetupGuideView: View {
     }
 
     private var redirectURIBox: some View {
+        copyBox(SpotifyAuth.redirectURI, copied: $copied)
+    }
+
+    private func copyBox(_ value: String, copied: Binding<Bool>) -> some View {
         HStack {
-            Text(SpotifyAuth.redirectURI)
+            Text(value)
                 .font(.callout.monospaced())
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
                 .textSelection(.enabled)
             Spacer()
             Button {
-                UIPasteboard.general.string = SpotifyAuth.redirectURI
-                copied = true
+                UIPasteboard.general.string = value
+                copied.wrappedValue = true
             } label: {
-                Label(copied ? String(localized: "Скопировано") : String(localized: "Скопировать"), systemImage: copied ? "checkmark" : "doc.on.doc")
+                Label(copied.wrappedValue ? String(localized: "Скопировано") : String(localized: "Скопировать"),
+                      systemImage: copied.wrappedValue ? "checkmark" : "doc.on.doc")
                     .font(.footnote.weight(.semibold))
             }
         }
@@ -227,14 +237,11 @@ struct SpotifySetupGuideView: View {
         busy = true
         error = nil
         defer { busy = false }
-        // Switch over only if sign-in works: a cancelled attempt keeps the current session.
-        let previous = settings.spotifyClientID
-        settings.spotifyClientID = clientID
+        // Switches over only if sign-in works: a cancelled attempt keeps the current session.
         do {
-            try await auth.logIn()
+            try await auth.logIn(clientID: clientID)
             dismiss()
         } catch {
-            settings.spotifyClientID = previous
             if case SpotifyAuthError.cancelled = error { return }
             self.error = error.localizedDescription
         }

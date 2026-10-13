@@ -27,16 +27,24 @@ struct OnboardingView: View {
                             .foregroundStyle(.red)
                     }
 
+                    accessExplanation
+
+                    Text(String(localized: "Приложение не связано со Spotify AB и с авторами Spicy Lyrics. Это неофициальный порт расширения Spicy Lyrics под AGPL-3.0."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(24)
+            }
+            // The actions sit at the bottom, under the thumb.
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 12) {
                     if canLogIn {
                         loginButton
                     }
-
-                    accessExplanation
-
                     NavigationLink {
                         SpotifySetupGuideView()
                     } label: {
-                        Label(canLogIn ? String(localized: "Сменить Client ID") : String(localized: "Настроить доступ к Spotify (5 минут)"),
+                        Label(canLogIn ? String(localized: "Сменить Client ID") : String(localized: "Настроить доступ к Spotify"),
                               systemImage: "key.horizontal")
                             .font(.headline)
                             .frame(maxWidth: .infinity)
@@ -44,12 +52,9 @@ struct OnboardingView: View {
                             .background(.white.opacity(canLogIn ? 0.12 : 0.9), in: Capsule())
                             .foregroundStyle(canLogIn ? .white : .black)
                     }
-
-                    Text(String(localized: "Приложение не связано со Spotify AB и с авторами Spicy Lyrics. Это неофициальный порт расширения Spicy Lyrics под AGPL-3.0."))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
                 }
-                .padding(24)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 12)
             }
             .background(
                 LinearGradient(colors: [Color(red: 0.25, green: 0.1, blue: 0.35), .black],

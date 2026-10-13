@@ -27,8 +27,13 @@ struct TrackPickerView: View {
     @State private var query = ""
     @State private var canLoadMore = false
     @State private var loading = false
-    @State private var error: String?
+    /// The last failure, per tab: an error in history must not fill the empty queue.
+    @State private var errors: [Tab: String] = [:]
+    private var error: String? { errors[tab] }
     @State private var needsRelogin = false
+    /// "Added to the queue" for a moment after a swipe or the menu.
+    @State private var queuedTitle: String?
+    @State private var queuedCount = 0
     @FocusState private var searchFocused: Bool
 
     private static let recentScope = "user-read-recently-played"
@@ -49,6 +54,22 @@ struct TrackPickerView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background { ArtworkBackdrop() }
+        .overlay(alignment: .bottom) {
+            if let queuedTitle {
+                Label(String(localized: "В очереди: \(queuedTitle)"), systemImage: "text.badge.checkmark")
+                    .font(.footnote.weight(.semibold))
+                    .lineLimit(1)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: queuedTitle)
+        .sensoryFeedback(.success, trigger: queuedCount)
         .animation(.spring(response: 0.38, dampingFraction: 0.85), value: tab)
         .task(id: tab) {
             if tab == .search {
@@ -64,7 +85,7 @@ struct TrackPickerView: View {
             guard !text.isEmpty else {
                 results = []
                 canLoadMore = false
-                error = nil
+                errors[.search] = nil
                 return
             }
             try? await Task.sleep(for: .milliseconds(350))
@@ -177,7 +198,7 @@ struct TrackPickerView: View {
                         .swipeActions(edge: .trailing) {
                             if tab != .queue {
                                 Button {
-                                    player.addToQueue(track)
+                                    enqueue(track)
                                 } label: {
                                     Label(String(localized: "В очередь"), systemImage: "text.badge.plus")
                                 }
@@ -282,7 +303,7 @@ struct TrackPickerView: View {
                         await load(.recent)
                     } catch SpotifyAuthError.cancelled {
                     } catch {
-                        self.error = error.localizedDescription
+                        errors[.recent] = error.localizedDescription
                     }
                 }
             }
@@ -310,7 +331,7 @@ struct TrackPickerView: View {
         }
         if tab != .queue {
             Button {
-                player.addToQueue(track)
+                enqueue(track)
             } label: {
                 Label(String(localized: "Добавить в очередь"), systemImage: "text.badge.plus")
             }
@@ -329,13 +350,24 @@ struct TrackPickerView: View {
     private func choose(_ track: TrackSummary, at index: Int) {
         switch tab {
         case .queue:
-            player.skipAhead(index + 1)
+            player.playFromQueue(track, at: index)
         case .recent:
             player.play(track, context: track.contextURI)
         case .search:
             player.play(track, context: nil)
         }
         dismiss()
+    }
+
+    private func enqueue(_ track: TrackSummary) {
+        Task {
+            guard await player.addToQueue(track) else { return }
+            queuedCount += 1
+            queuedTitle = track.title
+            let shown = queuedCount
+            try? await Task.sleep(for: .seconds(2))
+            if queuedCount == shown { queuedTitle = nil }
+        }
     }
 
     private func load(_ tab: Tab) async {
@@ -351,7 +383,7 @@ struct TrackPickerView: View {
         }
         #endif
         loading = true
-        error = nil
+        errors[tab] = nil
         defer { loading = false }
         do {
             switch tab {
@@ -363,14 +395,14 @@ struct TrackPickerView: View {
             needsRelogin = true
         } catch is CancellationError {
         } catch {
-            self.error = error.localizedDescription
+            errors[tab] = error.localizedDescription
         }
     }
 
     private func runSearch(_ text: String, offset: Int) async {
         guard !text.isEmpty else { return }
         loading = true
-        error = nil
+        errors[.search] = nil
         defer { loading = false }
         do {
             let page = try await player.searchTracks(text, offset: offset)
@@ -384,7 +416,7 @@ struct TrackPickerView: View {
             canLoadMore = page.count >= 10 && results.count < 100
         } catch is CancellationError {
         } catch {
-            self.error = error.localizedDescription
+            errors[.search] = error.localizedDescription
         }
     }
 

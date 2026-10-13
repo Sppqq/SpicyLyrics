@@ -106,6 +106,8 @@ final class PlayerModel {
     @ObservationIgnored private var lastRemoteSampleAt: CFTimeInterval = 0
     /// Asks App Remote for the position right now (set by `SpotifyAppRemote`).
     @ObservationIgnored var onRemoteQueryNow: (() -> Void)?
+    /// Sends a control to the Spotify app directly (set by `SpotifyAppRemote`); false if it can't.
+    @ObservationIgnored var onRemoteCommand: ((SpotifyAppRemote.Command) async -> Bool)?
     @ObservationIgnored private var watchdogTask: Task<Void, Never>?
     @ObservationIgnored private var lastWatch: (media: CFTimeInterval, wall: TimeInterval)?
     @ObservationIgnored private var resyncTask: Task<Void, Never>?
@@ -786,7 +788,8 @@ final class PlayerModel {
 
     func togglePlay() {
         let wasPlaying = isPlaying
-        control({ [api] in
+        control({ [weak self, api] in
+            if await self?.viaRemote(wasPlaying ? .pause : .play) == true { return }
             if wasPlaying { try await api.pause() } else { try await api.play() }
         }, optimistic: { [weak self] in
             guard let self else { return }
@@ -795,17 +798,35 @@ final class PlayerModel {
         })
     }
 
-    func next() { control({ [api] in try await api.next() }) }
+    func next() {
+        control({ [weak self, api] in
+            if await self?.viaRemote(.next) == true { return }
+            try await api.next()
+        })
+    }
 
     func previous() {
         exemptNextSongUntil = MediaClock.now() + 5
-        control({ [api] in try await api.previous() })
+        control({ [weak self, api] in
+            if await self?.viaRemote(.previous) == true { return }
+            try await api.previous()
+        })
     }
 
     func seek(to seconds: Double) {
-        control({ [api] in try await api.seek(to: seconds) }, optimistic: { [weak self] in
+        control({ [weak self, api] in
+            if await self?.viaRemote(.seek(seconds)) == true { return }
+            try await api.seek(to: seconds)
+        }, optimistic: { [weak self] in
             self?.setClock(seconds)
         })
+    }
+
+    /// Controls go straight to the Spotify app on this phone when it is connected: no internet
+    /// needed and no round trip. Otherwise (or if it refuses) through the Web API.
+    private func viaRemote(_ command: SpotifyAppRemote.Command) async -> Bool {
+        guard remoteAuthority, let onRemoteCommand else { return false }
+        return await onRemoteCommand(command)
     }
 
     #if DEBUG
@@ -822,12 +843,24 @@ final class PlayerModel {
     /// Jumps to an upcoming track by skipping everything queued before it.
     func skipAhead(_ count: Int) {
         guard count > 0 else { return }
-        control({ [api] in
+        control({ [weak self, api] in
             for index in 0..<count {
                 if index > 0 { try await Task.sleep(for: .milliseconds(150)) }
+                if await self?.viaRemote(.next) == true { continue }
                 try await api.next()
             }
         })
+    }
+
+    /// Plays a song from the queue. A few steps ahead are skipped to (that keeps songs added to
+    /// the queue by hand); further down, the song is started inside the album or playlist
+    /// instead of firing a dozen skips that each play for a moment.
+    func playFromQueue(_ track: TrackSummary, at index: Int) {
+        if index < 3 || contextURI.map(Self.supportsOffset) != true {
+            skipAhead(index + 1)
+        } else {
+            play(track, context: contextURI)
+        }
     }
 
     /// Plays `track`, continuing with the album or playlist it came from when there is one.
@@ -847,14 +880,16 @@ final class PlayerModel {
         })
     }
 
-    func addToQueue(_ track: TrackSummary) {
-        Task {
-            do {
-                try await api.addToQueue(track.uri)
-            } catch {
-                SyncLog.shared.add("control", "add to queue failed: \(error.localizedDescription)")
-                transientError = error.localizedDescription
-            }
+    /// True once Spotify took it.
+    @discardableResult
+    func addToQueue(_ track: TrackSummary) async -> Bool {
+        do {
+            try await api.addToQueue(track.uri)
+            return true
+        } catch {
+            SyncLog.shared.add("control", "add to queue failed: \(error.localizedDescription)")
+            transientError = error.localizedDescription
+            return false
         }
     }
 

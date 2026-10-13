@@ -345,7 +345,7 @@ private struct LanguageSettings: View {
         case .apple:
             return String(localized: "Apple переводит прямо на телефоне (iOS 18 и новее), без интернета. Строки, которые уже на выбранном языке, не переводятся. При первом использовании iOS предложит скачать языковую модель.")
         case .google, .yandex:
-            return String(localized: "Строки текста отправляются в онлайн-переводчик. Нужен интернет; переводы запоминаются до перезапуска приложения. Строки, которые уже на выбранном языке, не переводятся.")
+            return String(localized: "Строки текста отправляются в онлайн-переводчик. Нужен интернет; переводы запоминаются на телефоне, повторно песня не переводится. Строки, которые уже на выбранном языке, не переводятся.")
         case .deepl:
             return String(localized: "DeepL переводит лучше всех, но нужен свой ключ API: бесплатного тарифа (500 000 символов в месяц) хватает с запасом. Ключ хранится в связке ключей iOS.")
         }
@@ -401,6 +401,10 @@ private struct LanguageSettings: View {
                     }
                     Text(providerNote)
                 }
+            }
+
+            if settings.translateLyrics {
+                ResetSection(title: String(localized: "Вернуть вид перевода")) { settings.resetTranslationLook() }
             }
         }
     }
@@ -546,15 +550,7 @@ private struct PictureInPictureSettings: View {
                 Text(String(localized: "Меньше кадров — меньше нагрузка и нагрев. Размытие строк работает, только если оно включено и в «Эффектах»."))
             }
 
-            ResetSection(title: String(localized: "Сбросить вид окна")) {
-                settings.pipFormat = PiPFormat.wide.rawValue
-                settings.pipTextScale = 1
-                settings.pipBackgroundDim = 0.42
-                settings.pipFrameRate = 30
-                settings.pipBlurLines = true
-                settings.pipShowTranslation = true
-                settings.pipShowFPS = false
-            }
+            ResetSection(title: String(localized: "Сбросить вид окна")) { settings.resetPictureInPicture() }
         }
     }
 }
@@ -680,9 +676,6 @@ private struct SyncSettings: View {
                 SliderRow(title: String(localized: "С приложением Spotify: раз в"), value: $settings.remoteQueryInterval,
                           range: 0.5...5, step: 0.5, format: { String(format: "%.1f", $0) + " " + String(localized: "с") })
                 Toggle(String(localized: "Значок сверки над текстом"), isOn: $settings.showSyncIndicator)
-                NavigationLink(String(localized: "Журнал")) {
-                    SyncLogView().navigationTitle(String(localized: "Журнал"))
-                }
             } header: {
                 Text(String(localized: "Как часто сверять время"))
             } footer: {
@@ -726,11 +719,10 @@ private struct PerformanceSettings: View {
                     }
                 }
                 Toggle(String(localized: "Показывать FPS в плеере"), isOn: $settings.showLyricsFPS)
-                Toggle(String(localized: "Показывать FPS в PiP"), isOn: $settings.pipShowFPS)
             } header: {
                 Text(String(localized: "Кадры"))
             } footer: {
-                Text(String(localized: "Меньше кадров — меньше нагрев. На паузе текст рисуется 15 раз в секунду, в режиме экономии — не больше 30. Счётчик показывает реальные кадры / цель. Частота PiP настраивается в «Картинке в картинке»."))
+                Text(String(localized: "Меньше кадров — меньше нагрев. На паузе текст рисуется 15 раз в секунду, в режиме экономии — не больше 30. Счётчик показывает реальные кадры / цель. Частота и счётчик PiP — в «Картинке в картинке»."))
             }
 
             Section {

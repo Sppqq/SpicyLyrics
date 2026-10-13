@@ -36,10 +36,17 @@ struct ReportComposeView: View {
     @State private var message = ""
     @State private var includeLog = true
     @State private var picked: [PhotosPickerItem] = []
-    @State private var photos: [Data] = []
+    /// The picked photos, compressed, each with the picker item it came from.
+    @State private var photos: [PickedPhoto] = []
+    @State private var unreadablePhotos = 0
     @State private var sending = false
     @State private var failure: String?
     @State private var sent = false
+
+    private struct PickedPhoto {
+        let item: PhotosPickerItem
+        let jpeg: Data
+    }
 
     private var canSend: Bool {
         !sending && (!message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !photos.isEmpty || includeLog)
@@ -50,6 +57,15 @@ struct ReportComposeView: View {
             Section(String(localized: "Что случилось")) {
                 TextEditor(text: $message)
                     .frame(minHeight: 120)
+                    .overlay(alignment: .topLeading) {
+                        if message.isEmpty {
+                            Text(String(localized: "Например: на этой песне текст отстаёт на секунду, после паузы всё нормально."))
+                                .foregroundStyle(.tertiary)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                    }
             }
 
             Section {
@@ -60,10 +76,15 @@ struct ReportComposeView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
                             ForEach(photos.indices, id: \.self) { index in
-                                thumbnail(index)
+                                thumbnail(photos[index])
                             }
                         }
                     }
+                }
+                if unreadablePhotos > 0 {
+                    Text(String(localized: "Не удалось прочитать фото: \(unreadablePhotos)"))
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
                 }
             } header: {
                 Text(String(localized: "Фото"))
@@ -93,9 +114,8 @@ struct ReportComposeView: View {
                 }
             }
         }
-        .onChange(of: picked) { _, items in
-            Task { await load(items) }
-        }
+        // A new selection cancels the loading of the previous one.
+        .task(id: picked) { await load(picked) }
         .alert(String(localized: "Отправлено"), isPresented: $sent) {
             Button("OK") { dismiss() }
         } message: {
@@ -104,8 +124,8 @@ struct ReportComposeView: View {
     }
 
     @ViewBuilder
-    private func thumbnail(_ index: Int) -> some View {
-        if let image = UIImage(data: photos[index]) {
+    private func thumbnail(_ photo: PickedPhoto) -> some View {
+        if let image = UIImage(data: photo.jpeg) {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
@@ -113,8 +133,8 @@ struct ReportComposeView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(alignment: .topTrailing) {
                     Button {
-                        guard picked.indices.contains(index) else { return }
-                        picked.remove(at: index)
+                        photos.removeAll { $0.item == photo.item }
+                        picked.removeAll { $0 == photo.item }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .symbolRenderingMode(.palette)
@@ -127,13 +147,24 @@ struct ReportComposeView: View {
     }
 
     private func load(_ items: [PhotosPickerItem]) async {
-        var loaded: [Data] = []
+        var loaded: [PickedPhoto] = []
+        var unreadable = 0
         for item in items {
+            // Already compressed (a photo was removed, the rest stay).
+            if let known = photos.first(where: { $0.item == item }) {
+                loaded.append(known)
+                continue
+            }
             guard let data = try? await item.loadTransferable(type: Data.self),
-                  let jpeg = Self.compress(data) else { continue }
-            loaded.append(jpeg)
+                  let jpeg = Self.compress(data) else {
+                unreadable += 1
+                continue
+            }
+            loaded.append(PickedPhoto(item: item, jpeg: jpeg))
         }
+        guard !Task.isCancelled else { return }
         photos = loaded
+        unreadablePhotos = unreadable
     }
 
     private func send() async {
@@ -143,7 +174,7 @@ struct ReportComposeView: View {
         do {
             try await ReportService.shared.send(
                 kind: "manual", message: message.trimmingCharacters(in: .whitespacesAndNewlines),
-                photos: photos, includeLog: includeLog)
+                photos: photos.map(\.jpeg), includeLog: includeLog)
             sent = true
         } catch {
             failure = error.localizedDescription
