@@ -85,6 +85,13 @@ final class PlayerModel {
     @ObservationIgnored private var remoteURI: String?
     /// Its queried positions stopped moving while playing: only trust its events.
     @ObservationIgnored private var remoteQueriesFrozen = false
+    /// Spotify's position for a song that just started runs ahead of the sound by about a second
+    /// (seen in sync logs: the first pause, seek or stall afterwards showed the clock 0.5-1 s
+    /// early, and everything after was exact). Until such an event re-bases it, the position of
+    /// a fresh song is taken `startLead` seconds back. Learned from those events.
+    @ObservationIgnored private var startLead = 0.9
+    @ObservationIgnored private var leadActive = false
+    @ObservationIgnored private var trackStartedAt: CFTimeInterval = 0
     /// Web API reports in a row that contradict App Remote (play state or song).
     @ObservationIgnored private var remoteDisagreements = 0
     /// Asks App Remote to drop its connection and reconnect (set by `SpotifyAppRemote`).
@@ -148,6 +155,10 @@ final class PlayerModel {
     private static let normalRoundTrip: Double = 0.3
     /// App Remote answers slower than this went through a busy main thread: not trusted.
     private static let remoteMaxRoundTrip: Double = 0.25
+    /// A song counts as freshly started when App Remote first reports it this early.
+    private static let leadMaxStart: Double = 1.5
+    /// Events this long after the start are no longer part of it: they re-base Spotify's position.
+    private static let leadSettle: Double = 2.0
 
     /// The user's saved TTML files.
     @ObservationIgnored let localLyrics: LocalLyricsStore
@@ -427,6 +438,7 @@ final class PlayerModel {
         guard remoteConnected != connected else { return }
         remoteConnected = connected
         remoteQueriesFrozen = false
+        leadActive = false
         remoteDisagreements = 0
         lastRemoteQuery = nil
         lastRemoteSampleAt = connected ? MediaClock.now() : 0
@@ -463,7 +475,7 @@ final class PlayerModel {
             + " age \(max(0, now - sample.measuredAt).signedMs)"
         remoteURI = sample.uri
         lastRemoteSampleAt = now
-        let measured = sample.position + (sample.paused ? 0 : max(0, now - sample.measuredAt))
+        let raw = sample.position + (sample.paused ? 0 : max(0, now - sample.measuredAt))
 
         if track?.uri != sample.uri {
             guard sample.isTrack, let info = sample.trackInfo else {
@@ -476,10 +488,14 @@ final class PlayerModel {
                 return
             }
             // A new song, straight from the phone (works offline); the Web API adds the cover.
-            log.add("remote", "\(summary) → new track, set \(measured.s3)")
+            leadActive = !sample.paused && sample.position < Self.leadMaxStart
+            trackStartedAt = now
+            let start = raw - (leadActive ? startLead : 0)
+            log.add("remote", "\(summary) → new track, set \(start.s3)"
+                + (leadActive ? " (start lead \(startLead.signedMs))" : ""))
             content = .track(info)
             onContentChanged()
-            setClock(measured, at: now)
+            setClock(start, at: now)
             isPlaying = !sample.paused
             lastRemoteQuery = nil
             remoteQueriesFrozen = false
@@ -488,6 +504,9 @@ final class PlayerModel {
             return
         }
         lastRemoteMismatch = nil
+        // An event after the start re-bases Spotify's position: from here on it is exact.
+        let rebase = leadActive && sample.event && now - trackStartedAt > Self.leadSettle
+        let measured = raw - (leadActive && !rebase ? startLead : 0)
         // Events are the truth even right after our own play / pause; queries may lag behind it.
         if now < holdUntil, !sample.event {
             log.add("remote", "\(summary) → ignored (right after a control)")
@@ -501,6 +520,19 @@ final class PlayerModel {
         if sample.event {
             // Pushed on play, pause, seek or skip: exact, and the only source of play / pause.
             var decision = "kept clock"
+            var leadNote = ""
+            if rebase {
+                leadActive = false
+                // A spontaneous event (not our own control, not a pause) shows how far ahead
+                // Spotify's position really was.
+                let observed = startLead - drift
+                if !sample.paused, now >= holdUntil, (0...1.5).contains(observed) {
+                    startLead = (startLead + observed) / 2
+                    leadNote = " (start lead \(observed.signedMs) → now \(startLead.signedMs))"
+                } else {
+                    leadNote = " (start lead dropped)"
+                }
+            }
             if sample.paused == isPlaying {
                 isPlaying = !sample.paused
                 setClock(measured, at: now)
@@ -512,7 +544,7 @@ final class PlayerModel {
                 // comparable with the one before, or it would look like queries stopped moving.
                 lastRemoteQuery = nil
             }
-            log.add("remote", "\(summary) drift \(drift.signedMs) → \(decision)")
+            log.add("remote", "\(summary) drift \(drift.signedMs) → \(decision)\(leadNote)")
             log.synced("App Remote", drift: drift)
             return
         }
