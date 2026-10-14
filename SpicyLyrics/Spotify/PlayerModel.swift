@@ -502,7 +502,9 @@ final class PlayerModel {
                 return
             }
             // A new song, straight from the phone (works offline); the Web API adds the cover.
-            leadActive = !sample.paused && sample.position < Self.leadMaxStart
+            // A song started by our own skip reports 0.000 s exactly: the lead belongs to songs
+            // that start by themselves (reports: lyrics 0.2-0.4 s late until the first pause).
+            leadActive = !sample.paused && sample.position < Self.leadMaxStart && now >= holdUntil
             trackStartedAt = now
             let start = raw - (leadActive ? startLead : 0)
             log.add("remote", "\(summary) → new track, set \(start.s3)"
