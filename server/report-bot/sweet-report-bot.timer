@@ -1,9 +1,9 @@
 [Unit]
-Description=Check Sweet Lyrics reports every 15 minutes
+Description=Check Sweet Lyrics reports every 5 minutes
 
 [Timer]
 OnBootSec=3min
-OnUnitActiveSec=15min
+OnUnitActiveSec=5min
 Persistent=true
 Unit=sweet-report-bot.service
 
