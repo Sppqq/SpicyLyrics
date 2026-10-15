@@ -28,3 +28,10 @@ cloudflare/.wrangler/
 cloudflare/.admin-token
 cloudflare/.dev.vars
 cloudflare/.bot-token
+
+# Report processor runtime (private reports, credentials and copied executable)
+server/report-bot/codex
+server/report-bot/codex-code-mode-host
+server/report-bot/codex-bwrap-real
+server/report-bot/secrets.json
+.report-bot-state/

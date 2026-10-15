@@ -8,8 +8,8 @@ status change (nightly cron), so a thread still being talked in stays.
 - `POST /v1/report`: multipart form: `meta` (JSON), `log` (text), `photo` (up to 3 JPEG/PNG, 2 MB each).
   Limits: 8 MB per request, 12 reports per hour per install, 40 per hour / 200 per day per network.
 - `GET /v1/threads`, `POST /v1/threads/{id}/messages`: the sender's side, header `X-Install-Id`.
-- `/v1/bot/…` (`inbox`, `report/{id}`, `reply`, `status`): the report bot, `Authorization: Bearer
-  $BOT_TOKEN`. Used by `.github/workflows/report-bot.yml`.
+- `/v1/bot/…` (`inbox`, `report/{id}`, `reply`, `status`): private report processing, `Authorization: Bearer
+  $BOT_TOKEN`. The scheduled processor runs on the server; see [`server/report-bot`](../server/report-bot/README.md).
 - `/admin`: the list, a report with its photos and log, answer, set the status, delete. HTTP Basic: any user name, the password
   is the `ADMIN_TOKEN` secret.
 
@@ -37,9 +37,9 @@ never run it on a database made from the current `schema.sql` (the columns alrea
 
 ## Report bot
 
-Every hour `.github/workflows/report-bot.yml` asks `/v1/bot/inbox`; if something is waiting, Claude Code
-works through it (`.github/report-bot-prompt.md`). Repository secrets: `REPORT_BOT_TOKEN` (the same value as
-the Worker's `BOT_TOKEN`) and `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`). Protect `main` (pull request
-required): report text comes from anyone and the bot can push branches.
+Report processing runs on the private server through the Codex CLI in an isolated container. The
+server stores feature requests and private analysis locally before replying. Fixes are proposed in
+draft pull requests and are never merged automatically. The scheduled GitHub Actions workflow is
+retired.
 
 The app posts to the URL in `SpicyLyrics/Support/ReportService.swift` (`endpoint`).
