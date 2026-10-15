@@ -54,7 +54,7 @@ final class LyricsService {
 
         if !track.isLocal {
             do {
-                if let document = try await fetchSpicy(trackID: track.id) {
+                if let document = try await fetchSpicy(trackID: track.id), !document.isNoLyricsPlaceholder {
                     remember(document, for: track.id)
                     return .found(document)
                 }
@@ -67,7 +67,7 @@ final class LyricsService {
 
         if settings.useLRCLibFallback {
             do {
-                if let document = try await fetchLRCLib(track) {
+                if let document = try await fetchLRCLib(track), !document.isNoLyricsPlaceholder {
                     remember(document, for: track.id)
                     return .found(document)
                 }
@@ -253,7 +253,8 @@ final class LyricsService {
         }
         let payload = try JSONDecoder().decode(Payload.self, from: data)
         if payload.instrumental == true {
-            // Not "not found": the song has no words.
+            // Keep this as a static placeholder; lyrics(for:) maps it to not found so
+            // hide-not-found and auto-skip settings apply consistently.
             return LRCParser.plain(String(localized: "♪ Без слов ♪"), sourceName: "LRCLIB")
         }
         if let synced = payload.syncedLyrics?.nilIfBlank,
@@ -264,6 +265,29 @@ final class LyricsService {
             return LRCParser.plain(plain, sourceName: "LRCLIB")
         }
         return nil
+    }
+}
+
+private extension LyricsDocument {
+    /// Some catalogue responses encode an empty result as a one-line static document.
+    /// Treat only a document made entirely of known empty-result labels as not found, so
+    /// ordinary lyrics that happen to contain similar words remain untouched.
+    var isNoLyricsPlaceholder: Bool {
+        guard kind == .static, !lines.isEmpty else { return false }
+        let placeholders: Set<String> = [
+            "нет текста", "нет текст", "текст не найден", "♪ без слов ♪",
+            "no lyrics", "no lyrics found", "lyrics not found", "♪ instrumental ♪"
+        ]
+        return lines.allSatisfy { line in
+            let normalized = line.text
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "ru"))
+                .replacingOccurrences(of: ".", with: "")
+                .replacingOccurrences(of: "!", with: "")
+                .replacingOccurrences(of: "…", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return placeholders.contains(normalized)
+        }
     }
 }
 
