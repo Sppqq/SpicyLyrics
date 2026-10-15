@@ -1,0 +1,6 @@
+*
+!Dockerfile
+!codex
+!codex-code-mode-host
+!codex-bwrap-real
+!bwrap-wrapper.py
