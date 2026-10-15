@@ -23,6 +23,12 @@ REPO = "Sppqq/sweet-lyrics-ios"
 BASE = "https://sweet.sppq.dev"
 
 
+class RequestError(RuntimeError):
+    def __init__(self, host, status):
+        self.status = status
+        super().__init__(f"HTTP request to {host} failed ({status})")
+
+
 def request(url, token, body=None):
     headers = {"Authorization": "Bearer " + token, "User-Agent": "sweet-report-controller"}
     data = None
@@ -35,7 +41,7 @@ def request(url, token, body=None):
     except urllib.error.HTTPError as error:
         # Log only the service host and status; never include response bodies or request data.
         host = urllib.parse.urlsplit(url).hostname or "unknown"
-        raise RuntimeError(f"HTTP request to {host} failed ({error.code})") from None
+        raise RequestError(host, error.code) from None
 
 
 def command(args, cwd=None, env=None, timeout=180):
@@ -133,27 +139,42 @@ def publish(job, source, changed, result, report_id):
     branch = "bot/report-" + report_id[:8]
     existing = github("pulls?state=all&head=Sppqq:" + branch)
     if existing:
-        raise ValueError("existing PR requires follow-up; refusing duplicate repair")
+        pr = existing[0]
+        if (pr["state"] != "open" or pr["base"]["ref"] != "main"
+                or pr["head"]["ref"] != branch
+                or pr["head"]["repo"]["full_name"] != REPO):
+            raise ValueError("existing PR requires manual follow-up")
+        return pr["html_url"]
     repo = job / "publish"
-    command(["git", "clone", "--quiet", "--branch", "main", f"https://github.com/{REPO}.git", str(repo)])
-    # Pin to the source commit so the proposed diff cannot silently incorporate a newer main.
-    command(["git", "checkout", "-b", branch, (job / "commit").read_text().strip()], repo)
-    for name in changed:
-        target = repo / name
-        if (source / name).exists():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source / name, target)
-        else:
-            target.unlink()
-    command(["git", "diff", "--check"], repo)
-    command(["git", "add", "--", *changed], repo)
-    command(["git", "-c", "core.hooksPath=/dev/null", "-c", "user.name=Sweet Lyrics Maintenance",
-             "-c", "user.email=noreply@sppq.dev", "commit", "-m", result["title"]], repo)
+    commit_file = job / "publication-commit"
+    if not commit_file.exists():
+        # An interrupted preparation is safe to rebuild: nothing has been pushed yet.
+        if repo.exists():
+            shutil.rmtree(repo)
+        command(["git", "clone", "--quiet", "--branch", "main", f"https://github.com/{REPO}.git", str(repo)])
+        # Pin to the source commit so the proposed diff cannot silently incorporate a newer main.
+        command(["git", "checkout", "-b", branch, (job / "commit").read_text().strip()], repo)
+        for name in changed:
+            target = repo / name
+            if (source / name).exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source / name, target)
+            else:
+                target.unlink()
+        command(["git", "diff", "--check"], repo)
+        command(["git", "add", "--", *changed], repo)
+        command(["git", "-c", "core.hooksPath=/dev/null", "-c", "user.name=Sweet Lyrics Maintenance",
+                 "-c", "user.email=noreply@sppq.dev", "commit", "-m", result["title"]], repo)
+        pending_commit = job / "publication-commit.tmp"
+        pending_commit.write_text(command(["git", "rev-parse", "HEAD"], repo))
+        pending_commit.replace(commit_file)
     askpass = job / "askpass"
     askpass.write_text('#!/bin/sh\ncase "$1" in *Username*) echo x-access-token;; *) printf "%s\\n" "$GH_TOKEN";; esac\n')
     askpass.chmod(0o700)
     env = dict(os.environ, GIT_ASKPASS=str(askpass), GIT_TERMINAL_PROMPT="0")
-    command(["git", "-c", "core.hooksPath=/dev/null", "-c", "credential.helper=", "push", "origin", branch], repo, env)
+    # Retry exactly the same commit after a push or PR request with an uncertain outcome.
+    command(["git", "-c", "core.hooksPath=/dev/null", "-c", "credential.helper=", "push", "origin",
+             commit_file.read_text().strip() + ":refs/heads/" + branch], repo, env)
     # The private analysis and sender's wording never become a public PR body.
     pr = github("pulls", {"title": result["title"], "head": branch, "base": "main", "draft": True,
         "body": "Prepared from a private support report. The proposed code change requires review.\n\n"
@@ -164,6 +185,22 @@ def publish(job, source, changed, result, report_id):
 
 
 def analyze(state, report, previous):
+    # The repair intent is saved before publishing. Recover it without rerunning the agent
+    # when a push/PR succeeded but the process stopped before save_task committed.
+    for pending in sorted(state.glob("job-*/repair.json")):
+        repair = json.loads(pending.read_text())
+        if repair["fingerprint"] == fingerprint(report):
+            job = pending.parent
+            source = job / "source"
+            after = files(source)
+            if after != repair["after"]:
+                raise ValueError("pending repair content changed since validation")
+            changed = changed_files(repair["before"], after)
+            if changed != repair["changed"]:
+                raise ValueError("pending repair changed since validation")
+            result = validate_result(repair["result"])
+            pr = publish(job, source, changed, result, report["report"]["id"])
+            return result, pr
     job = Path(tempfile.mkdtemp(prefix="job-", dir=state))
     source, inputs, auth = job / "source", job / "input", job / "auth"
     inputs.mkdir()
@@ -198,7 +235,7 @@ def analyze(state, report, previous):
             continue
         name = f"photo-{index}.{ext}"
         (inputs / name).write_bytes(data)
-        images += ["--image", str(inputs / name)]
+        images += ["--image", "/input/" + name]
     context["unavailable_photos"] = unavailable_photos
     (inputs / "context.json").write_text(json.dumps(context, ensure_ascii=False), encoding="utf-8")
     before = files(source)
@@ -233,9 +270,14 @@ def analyze(state, report, previous):
         changed = changed_files(before, files(source))
         if result["fix"] != bool(changed):
             raise ValueError("fix claim does not match code changes")
-        pr = publish(job, source, changed, result, report["report"]["id"]) if changed else ""
-        # Preserve a refreshed login for the next invocation, without changing the user's own auth.
+        if changed:
+            repair = {"fingerprint": fingerprint(report), "before": before, "after": files(source), "changed": changed, "result": result}
+            pending = job / "repair.tmp"
+            pending.write_text(json.dumps(repair, ensure_ascii=False), encoding="utf-8")
+            pending.replace(job / "repair.json")
+        # Preserve a refreshed login even if publication needs a later retry.
         shutil.copyfile(auth / "auth.json", state / "auth.json")
+        pr = publish(job, source, changed, result, report["report"]["id"]) if changed else ""
         return result, pr
     finally:
         subprocess.run(["docker", "rm", "-f", container], capture_output=True)
@@ -262,7 +304,16 @@ def save_task(db, report, result, pr):
 
 def deliver(db, row):
     path = BASE + "/v1/bot/report/" + row["report_id"]
-    current = request(path, os.environ["BOT_TOKEN"])
+    try:
+        current = request(path, os.environ["BOT_TOKEN"])
+    except RequestError as error:
+        if error.status != 404:
+            raise
+        # The sender/admin or retention job removed the report. Keep its private task,
+        # but retire this outbox entry so it cannot prevent delivery of other replies.
+        db.execute("UPDATE tasks SET delivered=1 WHERE report_id=?", (row["report_id"],))
+        db.commit()
+        return
     # A crash after the POST must not send the same response twice on restart.
     duplicate = any(m["author"] == "dev" and m["text"] == row["reply"] for m in current["thread"])
     if row["reply"] and not duplicate:
@@ -304,35 +355,51 @@ def main():
             return
         if not args.dry_run:
             for row in db.execute("SELECT * FROM tasks WHERE delivered=0").fetchall():
-                deliver(db, row)
+                try:
+                    deliver(db, row)
+                except Exception:
+                    print("Reply delivery failed; private state retained for retry.", file=sys.stderr)
         inbox = request(BASE + "/v1/bot/inbox", os.environ["BOT_TOKEN"])["reports"]
         for item in inbox[:8]:
-            report_id = str(uuid.UUID(item["id"]))
-            report = request(BASE + "/v1/bot/report/" + report_id, os.environ["BOT_TOKEN"])
-            previous = db.execute("SELECT * FROM tasks WHERE report_id=?", (report_id,)).fetchone()
-            if previous and previous["fingerprint"] == fingerprint(report):
-                if previous["pr"]:
-                    version = released_version(previous, report["report"].get("channel"))
-                    if version and not args.dry_run:
-                        reply = "" if report["report"]["kind"] == "auto" else f"Исправление вышло в версии {version}."
-                        db.execute("UPDATE tasks SET status='closed', reply=?, delivered=0 WHERE report_id=?", (reply, report_id))
-                        db.commit()
-                        deliver(db, db.execute("SELECT * FROM tasks WHERE report_id=?", (report_id,)).fetchone())
-                        continue
-                if previous["pr"] or previous["kind"] == "feature":
-                    # Keep features durable; check existing repairs against actual release commits.
-                    if not args.dry_run:
-                        request(BASE + "/v1/bot/report/" + report_id + "/status", os.environ["BOT_TOKEN"], {"status": previous["status"]})
-                    continue
-            result, pr = analyze(args.state, report, previous) if not args.dry_run else (None, "")
-            if result:
-                save_task(db, report, result, pr)
-                deliver(db, db.execute("SELECT * FROM tasks WHERE report_id=?", (report_id,)).fetchone())
-            print("Report checked" if args.dry_run else "Report processed", flush=True)
+            try:
+                process_report(db, args, item)
+            except Exception:
+                print("Report processing failed; private state retained for retry.", file=sys.stderr)
         # Reports/logs are private and bounded; permanent task records are kept separately.
         for job in args.state.glob("job-*"):
             if job.is_dir() and job.stat().st_mtime < time.time() - 14 * 86400:
+                # Uncommitted publication intents must survive until they can be recovered.
+                pending = job / "repair.json"
+                if pending.exists():
+                    repair = json.loads(pending.read_text())
+                    if not db.execute("SELECT 1 FROM tasks WHERE fingerprint=?", (repair["fingerprint"],)).fetchone():
+                        continue
                 shutil.rmtree(job)
+
+
+def process_report(db, args, item):
+    report_id = str(uuid.UUID(item["id"]))
+    report = request(BASE + "/v1/bot/report/" + report_id, os.environ["BOT_TOKEN"])
+    previous = db.execute("SELECT * FROM tasks WHERE report_id=?", (report_id,)).fetchone()
+    if previous and previous["fingerprint"] == fingerprint(report):
+        if previous["pr"]:
+            version = released_version(previous, report["report"].get("channel"))
+            if version and not args.dry_run:
+                reply = "" if report["report"]["kind"] == "auto" else f"Исправление вышло в версии {version}."
+                db.execute("UPDATE tasks SET status='closed', reply=?, delivered=0 WHERE report_id=?", (reply, report_id))
+                db.commit()
+                deliver(db, db.execute("SELECT * FROM tasks WHERE report_id=?", (report_id,)).fetchone())
+                return
+        if previous["pr"] or previous["kind"] == "feature":
+            # Keep features durable; check existing repairs against actual release commits.
+            if not args.dry_run:
+                request(BASE + "/v1/bot/report/" + report_id + "/status", os.environ["BOT_TOKEN"], {"status": previous["status"]})
+            return
+    result, pr = analyze(args.state, report, previous) if not args.dry_run else (None, "")
+    if result:
+        save_task(db, report, result, pr)
+        deliver(db, db.execute("SELECT * FROM tasks WHERE report_id=?", (report_id,)).fetchone())
+    print("Report checked" if args.dry_run else "Report processed", flush=True)
 
 
 if __name__ == "__main__":

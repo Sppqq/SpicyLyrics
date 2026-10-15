@@ -22,7 +22,13 @@ not include report text, logs, photos, or internal analysis.
 The service replies only after saving the task. Feature requests are marked as tasks and are not
 described as completed fixes. Rechecks compare the actual PR merge commit against published release
 tags before saying a fix is out. Unsent replies are kept in a SQLite outbox so a restart can resume.
-Temporary report copies expire after 14 days; task metadata remains locally for follow-up.
+Photo arguments use paths inside the container's `/input` mount. Before publishing, the controller
+journals the validated repair and persists its commit before pushing. Retries reuse that commit or
+the existing open PR, so an interrupted publication does not require another agent run. Missing
+reports retire their outbox entries; transient delivery and per-report failures remain retryable
+without stopping the rest of the queue.
+Temporary report copies expire after 14 days, except unpublished repair journals retained for
+recovery; task metadata remains locally for follow-up.
 
 Use `report_bot.py tasks` over SSH to see saved tasks. Do not copy the database or transient reports
 to a public repository. The timer should be enabled only after verifying the private credentials,
