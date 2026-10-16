@@ -747,8 +747,12 @@ final class PlayerModel {
                 // really was. A pause made elsewhere (Spotify, the lock screen, headphones) counts
                 // too: it carries the exact position. Leaving pauses out kept the lead stuck at
                 // 635 ms while it really was ~260 ms (a report: lyrics late all song long).
-                let observed = startLead - drift
-                if now >= holdUntil, (0...1.5).contains(observed) {
+                // `drift` is measured against a clock that already had `startLead` removed.
+                // If the estimate is larger than the real lead, the observed value can be
+                // negative. Clamp that to zero so a pause/seek can teach us to stop subtracting
+                // a lead instead of discarding the sample and retaining the bad estimate.
+                let observed = max(0, startLead - drift)
+                if now >= holdUntil, observed <= 1.5 {
                     startLead = (startLead + observed) / 2
                     leadNote = " (start lead \(observed.signedMs) → now \(startLead.signedMs))"
                 } else {
