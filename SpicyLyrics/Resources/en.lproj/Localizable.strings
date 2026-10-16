@@ -510,3 +510,4 @@
 "Пока не определено — дослушайте пару песен до конца" = "Not detected yet — let a couple of songs play through";
 "Сбросить определение" = "Reset Detection";
 "Авто оценивает переход по естественным сменам треков отдельно для Spotify и Apple Music. Вручную можно указать настройку музыкального приложения. Это не меняет звук." = "Automatic mode estimates transitions from natural track changes separately for Spotify and Apple Music. Manual mode lets you match your music app setting. This does not change audio.";
+"Spotify не может выполнить это действие для текущего трека или устройства." = "Spotify can't perform this action for the current track or device.";
