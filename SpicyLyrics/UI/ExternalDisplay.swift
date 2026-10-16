@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 import UIKit
 
@@ -54,6 +55,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 extension ExternalDisplay {
     /// For the log: which screens and scenes iOS reports, so a TV that shows a copy of the phone
     /// instead of the lyrics can be told apart from one the app never heard of.
+    private static func logState(_ reason: String) {
+        let roles = UIApplication.shared.connectedScenes.map { $0.session.role.rawValue.replacingOccurrences(of: "UIWindowSceneSessionRole", with: "") }
+        let outputs = AVAudioSession.sharedInstance().currentRoute.outputs.map { $0.portType.rawValue }
+        SyncLog.log("display", "\(reason): \(UIScreen.screens.count) screen(s), scenes [\(roles.joined(separator: ", "))], audio \(outputs.joined(separator: ", "))")
+    }
+
     static func startDiagnostics() {
         let center = NotificationCenter.default
         SyncLog.log("display", "screens at launch: \(UIScreen.screens.count)")
@@ -63,6 +70,17 @@ extension ExternalDisplay {
         }
         center.addObserver(forName: UIScreen.didDisconnectNotification, object: nil, queue: .main) { _ in
             SyncLog.log("display", "screen disconnected")
+        }
+        // Screen mirroring switches the audio to AirPlay too: what does iOS show the app then?
+        center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { _ in
+            logState("audio route changed")
+        }
+        center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            logState("app active")
+        }
+        center.addObserver(forName: UIScene.didDisconnectNotification, object: nil, queue: .main) { note in
+            guard let scene = note.object as? UIScene else { return }
+            SyncLog.log("display", "scene disconnected: \(scene.session.role.rawValue)")
         }
         center.addObserver(forName: UIScene.willConnectNotification, object: nil, queue: .main) { note in
             guard let scene = note.object as? UIScene else { return }
