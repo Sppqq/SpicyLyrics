@@ -36,7 +36,10 @@ final class LyricsService {
         // The user's own TTML wins over every online source (the extension's Local DB).
         if let document = local.document(for: track.id) { return .found(document) }
         if !ignoreCache {
-            if let hit = memory[track.id] { return .found(hit) }
+            if let hit = memory[track.id] {
+                if !hit.isNoLyricsPlaceholder { return .found(hit) }
+                memory.removeValue(forKey: track.id)
+            }
             // Off the main thread: a big document takes a moment to decode.
             let cache = cache, id = track.id
             switch await Task.detached(priority: .userInitiated, operation: { cache.read(id) }).value {
@@ -51,12 +54,16 @@ final class LyricsService {
         }
 
         var failures: [String] = []
+        var confirmedInstrumental = false
 
         if !track.isLocal {
             do {
-                if let document = try await fetchSpicy(trackID: track.id), !document.isNoLyricsPlaceholder {
-                    remember(document, for: track.id)
-                    return .found(document)
+                if let document = try await fetchSpicy(trackID: track.id) {
+                    // Spicy Lyrics answered "no words": a later LRCLIB failure must not turn it into an error.
+                    if document.isNoLyricsPlaceholder { confirmedInstrumental = true } else {
+                        remember(document, for: track.id)
+                        return .found(document)
+                    }
                 }
             } catch is CancellationError {
                 return .failed("cancelled")
@@ -67,9 +74,14 @@ final class LyricsService {
 
         if settings.useLRCLibFallback {
             do {
-                if let document = try await fetchLRCLib(track), !document.isNoLyricsPlaceholder {
+                switch try await fetchLRCLib(track) {
+                case .document(let document) where !document.isNoLyricsPlaceholder:
                     remember(document, for: track.id)
                     return .found(document)
+                case .instrumental:
+                    confirmedInstrumental = true
+                case .document, .missing:
+                    break
                 }
             } catch is CancellationError {
                 return .failed("cancelled")
@@ -83,7 +95,7 @@ final class LyricsService {
             }
         }
 
-        if failures.isEmpty {
+        if failures.isEmpty || confirmedInstrumental {
             let cache = cache, id = track.id
             Task.detached(priority: .utility) { cache.writeMiss(id) }
             return .notFound
@@ -231,7 +243,13 @@ final class LyricsService {
 
     // MARK: LRCLIB
 
-    private func fetchLRCLib(_ track: TrackInfo) async throws -> LyricsDocument? {
+    private enum LRCLibOutcome {
+        case document(LyricsDocument)
+        case instrumental
+        case missing
+    }
+
+    private func fetchLRCLib(_ track: TrackInfo) async throws -> LRCLibOutcome {
         var components = URLComponents(string: "https://lrclib.net/api/get")!
         components.queryItems = [
             .init(name: "track_name", value: track.title),
@@ -243,7 +261,7 @@ final class LyricsService {
         request.setValue("SpicyLyrics-iOS/\(Self.appVersion) (https://github.com/Spikerko/spicy-lyrics)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        if status == 404 { return nil }
+        if status == 404 { return .missing }
         guard status == 200 else { throw SpicyError.http(status, nil) }
 
         struct Payload: Decodable {
@@ -253,18 +271,16 @@ final class LyricsService {
         }
         let payload = try JSONDecoder().decode(Payload.self, from: data)
         if payload.instrumental == true {
-            // Keep this as a static placeholder; lyrics(for:) maps it to not found so
-            // hide-not-found and auto-skip settings apply consistently.
-            return LRCParser.plain(String(localized: "♪ Без слов ♪"), sourceName: "LRCLIB")
+            return .instrumental
         }
         if let synced = payload.syncedLyrics?.nilIfBlank,
            let document = LRCParser.parse(synced, duration: track.duration, sourceName: "LRCLIB") {
-            return document
+            return .document(document)
         }
         if let plain = payload.plainLyrics?.nilIfBlank {
-            return LRCParser.plain(plain, sourceName: "LRCLIB")
+            return LRCParser.plain(plain, sourceName: "LRCLIB").map(LRCLibOutcome.document) ?? .missing
         }
-        return nil
+        return .missing
     }
 }
 
@@ -322,6 +338,10 @@ struct LyricsDiskCache {
         else { return nil }
         let age = -record.savedAt.timeIntervalSinceNow
         if let document = record.document {
+            if document.isNoLyricsPlaceholder {
+                try? FileManager.default.removeItem(at: file(id))
+                return nil
+            }
             let lifetime: TimeInterval = document.sourceName.hasPrefix("LRCLIB") ? 86_400 : Self.hitLifetime
             return age < lifetime ? .hit(document) : nil
         }
