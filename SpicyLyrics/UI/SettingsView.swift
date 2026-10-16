@@ -483,6 +483,8 @@ private struct InterfaceSettings: View {
             Section {
                 Toggle(String(localized: "Полоска громкости"), isOn: $settings.showVolumeSlider)
                 Toggle(String(localized: "Не гасить экран"), isOn: $settings.keepScreenOn)
+            } footer: {
+                Text(String(localized: "Текст на телевизоре: включите «Повтор экрана» в Пункте управления (AirPlay) или подключите экран кабелем. Там откроется полноэкранный текст, как в десктопной версии, а телефон останется пультом и не будет гаснуть."))
             }
         }
     }

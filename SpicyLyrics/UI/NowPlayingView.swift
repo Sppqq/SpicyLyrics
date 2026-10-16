@@ -228,9 +228,10 @@ struct NowPlayingView: View {
         var eligible: Bool
     }
 
-    /// The app's window, or nil before it exists.
+    /// The app's window, or nil before it exists (never the external screen's).
     private static var keyWindow: UIWindow? {
         UIApplication.shared.connectedScenes
+            .filter { $0.session.role == .windowApplication }
             .compactMap { ($0 as? UIWindowScene)?.keyWindow }
             .first
     }

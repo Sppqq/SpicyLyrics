@@ -94,6 +94,7 @@
 "Настроить доступ к Spotify" = "Set Up Spotify Access";
 "Настройки" = "Settings";
 "Не гасить экран" = "Keep Screen On";
+"Текст на телевизоре: включите «Повтор экрана» в Пункте управления (AirPlay) или подключите экран кабелем. Там откроется полноэкранный текст, как в десктопной версии, а телефон останется пультом и не будет гаснуть." = "Lyrics on a TV: turn on Screen Mirroring in Control Center (AirPlay) or connect a display with a cable. It shows full-screen lyrics like the desktop version, while your phone stays the remote and doesn't lock.";
 "Не настроен" = "Not set up";
 "Не удалось загрузить текст" = "Couldn't load lyrics";
 "Не удалось открыть окно: %@" = "Couldn't open the window: %@";

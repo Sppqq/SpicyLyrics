@@ -51,6 +51,9 @@ the popular Spicetify extension for Spotify on desktop. Made by
 - **A background made from the album cover** that slowly flows like liquid.
 - **Big artwork mode**: the quote button at the bottom left swaps the lyrics for a large cover
   with the current line under it.
+- **Lyrics on your TV**: turn on Screen Mirroring (AirPlay) or plug in a display, and it shows
+  full-screen lyrics like the desktop extension, while your phone stays the remote
+  ([see it](docs/media/tv-mirroring.mp4)).
 - **Floating lyrics (Picture in Picture)**: keep the current line on screen over other apps.
 - **Lyrics in other languages**: Japanese, Chinese, Korean, Russian and Greek can be shown in
   Latin letters, and any song can be translated line by line.
