@@ -35,6 +35,13 @@ npx wrangler deploy
 database made before threads existed up to date (`wrangler d1 execute … --file=migrations/0001_threads.sql`);
 never run it on a database made from the current `schema.sql` (the columns already exist).
 
+After the first setup, GitHub Actions deploys the Worker (`.github/workflows/cloudflare-worker.yml`):
+pull requests that touch `cloudflare/` or `server/report-bot/` get a check (syntax, report bot tests,
+`wrangler deploy --dry-run`), and every such push to `main` is deployed. It needs two repository
+secrets: `CLOUDFLARE_API_TOKEN` (the "Edit Cloudflare Workers" template, with D1 and R2 edit added)
+and `CLOUDFLARE_ACCOUNT_ID`. Schema changes are not applied automatically: run them by hand before
+merging the Worker that needs them.
+
 ## Report bot
 
 Report processing runs on the private server through the Codex CLI in an isolated container. The
