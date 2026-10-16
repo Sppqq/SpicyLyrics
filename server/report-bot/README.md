@@ -18,6 +18,10 @@ this container only; filesystem isolation remains enforced by bwrap and seccomp.
 checks every changed path and file type before a commit.
 Only an allow-listed source diff is pushed to a draft PR; it is never merged. PR metadata does
 not include report text, logs, photos, or internal analysis.
+Commit and PR titles are controller-generated from the task kind and short report ID. Before
+publication (including retries), the diff is checked for email addresses, phone numbers and
+recognizable tokens from the private note, log and user messages. This is a heuristic privacy
+check, not a guarantee against every possible encoding of private data.
 
 The service replies only after saving the task. Feature requests are marked as tasks and are not
 described as completed fixes. Rechecks compare the actual PR merge commit against published release
@@ -27,6 +31,13 @@ journals the validated repair and persists its commit before pushing. Retries re
 the existing open PR, so an interrupted publication does not require another agent run. Missing
 reports retire their outbox entries; transient delivery and per-report failures remain retryable
 without stopping the rest of the queue.
+New repairs for an existing open PR start from its current branch head and append a commit
+without force-pushing. A PR closed without merge returns the task to open/manual review.
+Replies are bounded to the Worker's 4000 UTF-16-unit limit before entering the outbox.
+Deploy the Worker before this controller: `expect_user_revision` guards bot replies/status updates
+with the last user message ID, checked inside a transactional D1 batch. A mismatch returns 409
+without changing the thread or status; the controller discards the stale reply and reanalyzes
+the report on the next inbox pass. The field is optional for older API clients.
 Temporary report copies expire after 14 days, except unpublished repair journals retained for
 recovery; task metadata remains locally for follow-up.
 

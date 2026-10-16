@@ -217,6 +217,29 @@ async function bot(request, env, url) {
   if (request.method === "POST" && (parts[4] === "reply" || parts[4] === "status")) {
     let body;
     try { body = await request.json(); } catch { return json({ error: "body" }, 400); }
+    if (body?.expect_user_revision !== undefined) {
+      const revision = body.expect_user_revision;
+      if (!Number.isSafeInteger(revision) || revision < 0 || !STATUSES.includes(body.status)) {
+        return json({ error: "condition" }, 400);
+      }
+      const message = String(body.text || "").trim().slice(0, MAX_REPLY);
+      if (parts[4] === "reply" && !message) return json({ error: "empty" }, 400);
+      // D1 batch is transactional: a user message cannot slip between the conditional
+      // reply and status update. Message IDs also detect arrivals within the same second.
+      const guard = `EXISTS (SELECT 1 FROM reports WHERE id = ?)
+        AND COALESCE((SELECT MAX(id) FROM messages WHERE report_id = ? AND author = 'user'), 0) = ?`;
+      const now = Math.floor(Date.now() / 1000);
+      const statements = [];
+      if (parts[4] === "reply") {
+        statements.push(env.DB.prepare(`INSERT INTO messages (report_id, created_at, author, text)
+          SELECT ?, ?, 'dev', ? WHERE ${guard}`).bind(row.id, now, message, row.id, row.id, revision));
+      }
+      statements.push(env.DB.prepare(`UPDATE reports SET status = ?, updated_at = ?
+        WHERE id = ? AND ${guard}`).bind(body.status, now, row.id, row.id, row.id, revision));
+      const results = await env.DB.batch(statements);
+      if (!results[results.length - 1].meta.changes) return json({ error: "stale report" }, 409);
+      return json({ ok: true });
+    }
     if (parts[4] === "reply") {
       if (!String(body?.text || "").trim()) return json({ error: "empty" }, 400);
       await addDevMessage(env, row.id, body.text, body.status);
