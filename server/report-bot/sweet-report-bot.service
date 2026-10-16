@@ -1,0 +1,12 @@
+[Unit]
+Description=Private Sweet Lyrics report processor
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/.local/share/sweet-report-bot
+ExecStart=/usr/bin/python3 %h/.local/share/sweet-report-bot/report_bot.py run
+TimeoutStartSec=4h
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true

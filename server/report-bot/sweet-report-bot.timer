@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Sweet Lyrics reports every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=sweet-report-bot.service
+
+[Install]
+WantedBy=timers.target

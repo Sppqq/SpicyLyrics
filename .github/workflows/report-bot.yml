@@ -1,60 +1,13 @@
-name: Work through bug reports
-
-# Every hour Claude reads new reports and replies from the report server (cloudflare/), fixes what it
-# can in a PR and answers the sender in the app. The instructions are in .github/report-bot-prompt.md.
-# Secrets: CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`) and REPORT_BOT_TOKEN (the worker's BOT_TOKEN).
+name: "Retired: report bot runs on the private server"
 
 on:
-  schedule:
-    - cron: "7 * * * *"
   workflow_dispatch:
 
-concurrency:
-  group: report-bot
-  cancel-in-progress: false
-
 permissions:
-  contents: write
-  pull-requests: write
-  id-token: write
+  contents: read
 
 jobs:
-  triage:
+  retired:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-    env:
-      BOT_TOKEN: ${{ secrets.REPORT_BOT_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      # Most hours there is nothing new: don't start Claude for an empty inbox.
-      - name: Anything to do?
-        id: inbox
-        run: |
-          set -euo pipefail
-          count=$(curl -sf -H "Authorization: Bearer $BOT_TOKEN" https://sweet.sppq.dev/v1/bot/inbox | jq '.reports | length')
-          echo "count=$count" >> "$GITHUB_OUTPUT"
-          echo "Reports waiting: $count" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Prompt
-        if: steps.inbox.outputs.count != '0'
-        id: prompt
-        run: |
-          {
-            echo "text<<PROMPT_EOF"
-            cat .github/report-bot-prompt.md
-            echo "PROMPT_EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - uses: anthropics/claude-code-action@v1
-        if: steps.inbox.outputs.count != '0'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: ${{ steps.prompt.outputs.text }}
-          claude_args: >-
-            --model claude-sonnet-5-5 --effort medium
-            --allowedTools "Bash,Read,Write,Edit,Glob,Grep"
+      - run: echo "Report triage runs on the server. See server/report-bot/README.md."

@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "title", "analysis", "reply", "status", "fix", "validation"],
+  "properties": {
+    "kind": {"type": "string", "enum": ["bug", "feature", "question", "expected"]},
+    "title": {"type": "string"},
+    "analysis": {"type": "string"},
+    "reply": {"type": "string"},
+    "status": {"type": "string", "enum": ["open", "in_progress", "closed"]},
+    "fix": {"type": "boolean"},
+    "validation": {"type": "string"}
+  }
+}
