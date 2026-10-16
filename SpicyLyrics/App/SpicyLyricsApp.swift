@@ -85,6 +85,8 @@ struct RootView: View {
                 OnboardingView()
             }
         }
+        // The TV on screen mirroring (iOS 27 needs this to offer the screen at all).
+        .modifier(ExternalDisplayAccessory())
         .onChange(of: scenePhase, initial: true) { old, phase in
             updateActivity(phase)
             // Back in the app: the lyrics on screen were last drawn a while ago.

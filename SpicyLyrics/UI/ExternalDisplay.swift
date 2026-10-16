@@ -11,8 +11,15 @@ final class ExternalDisplay {
     static let shared = ExternalDisplay()
 
     /// Some screen is showing the lyrics: the phone must not lock (that ends the mirroring).
-    var isConnected: Bool { connections > 0 }
+    var isConnected: Bool { connections > 0 || accessoryShown }
     private var connections = 0
+    /// iOS 27: the scene accessory's content is on a screen.
+    private var accessoryShown = false
+
+    fileprivate func setAccessoryShown(_ shown: Bool) {
+        accessoryShown = shown
+        SyncLog.log("display", shown ? "external screen: lyrics shown (scene accessory)" : "external screen: lyrics gone (scene accessory)")
+    }
 
     private(set) var settings: AppSettings?
     private(set) var player: PlayerModel?
@@ -113,6 +120,31 @@ final class ExternalDisplaySceneDelegate: UIResponder, UIWindowSceneDelegate {
         window = nil
         ExternalDisplay.shared.disconnected()
         SyncLog.log("display", "external screen disconnected")
+    }
+}
+
+/// iOS 27 offers the external screen only to an app that registered a scene accessory for it
+/// ("Presenting content on a connected display"); before that the scene from Info.plist and
+/// `AppDelegate` is enough. Put on the app's root view. The SDK check keeps older Xcodes (CI)
+/// building.
+struct ExternalDisplayAccessory: ViewModifier {
+    func body(content: Content) -> some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.0, *) {
+            content.sceneAccessory {
+                ExternalNonInteractiveAccessory {
+                    ExternalDisplayRoot()
+                }
+                .onAvailabilityChange { available in
+                    ExternalDisplay.shared.setAccessoryShown(available)
+                }
+            }
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
     }
 }
 
