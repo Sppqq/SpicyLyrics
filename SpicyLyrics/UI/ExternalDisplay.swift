@@ -28,19 +28,54 @@ final class ExternalDisplay {
     fileprivate func disconnected() { connections = max(0, connections - 1) }
 }
 
-/// Only to give the external screen its own scene; the app's window stays SwiftUI's.
+/// Only to give the external screen its own scene; the app's window stays SwiftUI's. The same
+/// scene is also declared in Info.plist (`UIApplicationSceneManifest`): without a manifest iOS
+/// never offered the app a scene for the TV and just mirrored the phone.
 final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        ExternalDisplay.startDiagnostics()
+        return true
+    }
+
     func application(_ application: UIApplication, configurationForConnecting session: UISceneSession,
                      options: UIScene.ConnectionOptions) -> UISceneConfiguration {
-        let configuration = UISceneConfiguration(name: nil, sessionRole: session.role)
-        if session.role == .windowExternalDisplayNonInteractive {
-            configuration.delegateClass = ExternalDisplaySceneDelegate.self
+        guard session.role == .windowExternalDisplayNonInteractive else {
+            return UISceneConfiguration(name: nil, sessionRole: session.role)
         }
+        SyncLog.log("display", "iOS asks for the external screen's scene")
+        let configuration = UISceneConfiguration(name: ExternalDisplaySceneDelegate.configurationName,
+                                                 sessionRole: session.role)
+        configuration.delegateClass = ExternalDisplaySceneDelegate.self
         return configuration
     }
 }
 
+extension ExternalDisplay {
+    /// For the log: which screens and scenes iOS reports, so a TV that shows a copy of the phone
+    /// instead of the lyrics can be told apart from one the app never heard of.
+    static func startDiagnostics() {
+        let center = NotificationCenter.default
+        SyncLog.log("display", "screens at launch: \(UIScreen.screens.count)")
+        center.addObserver(forName: UIScreen.didConnectNotification, object: nil, queue: .main) { note in
+            let screen = note.object as? UIScreen
+            SyncLog.log("display", "screen connected \(screen.map { "\($0.bounds.size)" } ?? "?"), mirrored: \(screen?.mirrored != nil)")
+        }
+        center.addObserver(forName: UIScreen.didDisconnectNotification, object: nil, queue: .main) { _ in
+            SyncLog.log("display", "screen disconnected")
+        }
+        center.addObserver(forName: UIScene.willConnectNotification, object: nil, queue: .main) { note in
+            guard let scene = note.object as? UIScene else { return }
+            SyncLog.log("display", "scene connecting: \(scene.session.role.rawValue), delegate \(scene.delegate.map { "\(type(of: $0))" } ?? "none")")
+        }
+    }
+}
+
+@objc(SLExternalDisplaySceneDelegate)
 final class ExternalDisplaySceneDelegate: UIResponder, UIWindowSceneDelegate {
+    /// Matches `UISceneConfigurationName` in project.yml.
+    static let configurationName = "External Display"
+
     var window: UIWindow?
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options: UIScene.ConnectionOptions) {
