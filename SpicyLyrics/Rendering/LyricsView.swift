@@ -273,7 +273,7 @@ extension LyricsView {
                         onInteraction()
                         guard shown.kind != .static else { return }
                         resumeAutoScrollAt = .distantPast
-                        player.seek(to: seekTarget(line))
+                        player.seekLyrics(to: seekTarget(line))
                     }
                     .contextMenu { lineMenu(line) }
                     // Entirely under the header or the controls: nobody sees it, so it is not
@@ -304,7 +304,7 @@ extension LyricsView {
         if !line.isInterlude {
             if shown.kind != .static {
                 Button {
-                    player.seek(to: seekTarget(line))
+                    player.seekLyrics(to: seekTarget(line))
                 } label: {
                     Label(String(localized: "Перемотать сюда"), systemImage: "play.circle")
                 }

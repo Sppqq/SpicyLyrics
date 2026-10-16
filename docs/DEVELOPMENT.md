@@ -18,8 +18,9 @@ These features work, but still need testing and refinement.
 | Big artwork | The quote button at the bottom left swaps the lyrics for the cover, as big as fits, over a flowing nebula in the cover's colours, with the line being sung under it (word by word, like the lyrics). Songs whose lyrics are hidden can show it too, or the nebula alone |
 | Skip songs without sync | Optionally skips songs that have no Spicy Lyrics sync (or no word-by-word sync). The next songs in the queue are looked up while the current one plays, so an unsynced song is skipped the moment it starts, together with any unsynced songs right after it; songs you pick or go back to are kept |
 | Lyrics ahead of time | The lyrics of the next songs in the queue are fetched while the current one plays, so they show the moment the song changes |
-| Lyrics sources | Spicy Lyrics API with [LRCLIB](https://lrclib.net) as a fallback |
-| Seeking | Tap a lyric line to seek to it; requires Spotify Premium |
+| Playback sources | Spotify Web API / App Remote, or the Apple Music system player through public MediaPlayer APIs |
+| Lyrics sources | Spicy Lyrics API with [LRCLIB](https://lrclib.net) as a fallback; Apple Music can match Spotify IDs and always enables LRCLIB |
+| Seeking | Tap a lyric line to seek through the selected player; Spotify mode requires Spotify Premium |
 | Track picker | Tap the track header (or the list button) to jump ahead in the queue, replay something from your history, or search; swipe the header sideways to skip. Requires Spotify Premium |
 | Own TTML files | Like the extension's Lyrics Manager: pick a `.ttml` file or paste TTML, apply it just once or save it to a library that wins over online sources (*••• → Свой текст (TTML)*) |
 | Apple Music style player | Controls fade away while a song plays; landscape and iPad put artwork and controls beside the lyrics |
@@ -29,6 +30,57 @@ These features work, but still need testing and refinement.
 | Romanization and translation | On-device: Japanese (with kanji readings), Chinese pinyin, Korean, Cyrillic, Greek; translation under or instead of each line, by Apple Translation on the device (iOS 18+), Google, Yandex or DeepL (your own key) |
 | Interface language | English and Russian; follows the phone's language (English otherwise), or pick one in *Settings → Interface* |
 | Display modes | Spicy Lyrics' Simple Lyrics Mode, centred lyrics, SF Pro / Rounded / New York |
+
+## Apple Music and playback sources
+
+`PlaybackSource` in `AppSettings` selects Spotify (default) or Apple Music manually.
+`PlayerModel` routes sampling and transport controls; the Spotify clock and network path
+remain in use only in Spotify mode. Queue, history, search, App Remote and auto-skip are
+Spotify-only. Apple Music onboarding does not require a Spotify account or Client ID.
+
+`AppleMusicPlayer` uses the public `MediaPlayer.MPMusicPlayerController.systemMusicPlayer`,
+with `MPMediaLibrary` permission and `NSAppleMusicUsageDescription`. It reads the local
+position every 750 ms and on item/state notifications. The read time anchors the existing
+smooth clock; repeated positions do not pull it backwards. Artwork comes from `MPMediaItem`
+or an iTunes lookup by store ID. No MusicKit entitlement or private API is used.
+iOS has no public API for reading arbitrary other apps' Now Playing state.
+
+Apple Music IDs use the `am:` namespace, including local and metadata fallbacks. Own TTML
+and lyrics caches stay attached to that ID. Optional Spotify sign-in enables a metadata
+search: normalized title/artist must match and duration must differ by at most 3 seconds.
+Successful mappings are cached in memory and UserDefaults (cleared with the lyrics cache).
+Spicy Lyrics receives the matched Spotify ID; LRCLIB is always enabled for Apple Music.
+
+Transitions default to automatic detection; existing saved crossfades above zero migrate to
+manual mode. `TransitionDetector` persists the last six natural-change measurements separately
+for Spotify and Apple Music. A track must have been observed playing for at least 20 seconds;
+pauses, manual commands, clock jumps and observation gaps disqualify it. The rounded median
+of a recent agreeing run (at least two samples, spread at most 1.5 seconds) estimates crossfade,
+with remaining time below 0.7 seconds treated as off. Until agreement, the saved estimate stays.
+Apple Music AutoMix is inferred from two nonzero starts above 1.5 seconds in the last four
+changes, or a remaining-time spread above 3 seconds among overlaps longer than 2 seconds;
+three consecutive clean changes turn it off. These are behavioral estimates, not app settings.
+Automatic holds use the actual remaining time immediately, including the first eligible
+transition: more than 0.7 and at most 14 seconds, capped at 10 for AutoMix. Settings show the
+current source's estimate and can reset its history; manual mode retains the 0–12 second
+duration and AutoMix switch. None of these options changes audio playback.
+
+Near a natural track boundary, `PlayerModel` captures outgoing
+prepared lyrics, translations and a separate clock, while loading the new track normally.
+The existing `lyricsState` / `position(at:)` accessors expose that outgoing text until its
+end or the configured window expires. AutoMix uses up to 10 seconds and trusts the incoming
+Music position, including a nonzero start. Spotify's fresh-start lead compensation is
+disabled when a transition is detected or manually configured, including a first observed
+overlap. Controls in Sweet Lyrics skip the hold for five seconds after next/previous/track
+selection/seek. A tap on outgoing lyrics dismisses
+them to avoid seeking the incoming song using an outgoing timestamp; scrubber and PiP seeks
+cancel the hold and seek the incoming song normally.
+Pausing also dismisses the hold. Manual skips in the external app cannot be reliably
+distinguished from natural changes near the end using these public APIs.
+
+Device validation is still required for streaming metadata availability, position precision,
+crossfade/AutoMix notification timing and sideload permission behavior. No iOS build or
+device playback test is available in the Windows workspace.
 
 ## Spotify Connection
 

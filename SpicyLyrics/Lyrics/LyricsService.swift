@@ -6,7 +6,7 @@ enum LyricsLookupResult {
     case failed(String)
 }
 
-/// Finds lyrics for a Spotify track: disk cache → Spicy Lyrics → LRCLIB.
+/// Keeps source-specific caches while resolving online lyrics by metadata when needed.
 @MainActor
 final class LyricsService {
     private let settings: AppSettings
@@ -14,6 +14,10 @@ final class LyricsService {
     private let cache = LyricsDiskCache()
     private let session: URLSession
     private var memory: [String: LyricsDocument] = [:]
+    private let spotify: SpotifyAPI
+    private var spotifyMatches: [String: String]
+    private var spotifyMisses: Set<String> = []
+    private static let matchesKey = "appleMusicSpotifyMatches.v1"
 
     private static let spicyHost = URL(string: "https://api.spicylyrics.org")!
     private static let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
@@ -24,6 +28,8 @@ final class LyricsService {
         self.settings = settings
         self.auth = auth
         self.local = local
+        spotify = SpotifyAPI(auth: auth)
+        spotifyMatches = UserDefaults.standard.dictionary(forKey: Self.matchesKey) as? [String: String] ?? [:]
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -52,9 +58,11 @@ final class LyricsService {
 
         var failures: [String] = []
 
-        if !track.isLocal {
+        let appleMusic = track.id.hasPrefix("am:")
+        let spicyID: String? = appleMusic ? await spotifyID(for: track) : track.id
+        if !track.isLocal, let spicyID {
             do {
-                if let document = try await fetchSpicy(trackID: track.id) {
+                if let document = try await fetchSpicy(trackID: spicyID) {
                     remember(document, for: track.id)
                     return .found(document)
                 }
@@ -65,7 +73,7 @@ final class LyricsService {
             }
         }
 
-        if settings.useLRCLibFallback {
+        if settings.useLRCLibFallback || appleMusic {
             do {
                 if let document = try await fetchLRCLib(track) {
                     remember(document, for: track.id)
@@ -93,7 +101,77 @@ final class LyricsService {
 
     func clearCache() {
         memory.removeAll()
+        spotifyMatches.removeAll()
+        spotifyMisses.removeAll()
+        UserDefaults.standard.removeObject(forKey: Self.matchesKey)
         cache.clear()
+    }
+
+    private static func normalized(_ text: String) -> String {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            .components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
+    private static func titleCore(_ text: String) -> String {
+        let core = text.components(separatedBy: " - ").first ?? text
+        let withoutVersion = core.replacingOccurrences(of: #"[\(\[].*$"#, with: "", options: .regularExpression)
+        let withoutFeature = withoutVersion.replacingOccurrences(
+            of: #"(?i)\b(?:feat\.?|ft\.?|featuring)\s+.*$"#, with: "", options: .regularExpression)
+        return normalized(withoutFeature)
+    }
+
+    private static func firstArtist(_ text: String) -> String {
+        text.replacingOccurrences(of: #"(?i)\s*(?:&|,|\bfeat\.?\s|\bft\.?\s|\bfeaturing\s).*$"#,
+                                  with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func spotifyID(for track: TrackInfo) async -> String? {
+        let title = Self.titleCore(track.title)
+        let artistLine = track.artists.joined(separator: ", ")
+        let artist = Self.normalized(artistLine)
+        guard !title.isEmpty, !artist.isEmpty, track.duration > 0 else { return nil }
+        let key = "\(Self.normalized(track.title))|\(artist)|\(Int(track.duration.rounded()))"
+        if let id = spotifyMatches[key], auth.isLoggedIn || settings.validSpicyKey != nil { return id }
+        guard auth.isLoggedIn, !spotifyMisses.contains(key) else { return nil }
+        let safeTitle = track.title.replacingOccurrences(of: "\"", with: " ")
+        let safeArtist = artistLine.replacingOccurrences(of: "\"", with: " ")
+        func bestMatch(in results: [TrackSummary]) -> TrackSummary? {
+            results.filter { candidate in
+                let candidateTitle = Self.titleCore(candidate.title)
+                let titleMatches = candidateTitle == title || (min(candidateTitle.count, title.count) >= 3
+                    && (candidateTitle.contains(title) || title.contains(candidateTitle)))
+                let artistMatches = candidate.artists.enumerated().contains { index, name in
+                    let candidateArtist = Self.normalized(name)
+                    guard !candidateArtist.isEmpty else { return false }
+                    return artist.contains(candidateArtist) || (index == 0 && candidateArtist.contains(artist))
+                }
+                return abs(candidate.duration - track.duration) <= 3 && titleMatches && artistMatches
+                    && candidate.uri.hasPrefix("spotify:track:")
+            }.min { abs($0.duration - track.duration) < abs($1.duration - track.duration) }
+        }
+        do {
+            let results = try await spotify.search("track:\"\(safeTitle)\" artist:\"\(safeArtist)\"")
+            guard !Task.isCancelled else { return nil }
+            var match = bestMatch(in: results)
+            if match == nil {
+                let query = "\(title) \(Self.firstArtist(artistLine))"
+                match = bestMatch(in: try await spotify.search(query))
+            }
+            guard !Task.isCancelled else { return nil }
+            guard let match, let id = match.uri.split(separator: ":").last else {
+                // Only completed lookups are misses; an outage must remain retryable.
+                spotifyMisses.insert(key)
+                return nil
+            }
+            if spotifyMatches.count >= 1000 { spotifyMatches.removeAll() }
+            spotifyMatches[key] = String(id)
+            UserDefaults.standard.set(spotifyMatches, forKey: Self.matchesKey)
+            return String(id)
+        } catch {
+            SyncLog.shared.add("lyrics", "Apple Music match unavailable: \(error.localizedDescription)")
+            return nil
+        }
     }
 
     private func remember(_ document: LyricsDocument, for id: String) {

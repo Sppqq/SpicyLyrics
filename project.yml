@@ -79,6 +79,8 @@ targets:
               - spicylyrics-ios
         LSApplicationQueriesSchemes:
           - spotify
+          - music
+        NSAppleMusicUsageDescription: Sweet Lyrics reads the current track and playback position in Music to synchronize lyrics.
         ITSAppUsesNonExemptEncryption: false
         # Lets the lyrics run at 120 fps on ProMotion iPhones when the user picks it.
         CADisableMinimumFrameDurationOnPhone: true

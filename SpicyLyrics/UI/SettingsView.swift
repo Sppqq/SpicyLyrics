@@ -1,4 +1,5 @@
 import SwiftUI
+import MediaPlayer
 
 /// Settings laid out like iOS Settings: a short list of clearly named categories, each opening
 /// its own page.
@@ -50,6 +51,8 @@ struct SettingsView: View {
                 }
 
                 Section(String(localized: "Работа")) {
+                    category(String(localized: "Источник музыки"), "music.note", .pink,
+                             value: settings.playbackSource.title) { MusicSourceSettings() }
                     category(String(localized: "Синхронизация"), "timer", .cyan,
                              value: settings.timingOffsetMs == 0 ? nil : String(localized: "\(Int(settings.timingOffsetMs)) мс")) { SyncSettings() }
                     category(String(localized: "Батарея и нагрев"), "bolt.fill", .yellow,
@@ -62,8 +65,10 @@ struct SettingsView: View {
                              value: ReportService.shared.unreadCount > 0 ? String(localized: "Новый ответ")
                                  : (settings.sendsReports ? String(localized: "Вкл.") : nil)) { ReportSettings() }
                     category(String(localized: "Источники текстов"), "doc.text.fill", .brown) { SourceSettings() }
-                    category("Spotify", "music.note", Color(red: 0.12, green: 0.84, blue: 0.38),
-                             value: settings.hasValidClientID ? "…" + String(settings.spotifyClientID.suffix(4)) : String(localized: "Не настроен")) { SpotifySettings() }
+                    if settings.playbackSource == .spotify {
+                        category("Spotify", "music.note", Color(red: 0.12, green: 0.84, blue: 0.38),
+                                 value: settings.hasValidClientID ? "…" + String(settings.spotifyClientID.suffix(4)) : String(localized: "Не настроен")) { SpotifySettings() }
+                    }
                 }
 
                 Section {
@@ -597,6 +602,92 @@ private struct GestureSettings: View {
     }
 }
 
+private struct MusicSourceSettings: View {
+    @Environment(AppSettings.self) private var settings
+    @Environment(PlayerModel.self) private var player
+    @Environment(\.scenePhase) private var scenePhase
+
+    var body: some View {
+        @Bindable var settings = settings
+        Form {
+            Section(String(localized: "Источник музыки")) {
+                Picker(String(localized: "Источник музыки"), selection: Binding(get: { settings.playbackSource }, set: {
+                    if $0 == .appleMusic { settings.appleMusicOnboarded = true }
+                    settings.playbackSource = $0
+                })) {
+                    ForEach(PlaybackSource.allCases) { Text($0.title).tag($0) }
+                }
+            }
+            if settings.playbackSource == .appleMusic {
+                Section {
+                    LabeledContent(String(localized: "Доступ к медиатеке"), value: authorizationText)
+                    if player.appleMusic.authorization == .notDetermined {
+                        Button(String(localized: "Разрешить доступ к Музыке")) {
+                            Task { await player.appleMusic.requestAuthorization() }
+                        }
+                    } else if player.appleMusic.authorization != .authorized {
+                        Button(String(localized: "Открыть настройки iOS")) {
+                            if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                        }
+                    }
+                    Button(String(localized: "Открыть Музыку")) {
+                        if let url = URL(string: "music:") { UIApplication.shared.open(url) }
+                    }
+                } footer: {
+                    Text(String(localized: "Доступен только системный плеер «Музыки». iOS не разрешает читать воспроизведение других приложений."))
+                }
+                Section {
+                    NavigationLink("Spotify") { SpotifySettings() }
+                } footer: {
+                    Text(String(localized: "LRCLIB для Apple Music включён всегда. Вход в Spotify необязателен: он позволяет найти соответствие трека для Spicy Lyrics."))
+                }
+            }
+            Section {
+                Picker(String(localized: "Режим перехода"), selection: $settings.transitionMode) {
+                    Text(String(localized: "Авто (по умолчанию)")).tag(TransitionMode.automatic)
+                    Text(String(localized: "Вручную")).tag(TransitionMode.manual)
+                }
+                if settings.transitionMode == .automatic {
+                    if settings.transitionEstimate.autoMix {
+                        Text(String(localized: "Определено: AutoMix"))
+                    } else if let seconds = settings.transitionEstimate.crossfadeSeconds {
+                        Text(String(localized: "Определено: \(Int(seconds)) с"))
+                    } else {
+                        Text(String(localized: "Пока не определено — дослушайте пару песен до конца"))
+                    }
+                    Button(String(localized: "Сбросить определение")) { settings.resetTransitionDetection() }
+                } else {
+                    Picker(String(localized: "Плавный переход в музыкальном приложении"), selection: $settings.crossfadeSeconds) {
+                        Text(String(localized: "Выкл.")).tag(0.0)
+                        ForEach(1...12, id: \.self) { seconds in
+                            Text("\(seconds) " + String(localized: "с")).tag(Double(seconds))
+                        }
+                    }
+                    if settings.playbackSource == .appleMusic {
+                        Toggle("AutoMix", isOn: $settings.appleMusicAutoMix)
+                    }
+                }
+            } footer: {
+                Text(String(localized: "Авто оценивает переход по естественным сменам треков отдельно для Spotify и Apple Music. Вручную можно указать настройку музыкального приложения. Это не меняет звук."))
+            }
+            ResetSection(title: String(localized: "Сбросить настройки перехода")) { settings.resetPlaybackTransitions() }
+        }
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            if phase == .active, settings.playbackSource == .appleMusic { player.appleMusic.read() }
+        }
+    }
+
+    private var authorizationText: String {
+        switch player.appleMusic.authorization {
+        case .authorized: return String(localized: "Разрешён")
+        case .notDetermined: return String(localized: "Не запрошен")
+        case .denied: return String(localized: "Отклонён")
+        case .restricted: return String(localized: "Ограничен")
+        @unknown default: return String(localized: "Неизвестно")
+        }
+    }
+}
+
 private struct SyncSettings: View {
     @Environment(AppSettings.self) private var settings
     @Environment(PlayerModel.self) private var player
@@ -608,55 +699,57 @@ private struct SyncSettings: View {
     var body: some View {
         @Bindable var settings = settings
         Form {
-            Section {
-                Toggle(String(localized: "Связь с приложением Spotify"), isOn: $settings.useAppRemote)
-                if settings.useAppRemote {
-                    LabeledContent(String(localized: "Состояние"), value: appRemote.statusText)
-                    Toggle(String(localized: "Открывать Spotify, если молчит"), isOn: $settings.autoWakeSpotify)
-                    if let error = appRemote.lastError, appRemote.status != .connected, !appRemote.otherDeviceActive {
-                        Text(error)
-                            .font(.footnote.monospaced())
-                            .foregroundStyle(.orange)
-                            .textSelection(.enabled)
-                    }
-                    if appRemote.status == .needsLogin {
-                        Button(String(localized: "Войти заново")) {
-                            Task {
-                                try? await auth.logIn()
-                                appRemote.refresh()
-                            }
-                        }
-                    } else if appRemote.status == .unavailable || appRemote.status == .connecting {
-                        Button(String(localized: "Открыть Spotify и подключиться")) { appRemote.wakeSpotify() }
-                    }
-                }
-            } header: {
-                Text(String(localized: "Откуда брать время песни"))
-            } footer: {
-                Text(String(localized: "Включено: когда Spotify играет на этом iPhone, время песни берётся прямо из приложения Spotify — точно в такт и даже без интернета. Выключено или Spotify играет на другом устройстве (компьютер, колонка): время узнаётся у Spotify через интернет, чуть менее точно."))
-            }
-
-            if settings.useAppRemote {
+            if settings.playbackSource == .spotify {
                 Section {
-                    Button {
-                        UIPasteboard.general.string = Bundle.main.bundleIdentifier
-                        bundleCopied = true
-                    } label: {
-                        LabeledContent("Bundle ID") {
-                            Text(bundleCopied ? String(localized: "Скопировано") : (Bundle.main.bundleIdentifier ?? "—"))
+                    Toggle(String(localized: "Связь с приложением Spotify"), isOn: $settings.useAppRemote)
+                    if settings.useAppRemote {
+                        LabeledContent(String(localized: "Состояние"), value: appRemote.statusText)
+                        Toggle(String(localized: "Открывать Spotify, если молчит"), isOn: $settings.autoWakeSpotify)
+                        if let error = appRemote.lastError, appRemote.status != .connected, !appRemote.otherDeviceActive {
+                            Text(error)
                                 .font(.footnote.monospaced())
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.6)
+                                .foregroundStyle(.orange)
+                                .textSelection(.enabled)
                         }
-                    }
-                    .foregroundStyle(.primary)
-                    LabeledContent("Redirect URI") {
-                        Text(SpotifyAuth.redirectURI).font(.footnote.monospaced())
+                        if appRemote.status == .needsLogin {
+                            Button(String(localized: "Войти заново")) {
+                                Task {
+                                    try? await auth.logIn()
+                                    appRemote.refresh()
+                                }
+                            }
+                        } else if appRemote.status == .unavailable || appRemote.status == .connecting {
+                            Button(String(localized: "Открыть Spotify и подключиться")) { appRemote.wakeSpotify() }
+                        }
                     }
                 } header: {
-                    Text(String(localized: "Если не подключается"))
+                    Text(String(localized: "Откуда брать время песни"))
                 } footer: {
-                    Text(String(localized: "1. Включите музыку в Spotify на этом iPhone. 2. На developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте Bundle ID и Redirect URI отсюда (нажатие копирует Bundle ID; AltStore меняет его при установке). 3. Нажмите «Открыть Spotify и подключиться». Если пишет «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify."))
+                    Text(String(localized: "Включено: когда Spotify играет на этом iPhone, время песни берётся прямо из приложения Spotify — точно в такт и даже без интернета. Выключено или Spotify играет на другом устройстве (компьютер, колонка): время узнаётся у Spotify через интернет, чуть менее точно."))
+                }
+
+                if settings.useAppRemote {
+                    Section {
+                        Button {
+                            UIPasteboard.general.string = Bundle.main.bundleIdentifier
+                            bundleCopied = true
+                        } label: {
+                            LabeledContent("Bundle ID") {
+                                Text(bundleCopied ? String(localized: "Скопировано") : (Bundle.main.bundleIdentifier ?? "—"))
+                                    .font(.footnote.monospaced())
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.6)
+                            }
+                        }
+                        .foregroundStyle(.primary)
+                        LabeledContent("Redirect URI") {
+                            Text(SpotifyAuth.redirectURI).font(.footnote.monospaced())
+                        }
+                    } header: {
+                        Text(String(localized: "Если не подключается"))
+                    } footer: {
+                        Text(String(localized: "1. Включите музыку в Spotify на этом iPhone. 2. На developer.spotify.com → ваше приложение → Settings отметьте «iOS» и добавьте Bundle ID и Redirect URI отсюда (нажатие копирует Bundle ID; AltStore меняет его при установке). 3. Нажмите «Открыть Spotify и подключиться». Если пишет «Нужно войти заново» — войдите заново: старый вход был без доступа к приложению Spotify."))
+                    }
                 }
             }
 
@@ -674,15 +767,19 @@ private struct SyncSettings: View {
             }
 
             Section {
-                SliderRow(title: String(localized: "Через интернет: раз в"), value: $settings.webPollInterval, range: 1...5,
-                          step: 0.5, format: { String(format: "%.1f", $0) + " " + String(localized: "с") })
-                SliderRow(title: String(localized: "С приложением Spotify: раз в"), value: $settings.remoteQueryInterval,
-                          range: 0.5...5, step: 0.5, format: { String(format: "%.1f", $0) + " " + String(localized: "с") })
+                if settings.playbackSource == .spotify {
+                    SliderRow(title: String(localized: "Через интернет: раз в"), value: $settings.webPollInterval, range: 1...5,
+                              step: 0.5, format: { String(format: "%.1f", $0) + " " + String(localized: "с") })
+                    SliderRow(title: String(localized: "С приложением Spotify: раз в"), value: $settings.remoteQueryInterval,
+                              range: 0.5...5, step: 0.5, format: { String(format: "%.1f", $0) + " " + String(localized: "с") })
+                }
                 Toggle(String(localized: "Значок сверки над текстом"), isOn: $settings.showSyncIndicator)
             } header: {
                 Text(String(localized: "Как часто сверять время"))
             } footer: {
-                Text(String(localized: "Чаще — точнее, но частые запросы через интернет расходуют общий лимит вашего Client ID. Значок над текстом показывает, откуда пришло время («приложение» или «интернет»), на сколько часы разошлись и как давно была сверка. Нажмите на него, чтобы проверить связь с приложением Spotify."))
+                if settings.playbackSource == .spotify {
+                    Text(String(localized: "Чаще — точнее, но частые запросы через интернет расходуют общий лимит вашего Client ID. Значок над текстом показывает, откуда пришло время («приложение» или «интернет»), на сколько часы разошлись и как давно была сверка. Нажмите на него, чтобы проверить связь с приложением Spotify."))
+                }
             }
 
             Section {
@@ -692,7 +789,7 @@ private struct SyncSettings: View {
                                    value: String(localized: "\(Int((player.appliedOutputLatency * 1000).rounded())) мс"))
                 }
             } footer: {
-                Text(String(localized: "Когда Spotify играет на этом iPhone, задержка Bluetooth-наушников вычитается автоматически."))
+                Text(String(localized: "При воспроизведении на этом iPhone можно вычитать задержку Bluetooth-наушников."))
             }
         }
     }
@@ -766,21 +863,25 @@ private struct SourceSettings: View {
                     }
                     Link(String(localized: "Получить ключ Spicy Lyrics"), destination: URL(string: "https://developers.spicylyrics.org")!)
                 }
-                Toggle(String(localized: "Запасной источник LRCLIB"), isOn: $settings.useLRCLibFallback)
+                if settings.playbackSource == .spotify {
+                    Toggle(String(localized: "Запасной источник LRCLIB"), isOn: $settings.useLRCLibFallback)
+                }
             } header: {
                 Text("Spicy Lyrics")
             } footer: {
                 Text(String(localized: "С клиентским ключом используется публичный API /v1/lyrics. Без ключа приложение пробует токен Spotify, как расширение для Spicetify."))
             }
 
-            Section {
-                Picker(String(localized: "Пропускать песни"), selection: $settings.autoSkipMode) {
-                    ForEach(AutoSkipMode.allCases) { mode in
-                        Text(mode.title).tag(mode.rawValue)
+            if settings.playbackSource == .spotify {
+                Section {
+                    Picker(String(localized: "Пропускать песни"), selection: $settings.autoSkipMode) {
+                        ForEach(AutoSkipMode.allCases) { mode in
+                            Text(mode.title).tag(mode.rawValue)
+                        }
                     }
+                } footer: {
+                    Text(String(localized: "Песня, у которой нет синхронизации в Spicy Lyrics (текст не найден, есть только в LRCLIB или без таймингов), пропускается сама. Свои TTML считаются. Не пропускаются песни, выбранные вручную или возвращённые кнопкой «назад»; после \(PlayerModel.autoSkipLimit) пропусков подряд пропуск встаёт на паузу."))
                 }
-            } footer: {
-                Text(String(localized: "Песня, у которой нет синхронизации в Spicy Lyrics (текст не найден, есть только в LRCLIB или без таймингов), пропускается сама. Свои TTML считаются. Не пропускаются песни, выбранные вручную или возвращённые кнопкой «назад»; после \(PlayerModel.autoSkipLimit) пропусков подряд пропуск встаёт на паузу."))
             }
 
             Section {
@@ -835,11 +936,15 @@ private struct SpotifySettings: View {
                     Label(String(localized: "Сменить Client ID"), systemImage: "key.horizontal")
                 }
             } footer: {
-                Text(String(localized: "Приложение работает только через ваше собственное приложение Spotify. Друзей можно добавить в него через Settings → User Management в developer.spotify.com (до 5 человек)."))
+                Text(String(localized: "Для входа в Spotify нужен собственный Client ID. Его также можно использовать для поиска текстов треков Apple Music."))
             }
 
             Section {
-                Button(String(localized: "Выйти из Spotify"), role: .destructive) { auth.logOut() }
+                if auth.isLoggedIn {
+                    Button(String(localized: "Выйти из Spotify"), role: .destructive) { auth.logOut() }
+                } else if settings.hasValidClientID {
+                    Button(String(localized: "Войти через Spotify")) { Task { try? await auth.logIn() } }
+                }
             }
         }
     }

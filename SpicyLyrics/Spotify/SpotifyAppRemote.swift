@@ -63,6 +63,7 @@ final class SpotifyAppRemote: NSObject {
 
     /// Starts following the Spotify app (while the app follows Spotify at all).
     func start(player: PlayerModel) {
+        guard settings.playbackSource == .spotify else { stop(); return }
         self.player = player
         player.onRemoteStale = { [weak self] in self?.reconnect() }
         player.onRemoteQueryNow = { [weak self] in self?.query() }
@@ -99,6 +100,7 @@ final class SpotifyAppRemote: NSObject {
 
     /// Opens Spotify so it starts (and resumes playback), then comes back with a token.
     func wakeSpotify() {
+        guard settings.playbackSource == .spotify else { return }
         guard let remote = makeRemote() else {
             lastError = String(localized: "Нет Client ID")
             return
@@ -126,6 +128,7 @@ final class SpotifyAppRemote: NSObject {
 
     /// The `spicylyrics-ios://callback` URL Spotify opens after `wakeSpotify()`.
     func handle(_ url: URL) {
+        guard settings.playbackSource == .spotify else { return }
         guard let parameters = remote?.authorizationParameters(from: url) else { return }
         wakeTimeout?.cancel()
         if let token = parameters[SPTAppRemoteAccessTokenKey] {
@@ -163,7 +166,7 @@ final class SpotifyAppRemote: NSObject {
         defer { connectStarting = false }
         retryTask?.cancel()
         retryTask = nil
-        guard wanted, settings.useAppRemote, auth.isLoggedIn else {
+        guard settings.playbackSource == .spotify, wanted, settings.useAppRemote, auth.isLoggedIn else {
             status = .off
             return
         }

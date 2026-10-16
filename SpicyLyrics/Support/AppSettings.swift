@@ -2,11 +2,44 @@ import Foundation
 import Observation
 import SwiftUI
 
+enum PlaybackSource: String, CaseIterable, Identifiable, Hashable {
+    case spotify, appleMusic
+    var id: String { rawValue }
+    var title: String { self == .spotify ? "Spotify" : "Apple Music" }
+}
+
 /// User preferences, persisted in UserDefaults. The Spicy Lyrics key lives here too: it is a
 /// public client key (`sl_pk_…`), not a secret.
 @Observable
 final class AppSettings {
     private let defaults: UserDefaults
+    var playbackSource: PlaybackSource { didSet { defaults.set(playbackSource.rawValue, forKey: Keys.playbackSource) } }
+    var appleMusicOnboarded: Bool { didSet { defaults.set(appleMusicOnboarded, forKey: Keys.appleMusicOnboarded) } }
+    var crossfadeSeconds: Double { didSet { defaults.set(crossfadeSeconds, forKey: Keys.crossfadeSeconds) } }
+    var appleMusicAutoMix: Bool { didSet { defaults.set(appleMusicAutoMix, forKey: Keys.appleMusicAutoMix) } }
+    var transitionMode: TransitionMode { didSet { defaults.set(transitionMode.rawValue, forKey: Keys.transitionMode) } }
+    private(set) var transitionDetector: TransitionDetector {
+        didSet {
+            if let data = try? JSONEncoder().encode(transitionDetector) { defaults.set(data, forKey: Keys.transitionDetection) }
+        }
+    }
+
+    var effectiveAutoMix: Bool {
+        playbackSource == .appleMusic && (transitionMode == .manual ? appleMusicAutoMix : transitionEstimate.autoMix)
+    }
+
+    var effectiveTransitionWindow: Double {
+        if effectiveAutoMix { return 10 }
+        return transitionMode == .manual ? min(12, max(0, crossfadeSeconds)) : (transitionEstimate.crossfadeSeconds ?? 0)
+    }
+
+    var transitionEstimate: TransitionDetector.Estimate { transitionDetector.estimate(for: playbackSource) }
+
+    func recordTransition(remaining: Double, startOffset: Double) {
+        transitionDetector.record(remaining: remaining, startOffset: startOffset, source: playbackSource)
+    }
+
+    func resetTransitionDetection() { transitionDetector.reset(for: playbackSource) }
 
     /// The user's own Client ID (from their own Spotify developer app). Required: none is built in.
     var spotifyClientID: String { didSet { defaults.set(spotifyClientID, forKey: Keys.clientID) } }
@@ -170,6 +203,16 @@ final class AppSettings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        playbackSource = PlaybackSource(rawValue: defaults.string(forKey: Keys.playbackSource) ?? "") ?? .spotify
+        appleMusicOnboarded = defaults.bool(forKey: Keys.appleMusicOnboarded)
+        crossfadeSeconds = min(12, max(0, defaults.double(forKey: Keys.crossfadeSeconds)))
+        appleMusicAutoMix = defaults.bool(forKey: Keys.appleMusicAutoMix)
+        let mode: TransitionMode = defaults.string(forKey: Keys.transitionMode).flatMap { TransitionMode(rawValue: $0) }
+            ?? (defaults.double(forKey: Keys.crossfadeSeconds) > 0 ? .manual : .automatic)
+        transitionMode = mode
+        defaults.set(mode.rawValue, forKey: Keys.transitionMode)
+        transitionDetector = defaults.data(forKey: Keys.transitionDetection)
+            .flatMap { try? JSONDecoder().decode(TransitionDetector.self, from: $0) } ?? TransitionDetector()
         defaults.register(defaults: [
             Keys.pipAnimatedBackground: true,
             Keys.pipShowTitle: true,
@@ -413,7 +456,19 @@ final class AppSettings {
         backgroundSaturation = 1
     }
 
+    func resetPlaybackTransitions() {
+        crossfadeSeconds = 0
+        appleMusicAutoMix = false
+        transitionMode = .automatic
+    }
+
     private enum Keys {
+        static let playbackSource = "playbackSource"
+        static let appleMusicOnboarded = "appleMusicOnboarded"
+        static let crossfadeSeconds = "crossfadeSeconds"
+        static let appleMusicAutoMix = "appleMusicAutoMix"
+        static let transitionMode = "transitionMode"
+        static let transitionDetection = "transitionDetection.v1"
         static let clientID = "spotifyClientID"
         static let spicyKey = "spicyLyricsKey"
         static let offset = "timingOffsetMs"

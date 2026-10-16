@@ -80,7 +80,7 @@ struct OwnLyricsView: View {
                         .foregroundStyle(message.isError ? .red : .green)
                 }
             } else {
-                Text(String(localized: "Включите трек в Spotify, чтобы привязать к нему свой текст."))
+                Text(String(localized: "Включите трек в выбранном музыкальном приложении, чтобы привязать к нему свой текст."))
                     .foregroundStyle(.secondary)
             }
         } header: {

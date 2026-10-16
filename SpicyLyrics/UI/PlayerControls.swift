@@ -74,16 +74,20 @@ struct PlaybackBar: View {
             AirPlayButton()
                 .frame(width: 34, height: 30)
             Spacer()
-            Button {
-                onInteraction()
-                onShowQueue()
-            } label: {
-                Image(systemName: "list.bullet")
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.6))
-                    .frame(width: 34, height: 30)
+            if player.supportsSpotifyFeatures {
+                Button {
+                    onInteraction()
+                    onShowQueue()
+                } label: {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .frame(width: 34, height: 30)
+                }
+                .accessibilityLabel(String(localized: "Выбрать трек"))
+                } else {
+                    Color.clear.frame(width: 34, height: 30)
             }
-            .accessibilityLabel(String(localized: "Выбрать трек"))
         }
         .padding(.horizontal, 26)
     }

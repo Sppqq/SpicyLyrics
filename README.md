@@ -42,6 +42,7 @@ the popular Spicetify extension for Spotify on desktop. Made by
 
 ## What it can do
 
+- **Choose Spotify or Apple Music** (the iOS Music system player); optional crossfade / AutoMix lyric transitions.
 - **Lyrics that follow the singer word by word**, with the same smooth animations as the desktop
   extension. In duets each singer gets their own side, backing vocals sit under the main line,
   and instrumental breaks show three bouncing dots.
@@ -63,7 +64,7 @@ the popular Spicetify extension for Spotify on desktop. Made by
 ## What you need
 
 - An **iPhone or iPad** on **iOS 17** or newer.
-- **Spotify Premium**: Spotify requires it for the sign-in the app uses.
+- **Spotify Premium** for Spotify mode, or **Music library permission** for Apple Music mode (no Spotify Client ID required).
 - A **Windows PC or Mac** to set up AltStore or SideStore (see below). With SideStore that is needed
   once; AltStore keeps needing the computer (AltServer) to refresh the app.
 

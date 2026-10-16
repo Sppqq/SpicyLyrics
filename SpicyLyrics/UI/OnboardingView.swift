@@ -1,9 +1,12 @@
 import SwiftUI
+import MediaPlayer
 
 /// First run: set up one's own Spotify Client ID (step-by-step guide), then sign in with it.
 struct OnboardingView: View {
     @EnvironmentObject private var auth: SpotifyAuth
     @Environment(AppSettings.self) private var settings
+    @Environment(PlayerModel.self) private var player
+    @State private var selectedSource: PlaybackSource = .spotify
     @State private var error: String?
     @State private var busy = false
 
@@ -16,7 +19,7 @@ struct OnboardingView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Sweet Lyrics")
                             .font(.system(size: 40, weight: .heavy))
-                        Text(String(localized: "Синхронные по словам тексты для того, что играет у вас в Spotify."))
+                        Text(String(localized: "Пословные тексты для Spotify и Apple Music."))
                             .font(.title3.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
@@ -27,7 +30,16 @@ struct OnboardingView: View {
                             .foregroundStyle(.red)
                     }
 
-                    accessExplanation
+                    Picker(String(localized: "Источник музыки"), selection: $selectedSource) {
+                        ForEach(PlaybackSource.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    if selectedSource == .spotify {
+                        accessExplanation
+                    } else {
+                        Text(String(localized: "Apple Music работает без Spotify Client ID. Разрешите доступ к медиатеке и включите песню в приложении «Музыка»."))
+                            .foregroundStyle(.secondary)
+                    }
 
                     Text(String(localized: "Приложение не связано со Spotify AB и с авторами Spicy Lyrics. Это неофициальный порт расширения Spicy Lyrics под AGPL-3.0."))
                         .font(.footnote)
@@ -38,19 +50,44 @@ struct OnboardingView: View {
             // The actions sit at the bottom, under the thumb.
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 12) {
-                    if canLogIn {
-                        loginButton
-                    }
-                    NavigationLink {
-                        SpotifySetupGuideView()
-                    } label: {
-                        Label(canLogIn ? String(localized: "Сменить Client ID") : String(localized: "Настроить доступ к Spotify"),
-                              systemImage: "key.horizontal")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(.white.opacity(canLogIn ? 0.12 : 0.9), in: Capsule())
-                            .foregroundStyle(canLogIn ? .white : .black)
+                    if selectedSource == .appleMusic {
+                        Button {
+                            Task {
+                                busy = true
+                                error = nil
+                                defer { busy = false }
+                                await player.appleMusic.requestAuthorization()
+                                guard player.appleMusic.authorization == .authorized else {
+                                    error = String(localized: "Доступ к Музыке не разрешён. Откройте Настройки → Sweet Lyrics и разрешите доступ к медиатеке.")
+                                    return
+                                }
+                                settings.appleMusicOnboarded = true
+                                settings.playbackSource = .appleMusic
+                            }
+                        } label: {
+                            Text(String(localized: "Продолжить с Apple Music"))
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(.white, in: Capsule())
+                                .foregroundStyle(.black)
+                        }
+                        .disabled(busy)
+                    } else {
+                        if canLogIn {
+                            loginButton
+                        }
+                        NavigationLink {
+                            SpotifySetupGuideView()
+                        } label: {
+                            Label(canLogIn ? String(localized: "Сменить Client ID") : String(localized: "Настроить доступ к Spotify"),
+                                  systemImage: "key.horizontal")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(.white.opacity(canLogIn ? 0.12 : 0.9), in: Capsule())
+                                .foregroundStyle(canLogIn ? .white : .black)
+                        }
                     }
                 }
                 .padding(.horizontal, 24)
@@ -100,6 +137,7 @@ struct OnboardingView: View {
         defer { busy = false }
         do {
             try await auth.logIn()
+            settings.playbackSource = .spotify
         } catch SpotifyAuthError.cancelled {
             // Nothing to report.
         } catch {

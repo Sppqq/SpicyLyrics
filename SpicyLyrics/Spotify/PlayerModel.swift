@@ -4,7 +4,7 @@ import Observation
 import QuartzCore
 import UIKit
 
-/// Follows what Spotify is playing and keeps a smooth local clock between polls.
+/// Follows the selected player and keeps a smooth local clock between samples.
 @MainActor
 @Observable
 final class PlayerModel {
@@ -18,14 +18,39 @@ final class PlayerModel {
     }
 
     private(set) var content: PlaybackSnapshot.Content?
-    private(set) var isPlaying = false
+    private(set) var isPlaying = false {
+        didSet { if !isPlaying { transitionRun.interrupt() } }
+    }
     private(set) var artwork: UIImage?
     /// Small copy of the artwork for the animated background.
     private(set) var backgroundArtwork: UIImage?
     private(set) var artworkID = ""
     /// Bumped whenever new lyrics are shown, so the lyrics view starts fresh.
     private(set) var lyricsRevision = 0
-    private(set) var lyricsState: LyricsState = .idle
+    private var currentLyricsState: LyricsState = .idle
+    private(set) var lyricsState: LyricsState {
+        get { outgoingLyrics.map { .loaded($0.lyrics) } ?? currentLyricsState }
+        set { currentLyricsState = newValue }
+    }
+    private struct OutgoingLyrics {
+        let lyrics: PreparedLyrics
+        let position: Double
+        let startedAt: CFTimeInterval
+        let duration: Double
+        let deadline: CFTimeInterval
+        let translations: [String: String]
+        let documentRevision: Int
+    }
+    private var outgoingLyrics: OutgoingLyrics?
+    @ObservationIgnored private var transitionTask: Task<Void, Never>?
+    @ObservationIgnored private var manualChangeUntil: CFTimeInterval = 0
+    @ObservationIgnored private var transitionRun = TransitionDetector.PlaybackRun()
+    @ObservationIgnored private var appleSample: AppleMusicPlayer.Sample?
+    @ObservationIgnored private var sourceGeneration = 0
+    @ObservationIgnored let appleMusic = AppleMusicPlayer()
+    var playbackSource: PlaybackSource { settings.playbackSource }
+    var supportsSpotifyFeatures: Bool { playbackSource == .spotify }
+    private var transitionWindow: Double { settings.effectiveTransitionWindow }
     private(set) var statusMessage: String?
 
     enum AccessProblem: Equatable {
@@ -57,7 +82,8 @@ final class PlayerModel {
     /// Translations the shown lyrics were built with (replace mode), to rebuild only on change.
     @ObservationIgnored private var preparedReplacements: [String: String] = [:]
     /// Changes only when different lyrics arrive; translations belong to one revision of these.
-    private(set) var documentRevision = 0
+    private var currentDocumentRevision = 0
+    var documentRevision: Int { outgoingLyrics?.documentRevision ?? currentDocumentRevision }
     @ObservationIgnored private var lastArtworkURL: URL?
 
     // Clock anchor: position `anchorPosition` was correct at `anchorTime`. `slew` is a small
@@ -176,6 +202,13 @@ final class PlayerModel {
         self.lyrics = lyrics
         self.settings = settings
         self.localLyrics = localLyrics
+        appleMusic.onSample = { [weak self] in self?.applyAppleMusic($0) }
+        appleMusic.onArtwork = { [weak self] image, id in
+            guard let self, self.playbackSource == .appleMusic, self.track?.id == id else { return }
+            self.artwork = image
+            self.backgroundArtwork = image.downscaled(to: 160)
+            self.artworkID = id
+        }
         outputLatency = AudioRoute.outputLatency
         // Headphones connected or removed: the delay changes now, not at the next Web API poll
         // (which App Remote slows to every 5 s).
@@ -195,14 +228,169 @@ final class PlayerModel {
     /// Lyrics clock in seconds at media time `now`: playback position plus the user's offset,
     /// minus the audio output's delay when Spotify plays on this phone (Bluetooth headphones).
     func position(at now: CFTimeInterval = MediaClock.now()) -> Double {
-        playbackPosition(at: now) + settings.timingOffsetMs / 1000 - appliedOutputLatency
+        if let outgoing = outgoingLyrics {
+            return min(outgoing.duration, outgoing.position + max(0, min(now, outgoing.deadline) - outgoing.startedAt))
+                + settings.timingOffsetMs / 1000 - appliedOutputLatency
+        }
+        return playbackPosition(at: now) + settings.timingOffsetMs / 1000 - appliedOutputLatency
+    }
+
+    @discardableResult
+    private func holdPreviousLyrics(for incoming: PlaybackSnapshot.Content, startOffset: Double,
+                                    playing: Bool, at now: CFTimeInterval) -> Bool {
+        endTransition()
+        guard now >= manualChangeUntil, isPlaying, playing, case .track(let next) = incoming,
+              let track, next.id != track.id, track.duration.isFinite, track.duration > 0 else { return false }
+        let remaining = track.duration - rawPosition(at: now)
+        let natural = transitionRun.allowsMeasurement(trackID: track.id, at: now)
+        if natural {
+            SyncLog.shared.add("transition", "natural change, remaining \(remaining.s3) s, new starts at \(startOffset.s3) s")
+            settings.recordTransition(remaining: remaining, startOffset: startOffset)
+        }
+        let observedOverlap = natural && remaining > 0.7 && remaining <= 14
+        let hold: Double
+        if settings.transitionMode == .automatic {
+            // The first overlap is measurable even before there is an estimate.
+            let autoMix = settings.effectiveAutoMix || (playbackSource == .appleMusic && startOffset > 1.5)
+            hold = observedOverlap ? min(remaining, autoMix ? 10 : remaining) : 0
+        } else {
+            hold = transitionWindow > 0 && remaining > 0 && remaining <= transitionWindow + 2
+                ? min(remaining, transitionWindow) : 0
+        }
+        guard hold > 0, case .loaded(let prepared) = currentLyricsState else { return observedOverlap }
+        let position = playbackPosition(at: now)
+        outgoingLyrics = OutgoingLyrics(lyrics: prepared, position: position, startedAt: now,
+                                        duration: track.duration, deadline: now + hold,
+                                        translations: currentTranslations, documentRevision: currentDocumentRevision)
+        lyricsRevision += 1
+        SyncLog.shared.add("transition", "holding previous lyrics \(hold.s3) s")
+        transitionTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(hold))
+            guard !Task.isCancelled else { return }
+            self?.endTransition()
+        }
+        return observedOverlap
+    }
+
+    private func endTransition() {
+        transitionTask?.cancel()
+        transitionTask = nil
+        if outgoingLyrics != nil {
+            outgoingLyrics = nil
+            lyricsRevision += 1
+            snapToken += 1
+        }
+    }
+
+    private func manualTrackChange() {
+        manualChangeUntil = MediaClock.now() + 5
+        transitionRun.interrupt()
+        endTransition()
+    }
+
+    func sourceChanged() {
+        sourceGeneration += 1
+        stopPolling()
+        lyricsTask?.cancel()
+        artworkTask?.cancel()
+        lookaheadTask?.cancel()
+        noticeTask?.cancel()
+        autoSkipNotice = nil
+        autoSkipped = 0
+        skipCheckedURI = nil
+        skipExemptURI = nil
+        endTransition()
+        content = nil
+        lyricsState = .idle
+        rawLyrics = nil
+        currentDocumentRevision += 1
+        translations = [:]
+        artwork = nil
+        backgroundArtwork = nil
+        artworkID = ""
+        lastArtworkURL = nil
+        statusMessage = nil
+        transientError = nil
+        accessProblem = nil
+        contextURI = nil
+        deviceName = nil
+        isPlaying = false
+        isResyncing = false
+        playingOnThisPhone = false
+        remoteConnected = false
+        leadActive = false
+        lastSample = nil
+        appleSample = nil
+        holdUntil = 0
+        backoffUntil = 0
+        manualChangeUntil = 0
+        transitionRun = TransitionDetector.PlaybackRun()
+        setClock(0)
+        lyricsRevision += 1
+    }
+
+    private func applyAppleMusic(_ sample: AppleMusicPlayer.Sample) {
+        guard playbackSource == .appleMusic else { return }
+        isResyncing = false
+        playingOnThisPhone = true
+        guard let info = sample.track else {
+            endTransition()
+            content = nil
+            lyricsTask?.cancel()
+            lyricsState = .idle
+            isPlaying = false
+            appleSample = nil
+            artwork = nil
+            backgroundArtwork = nil
+            artworkID = ""
+            statusMessage = String(localized: "Включите музыку в Apple Music и разрешите доступ к медиатеке в настройках.")
+            return
+        }
+        statusMessage = nil
+        let now = MediaClock.now()
+        let measured = sample.position + (sample.paused ? 0 : max(0, now - sample.measuredAt))
+        let predicted = rawPosition(at: now)
+        let drift = measured - predicted
+        let changed = track?.id != info.id
+        if changed {
+            holdPreviousLyrics(for: .track(info), startOffset: measured, playing: !sample.paused, at: now)
+            content = .track(info)
+            artwork = nil
+            backgroundArtwork = nil
+            artworkID = ""
+            onContentChanged(playing: !sample.paused)
+            setClock(measured, at: now, detectSeek: false)
+        } else if sample.paused != !isPlaying || sample.paused {
+            endTransition()
+            setClock(measured, at: now)
+        } else if now >= holdUntil {
+            // Repeated stepwise readings must not drag a smoothly running clock backwards.
+            let frozen = appleSample.map { abs($0.position - sample.position) < 0.01 } ?? false
+            if !frozen {
+                if abs(drift) > Self.resyncThreshold { setClock(measured, at: now) }
+                else if abs(drift) > Self.catchUpThreshold { blend(to: measured, predicted: predicted, now: now) }
+            }
+        }
+        if track?.id == info.id, track != info {
+            let needsLyrics = track?.title != info.title || track?.artists != info.artists || track?.duration != info.duration
+            content = .track(info)
+            if needsLyrics { loadLyrics(force: false) }
+        }
+        isPlaying = !sample.paused
+        appleSample = sample
+        if changed { SyncLog.shared.add("apple", "new track \(info.id), set \(measured.s3)") }
+        SyncLog.shared.synced("Apple Music", drift: changed ? 0 : drift)
     }
 
     /// True from (re)starting the poll until Spotify has answered: what is on screen may be an
     /// old track (the app was in the background while the song changed).
     private(set) var isResyncing = false
     /// On-device translations of the current lyrics, keyed by the original line text.
-    private(set) var translations: [String: String] = [:]
+    private var currentTranslations: [String: String] = [:]
+    private(set) var translations: [String: String] {
+        get { outgoingLyrics?.translations ?? currentTranslations }
+        set { currentTranslations = newValue }
+    }
     /// Why the last translation failed (shown in settings).
     var translationError: String?
     @ObservationIgnored private var outputLatency: Double = 0
@@ -236,7 +424,10 @@ final class PlayerModel {
     }
 
     /// Re-anchors the clock at `position` right now, dropping any pending correction.
-    private func setClock(_ position: Double, at now: CFTimeInterval = MediaClock.now()) {
+    private func setClock(_ position: Double, at now: CFTimeInterval = MediaClock.now(), detectSeek: Bool = true) {
+        if detectSeek, track != nil, abs(position - rawPosition(at: now)) > Self.resyncThreshold {
+            transitionRun.interrupt()
+        }
         anchorPosition = position
         anchorTime = now
         slew = 0
@@ -255,6 +446,7 @@ final class PlayerModel {
     }
 
     private func apply(_ snapshot: PlaybackSnapshot?, roundTrip: Double) {
+        guard supportsSpotifyFeatures, !Task.isCancelled else { return }
         let log = SyncLog.shared
         guard let snapshot else {
             log.add("web", "204 nothing playing (rtt \(roundTrip.signedMs))")
@@ -308,10 +500,11 @@ final class PlayerModel {
                 let measured = snapshot.progress + (snapshot.isPlaying ? now - snapshot.measuredAt : 0)
                 log.add("web", "\(summary) → App Remote is stale: set \(measured.s3), reconnecting")
                 if trackChanged {
+                    holdPreviousLyrics(for: snapshot.content, startOffset: measured, playing: snapshot.isPlaying, at: now)
                     content = snapshot.content
-                    onContentChanged()
+                    onContentChanged(playing: snapshot.isPlaying)
                 }
-                setClock(measured, at: now)
+                setClock(measured, at: now, detectSeek: !trackChanged)
                 isPlaying = snapshot.isPlaying
                 lastSample = (snapshot.progress, snapshot.measuredAt, snapshot.stateChangedAt)
                 onRemoteStale?()
@@ -320,6 +513,8 @@ final class PlayerModel {
             remoteDisagreements = 0
             if trackChanged, case .track(let info) = snapshot.content, info.uri == remoteURI {
                 log.add("web", "\(summary) → track details for the App Remote track")
+                let measured = snapshot.progress + (snapshot.isPlaying ? max(0, now - snapshot.measuredAt) : 0)
+                holdPreviousLyrics(for: snapshot.content, startOffset: measured, playing: snapshot.isPlaying, at: now)
                 content = snapshot.content
                 onContentChanged()
             } else {
@@ -366,9 +561,13 @@ final class PlayerModel {
         var decision: String
 
         if trackChanged || stateChanged || !snapshot.isPlaying || isResyncing {
+            if trackChanged {
+                holdPreviousLyrics(for: snapshot.content, startOffset: measured, playing: snapshot.isPlaying, at: now)
+            }
+            if !snapshot.isPlaying { endTransition() }
             // Play, pause, a new song or the first report after the background: Spotify's
             // position is exact at these moments.
-            setClock(measured, at: now)
+            setClock(measured, at: now, detectSeek: !trackChanged)
             refineSamples = snapshot.isPlaying && !frozenReports ? Self.refineCount : 0
             decision = "set \(measured.s3) (\(trackChanged ? "new track" : stateChanged ? "play/pause" : isResyncing ? "resync" : "paused"))"
         } else if frozenReports {
@@ -446,9 +645,10 @@ final class PlayerModel {
     }
 
     /// App Remote is connected and allowed to keep the clock.
-    private var remoteAuthority: Bool { remoteConnected && settings.useAppRemote }
+    private var remoteAuthority: Bool { supportsSpotifyFeatures && remoteConnected && settings.useAppRemote }
 
     func setRemoteConnected(_ connected: Bool) {
+        guard supportsSpotifyFeatures else { remoteConnected = false; return }
         guard remoteConnected != connected else { return }
         remoteConnected = connected
         remoteQueriesFrozen = false
@@ -481,6 +681,7 @@ final class PlayerModel {
 
     /// A reading from the Spotify app on this phone (App Remote): exact to a few milliseconds.
     func applyRemote(_ sample: SpotifyAppRemote.Sample) {
+        guard supportsSpotifyFeatures else { return }
         let log = SyncLog.shared
         let now = MediaClock.now()
         let kind = sample.event ? "event" : "query"
@@ -504,14 +705,16 @@ final class PlayerModel {
             // A new song, straight from the phone (works offline); the Web API adds the cover.
             // A song started by our own skip reports 0.000 s exactly: the lead belongs to songs
             // that start by themselves (reports: lyrics 0.2-0.4 s late until the first pause).
-            leadActive = !sample.paused && sample.position < Self.leadMaxStart && now >= holdUntil
+            let overlap = holdPreviousLyrics(for: .track(info), startOffset: raw, playing: !sample.paused, at: now)
+            leadActive = transitionWindow == 0 && !(settings.transitionMode == .automatic && overlap)
+                && !sample.paused && sample.position < Self.leadMaxStart && now >= holdUntil
             trackStartedAt = now
             let start = raw - (leadActive ? startLead : 0)
             log.add("remote", "\(summary) → new track, set \(start.s3)"
                 + (leadActive ? " (start lead \(startLead.signedMs))" : ""))
             content = .track(info)
-            onContentChanged()
-            setClock(start, at: now)
+            onContentChanged(playing: !sample.paused)
+            setClock(start, at: now, detectSeek: false)
             isPlaying = !sample.paused
             lastRemoteQuery = nil
             remoteQueriesFrozen = false
@@ -534,6 +737,7 @@ final class PlayerModel {
         let drift = measured - (predicted + unapplied)
 
         if sample.event {
+            if sample.paused || abs(drift) > Self.seekBackThreshold { endTransition() }
             // Pushed on play, pause, seek or skip: exact, and the only source of play / pause.
             var decision = "kept clock"
             var leadNote = ""
@@ -638,6 +842,7 @@ final class PlayerModel {
     // MARK: Polling
 
     func startPolling() {
+        if playbackSource == .appleMusic { appleMusic.start(); return }
         #if DEBUG
         if DemoTrack.current != nil { return }
         #endif
@@ -655,6 +860,8 @@ final class PlayerModel {
     }
 
     func stopPolling() {
+        transitionRun.interrupt()
+        appleMusic.stop()
         pollTask?.cancel()
         pollTask = nil
         watchdogTask?.cancel()
@@ -668,6 +875,7 @@ final class PlayerModel {
     /// A moment the clock is most likely to be off (the app or the floating window opening or
     /// closing, a stall): check it against Spotify right away, then a few more times quickly.
     func resync(_ reason: String) {
+        if playbackSource == .appleMusic { appleMusic.read(); return }
         guard pollTask != nil else { return }
         snapToken += 1
         let now = MediaClock.now()
@@ -730,35 +938,42 @@ final class PlayerModel {
 
     /// Returns how long to wait before the next poll.
     private func pollOnce() async -> Double {
+        guard supportsSpotifyFeatures, !Task.isCancelled else { return 1 }
+        let generation = sourceGeneration
         let now = MediaClock.now()
         if now < backoffUntil { return backoffUntil - now }
         do {
             let sentAt = MediaClock.now()
             let snapshot = try await api.playbackState()
+            guard generation == sourceGeneration, !Task.isCancelled else { return 1 }
             apply(snapshot, roundTrip: snapshot?.roundTrip ?? MediaClock.now() - sentAt)
             accessProblem = nil
             isResyncing = false
             return nextPollInterval()
         } catch SpotifyAPIError.rateLimited(let retryAfter) {
+            guard generation == sourceGeneration, !Task.isCancelled else { return 1 }
             SyncLog.shared.add("web", "rate limited, retry in \(Int(retryAfter))s")
             backoffUntil = now + retryAfter
             return retryAfter
         } catch SpotifyAPIError.quotaExceeded(let retryAfter) {
+            guard generation == sourceGeneration, !Task.isCancelled else { return 1 }
             accessProblem = .quotaExceeded
             statusMessage = SpotifyAPIError.quotaExceeded(retryAfter: retryAfter).errorDescription
             backoffUntil = now + retryAfter
             return retryAfter
         } catch SpotifyAPIError.userNotRegistered {
+            guard generation == sourceGeneration, !Task.isCancelled else { return 1 }
             accessProblem = .notRegistered
             statusMessage = SpotifyAPIError.userNotRegistered.errorDescription
             return 15
         } catch SpotifyAuthError.notLoggedIn {
+            guard generation == sourceGeneration, !Task.isCancelled else { return 1 }
             statusMessage = SpotifyAuthError.notLoggedIn.errorDescription
             return 5
         } catch is CancellationError {
             return 1
         } catch {
-            if Task.isCancelled { return 1 }
+            if Task.isCancelled || generation != sourceGeneration { return 1 }
             SyncLog.shared.add("web", "poll failed: \(error.localizedDescription)")
             // Offline is fine while the Spotify app on this phone keeps the time.
             if !remoteAuthority { statusMessage = error.localizedDescription }
@@ -789,12 +1004,16 @@ final class PlayerModel {
     }
 
     func refreshNow() {
+        if playbackSource == .appleMusic { appleMusic.read(); return }
         Task { _ = await pollOnce() }
     }
 
     // MARK: Controls
 
     func togglePlay() {
+        transitionRun.interrupt()
+        endTransition()
+        if playbackSource == .appleMusic { appleMusic.togglePlay(); return }
         let wasPlaying = isPlaying
         control({ [weak self, api] in
             if await self?.viaRemote(wasPlaying ? .pause : .play) == true { return }
@@ -807,6 +1026,8 @@ final class PlayerModel {
     }
 
     func next() {
+        manualTrackChange()
+        if playbackSource == .appleMusic { appleMusic.next(); return }
         control({ [weak self, api] in
             if await self?.viaRemote(.next) == true { return }
             try await api.next()
@@ -814,6 +1035,8 @@ final class PlayerModel {
     }
 
     func previous() {
+        manualTrackChange()
+        if playbackSource == .appleMusic { appleMusic.previous(); return }
         exemptNextSongUntil = MediaClock.now() + 5
         control({ [weak self, api] in
             if await self?.viaRemote(.previous) == true { return }
@@ -821,9 +1044,22 @@ final class PlayerModel {
         })
     }
 
+    func seekLyrics(to seconds: Double) {
+        // A tap on outgoing lyrics must not seek the new song to the old song's timestamp.
+        if outgoingLyrics != nil { endTransition(); return }
+        seek(to: seconds)
+    }
+
     func seek(to requested: Double) {
+        manualTrackChange()
         // Never past the end: Spotify would refuse it or jump to the next song.
         let seconds = min(max(0, requested), track.map { $0.duration > 0 ? $0.duration : .infinity } ?? .infinity)
+        if playbackSource == .appleMusic {
+            setClock(seconds)
+            holdUntil = MediaClock.now() + 1
+            appleMusic.seek(to: seconds)
+            return
+        }
         control({ [weak self, api] in
             if await self?.viaRemote(.seek(seconds)) == true { return }
             try await api.seek(to: seconds)
@@ -852,7 +1088,8 @@ final class PlayerModel {
 
     /// Jumps to an upcoming track by skipping everything queued before it.
     func skipAhead(_ count: Int) {
-        guard count > 0 else { return }
+        guard supportsSpotifyFeatures, count > 0 else { return }
+        manualTrackChange()
         control({ [weak self, api] in
             for index in 0..<count {
                 if index > 0 { try await Task.sleep(for: .milliseconds(150)) }
@@ -866,6 +1103,7 @@ final class PlayerModel {
     /// the queue by hand); further down, the song is started inside the album or playlist
     /// instead of firing a dozen skips that each play for a moment.
     func playFromQueue(_ track: TrackSummary, at index: Int) {
+        guard supportsSpotifyFeatures else { return }
         skipExemptURI = track.uri
         if index < 3 || contextURI.map(Self.supportsOffset) != true {
             skipAhead(index + 1)
@@ -876,6 +1114,8 @@ final class PlayerModel {
 
     /// Plays `track`, continuing with the album or playlist it came from when there is one.
     func play(_ track: TrackSummary, context: String?) {
+        guard supportsSpotifyFeatures else { return }
+        manualTrackChange()
         skipExemptURI = track.uri
         let contexts = [context, track.albumURI].compactMap { $0 }.filter(Self.supportsOffset)
         control({ [api] in
@@ -894,20 +1134,31 @@ final class PlayerModel {
     /// True once Spotify took it.
     @discardableResult
     func addToQueue(_ track: TrackSummary) async -> Bool {
+        guard supportsSpotifyFeatures else { return false }
+        let generation = sourceGeneration
         do {
             try await api.addToQueue(track.uri)
-            return true
+            return generation == sourceGeneration
         } catch {
+            guard generation == sourceGeneration else { return false }
             SyncLog.shared.add("control", "add to queue failed: \(error.localizedDescription)")
             transientError = error.localizedDescription
             return false
         }
     }
 
-    func upcomingTracks() async throws -> [TrackSummary] { try await api.queue() }
-    func recentTracks() async throws -> [TrackSummary] { try await api.recentlyPlayed() }
+    func upcomingTracks() async throws -> [TrackSummary] {
+        guard supportsSpotifyFeatures else { return [] }
+        return try await api.queue()
+    }
+
+    func recentTracks() async throws -> [TrackSummary] {
+        guard supportsSpotifyFeatures else { return [] }
+        return try await api.recentlyPlayed()
+    }
     func searchTracks(_ query: String, offset: Int) async throws -> [TrackSummary] {
-        try await api.search(query, offset: offset)
+        guard supportsSpotifyFeatures else { return [] }
+        return try await api.search(query, offset: offset)
     }
 
     /// Only albums and playlists accept a starting track (`offset`).
@@ -916,6 +1167,8 @@ final class PlayerModel {
     }
 
     private func control(_ action: @escaping () async throws -> Void, optimistic: (() -> Void)? = nil) {
+        guard supportsSpotifyFeatures else { return }
+        let generation = sourceGeneration
         optimistic?()
         // Ignore stale polls for a moment so the optimistic state isn't undone.
         holdUntil = MediaClock.now() + 1.5
@@ -924,9 +1177,11 @@ final class PlayerModel {
                 try await action()
                 try? await Task.sleep(for: .milliseconds(400))
             } catch {
+                guard generation == sourceGeneration else { return }
                 SyncLog.shared.add("control", "failed: \(error.localizedDescription)")
                 transientError = error.localizedDescription
             }
+            guard generation == sourceGeneration else { return }
             holdUntil = 0
             _ = await pollOnce()
         }
@@ -966,6 +1221,7 @@ final class PlayerModel {
     /// they start, together with any known-unsynced songs queued right after them; others once
     /// their lyrics are in. Runs on every song change and from the watchdog.
     private func checkAutoSkip() {
+        guard supportsSpotifyFeatures, outgoingLyrics == nil else { return }
         guard let mode = AutoSkipMode(rawValue: settings.autoSkipMode), mode != .off,
               isPlaying, let track else { return }
         if skipCheckedMode != settings.autoSkipMode {
@@ -1019,6 +1275,7 @@ final class PlayerModel {
     /// songs to jump over.
     private func lookAhead() {
         lookaheadTask?.cancel()
+        guard supportsSpotifyFeatures else { return }
         #if DEBUG
         if DemoTrack.current != nil { return }
         #endif
@@ -1064,7 +1321,8 @@ final class PlayerModel {
 
     // MARK: Lyrics & artwork
 
-    private func onContentChanged() {
+    private func onContentChanged(playing: Bool? = nil) {
+        transitionRun.begin(trackID: track?.id, playing: playing ?? isPlaying, at: MediaClock.now())
         if MediaClock.now() < exemptNextSongUntil, let uri = track?.uri {
             skipExemptURI = uri
             exemptNextSongUntil = 0
@@ -1122,14 +1380,14 @@ final class PlayerModel {
     }
 
     func setTranslations(_ result: [String: String], revision: Int) {
-        guard revision == documentRevision, result != translations else { return }
+        guard outgoingLyrics == nil, revision == currentDocumentRevision, result != currentTranslations else { return }
         translations = result
         settingsChanged()
     }
 
     /// What replaces the original lines right now (translation in replace mode).
     private var replacements: [String: String] {
-        settings.translateLyrics && settings.translationReplaces ? translations : [:]
+        settings.translateLyrics && settings.translationReplaces ? currentTranslations : [:]
     }
 
     func clearLyricsCache() {
@@ -1147,7 +1405,7 @@ final class PlayerModel {
 
     enum TTMLError: LocalizedError {
         case noTrack
-        var errorDescription: String? { String(localized: "Сейчас не играет трек Spotify, к которому можно привязать текст.") }
+        var errorDescription: String? { String(localized: "Сейчас не играет трек, к которому можно привязать текст.") }
     }
 
     var hasTemporaryLyrics: Bool { track.map { temporaryLyrics[$0.id] != nil } ?? false }
@@ -1179,7 +1437,7 @@ final class PlayerModel {
         lyricsTask = nil
         rawLyrics = document
         translations = [:]
-        documentRevision += 1
+        currentDocumentRevision += 1
         prepare(document)
     }
 

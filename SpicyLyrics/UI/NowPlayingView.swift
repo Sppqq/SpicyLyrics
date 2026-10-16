@@ -557,7 +557,7 @@ struct NowPlayingView: View {
         .opacity(1 - min(Double(abs(headerSwipe)) / 160, 0.6))
         .onTapGesture {
             showChrome()
-            showPicker = true
+            if player.supportsSpotifyFeatures { showPicker = true }
         }
         .gesture(
             DragGesture(minimumDistance: 28)
@@ -616,10 +616,12 @@ struct NowPlayingView: View {
             // Three rows at most: with large system text a long menu barely fits and scrolls badly.
             // The everyday actions sit side by side in one row.
             ControlGroup {
-                Button {
-                    showPicker = true
-                } label: {
-                    Label(String(localized: "Трек"), systemImage: "music.note.list")
+                if player.supportsSpotifyFeatures {
+                    Button {
+                        showPicker = true
+                    } label: {
+                        Label(String(localized: "Трек"), systemImage: "music.note.list")
+                    }
                 }
                 Button {
                     settings.translateLyrics.toggle()
@@ -651,7 +653,7 @@ struct NowPlayingView: View {
                     Button {
                         UIApplication.shared.open(url)
                     } label: {
-                        Label(String(localized: "Открыть в Spotify"), systemImage: "arrow.up.forward.app")
+                        Label(player.supportsSpotifyFeatures ? String(localized: "Открыть в Spotify") : String(localized: "Открыть Музыку"), systemImage: "arrow.up.forward.app")
                     }
                 }
             } label: {
@@ -677,6 +679,7 @@ struct NowPlayingView: View {
     }
 
     private var spotifyURL: URL? {
+        if !player.supportsSpotifyFeatures { return URL(string: "music:") }
         guard let track = player.track else { return URL(string: "spotify:") }
         return URL(string: track.uri) ?? URL(string: "spotify:")
     }
@@ -684,7 +687,7 @@ struct NowPlayingView: View {
     private func controls(compact: Bool = false) -> some View {
         PlaybackBar(
             onInteraction: { showChrome() },
-            onShowQueue: { showPicker = true },
+            onShowQueue: { if player.supportsSpotifyFeatures { showPicker = true } },
             onToggleLyrics: {
                 withAnimation(.easeInOut(duration: 0.45)) { artworkMode.toggle() }
             },
@@ -710,7 +713,7 @@ struct NowPlayingView: View {
         switch player.content {
         case .track(let track): return track.artistLine
         case .episode(_, let show, _): return show
-        default: return player.statusMessage ?? String(localized: "Ожидание Spotify…")
+        default: return player.statusMessage ?? (player.supportsSpotifyFeatures ? String(localized: "Ожидание Spotify…") : String(localized: "Ожидание Apple Music…"))
         }
     }
 
@@ -837,7 +840,7 @@ struct NowPlayingView: View {
                 .frame(maxHeight: .infinity, alignment: .top)
         case .notFound:
             message(icon: "text.badge.xmark", title: String(localized: "Текст не найден"),
-                    detail: settings.useLRCLibFallback
+                    detail: settings.useLRCLibFallback || !player.supportsSpotifyFeatures
                         ? String(localized: "Для этого трека пока нет текста ни в Spicy Lyrics, ни в LRCLIB.")
                         : String(localized: "Для этого трека пока нет текста в Spicy Lyrics."),
                     retry: true)
@@ -854,7 +857,7 @@ struct NowPlayingView: View {
         VStack(spacing: 16) {
             Image(systemName: "music.quarternote.3")
                 .font(.system(size: 44))
-            Text(player.statusMessage ?? String(localized: "Включите музыку в Spotify"))
+            Text(player.statusMessage ?? (player.supportsSpotifyFeatures ? String(localized: "Включите музыку в Spotify") : String(localized: "Включите музыку в Apple Music")))
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
             if player.accessProblem != nil {
@@ -870,9 +873,9 @@ struct NowPlayingView: View {
                 }
             } else {
                 Button {
-                    if let url = URL(string: "spotify:") { UIApplication.shared.open(url) }
+                    if let url = spotifyURL { UIApplication.shared.open(url) }
                 } label: {
-                    Label(String(localized: "Открыть Spotify"), systemImage: "arrow.up.forward.app")
+                    Label(player.supportsSpotifyFeatures ? String(localized: "Открыть Spotify") : String(localized: "Открыть Музыку"), systemImage: "arrow.up.forward.app")
                         .font(.headline)
                         .padding(.horizontal, 18)
                         .padding(.vertical, 10)
@@ -934,7 +937,7 @@ private struct NowPlayingAlerts: ViewModifier {
             } message: {
                 Text(pip.lastError ?? "")
             }
-            .alert("Spotify", isPresented: transientErrorShown) {
+            .alert(player.playbackSource.title, isPresented: transientErrorShown) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(player.transientError ?? "")

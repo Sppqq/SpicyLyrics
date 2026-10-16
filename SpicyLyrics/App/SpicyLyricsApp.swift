@@ -62,7 +62,7 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if auth.isLoggedIn || isDemo {
+            if sourceReady || isDemo {
                 NowPlayingView()
             } else {
                 OnboardingView()
@@ -80,6 +80,12 @@ struct RootView: View {
             }
         }
         .onChange(of: auth.isLoggedIn) { _, _ in updateActivity(scenePhase) }
+        .onChange(of: settings.playbackSource) { _, _ in
+            appRemote.stop()
+            player.sourceChanged()
+            updateActivity(scenePhase)
+        }
+        .onChange(of: settings.appleMusicOnboarded) { _, _ in updateActivity(scenePhase) }
         .onChange(of: settings.keepScreenOn) { _, _ in updateActivity(scenePhase) }
         .onChange(of: pip.keepsAppRunning) { _, _ in updateActivity(scenePhase) }
         .onChange(of: settings.useAppRemote) { _, _ in appRemote.refresh() }
@@ -156,7 +162,7 @@ struct RootView: View {
     /// The update notice waits for the reports question (one alert at a time) and the login.
     private var updateNoticeShown: Binding<Bool> {
         Binding(get: {
-            guard auth.isLoggedIn || isDemo, !askAboutReports, let notice = updates.pendingNotice else { return false }
+            guard sourceReady || isDemo, !askAboutReports, let notice = updates.pendingNotice else { return false }
             return notice.version != remindLater
         }, set: { shown in
             if !shown, let notice = updates.pendingNotice, settings.skippedUpdateVersion != notice.version {
@@ -187,19 +193,23 @@ struct RootView: View {
     /// Following Spotify is wanted: the app is on screen (Control Center or the app switcher
     /// over it count), or the floating window is up or on its way.
     private func wantsToFollow(_ phase: ScenePhase) -> Bool {
-        auth.isLoggedIn && (phase != .background || pip.keepsAppRunning)
+        sourceReady && (phase != .background || pip.keepsAppRunning)
+    }
+
+    private var sourceReady: Bool {
+        settings.playbackSource == .appleMusic ? settings.appleMusicOnboarded : auth.isLoggedIn
     }
 
     private func updateActivity(_ phase: ScenePhase) {
-        UIApplication.shared.isIdleTimerDisabled = phase == .active && auth.isLoggedIn && settings.keepScreenOn
+        UIApplication.shared.isIdleTimerDisabled = phase == .active && sourceReady && settings.keepScreenOn
         if wantsToFollow(phase) {
             stopTask?.cancel()
             stopTask = nil
             player.startPolling()
-            if settings.useAppRemote { appRemote.start(player: player) }
+            if settings.playbackSource == .spotify, settings.useAppRemote { appRemote.start(player: player) }
             return
         }
-        guard auth.isLoggedIn else {
+        guard sourceReady else {
             stopFollowing()
             return
         }

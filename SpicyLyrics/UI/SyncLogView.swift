@@ -120,30 +120,35 @@ struct SyncIndicator: View {
 
     var body: some View {
         Menu {
-            Section {
-                Text(String(localized: "Связь с приложением Spotify: \(settings.useAppRemote ? appRemote.statusText : String(localized: "Выключено"))"))
-                if let error = appRemote.lastError, appRemote.status != .connected, !appRemote.otherDeviceActive {
-                    Text(error)
-                }
-            }
-            if settings.useAppRemote {
-                switch appRemote.status {
-                case .needsLogin:
-                    Button(String(localized: "Войти заново"), systemImage: "person.crop.circle.badge.checkmark") {
-                        Task {
-                            try? await auth.logIn()
-                            appRemote.refresh()
-                        }
-                    }
-                case .unavailable, .connecting:
-                    Button(String(localized: "Открыть Spotify и подключиться"), systemImage: "arrow.up.forward.app") {
-                        appRemote.wakeSpotify()
-                    }
-                case .off, .connected:
-                    EmptyView()
-                }
+            if player.playbackSource == .appleMusic {
+                Text("Apple Music")
+                Button(String(localized: "Проверить время")) { player.refreshNow() }
             } else {
-                Button(String(localized: "Включить связь с приложением Spotify"), systemImage: "bolt.horizontal") { settings.useAppRemote = true }
+                Section {
+                    Text(String(localized: "Связь с приложением Spotify: \(settings.useAppRemote ? appRemote.statusText : String(localized: "Выключено"))"))
+                    if let error = appRemote.lastError, appRemote.status != .connected, !appRemote.otherDeviceActive {
+                        Text(error)
+                    }
+                }
+                if settings.useAppRemote {
+                    switch appRemote.status {
+                    case .needsLogin:
+                        Button(String(localized: "Войти заново"), systemImage: "person.crop.circle.badge.checkmark") {
+                            Task {
+                                try? await auth.logIn()
+                                appRemote.refresh()
+                            }
+                        }
+                    case .unavailable, .connecting:
+                        Button(String(localized: "Открыть Spotify и подключиться"), systemImage: "arrow.up.forward.app") {
+                            appRemote.wakeSpotify()
+                        }
+                    case .off, .connected:
+                        EmptyView()
+                    }
+                } else {
+                    Button(String(localized: "Включить связь с приложением Spotify"), systemImage: "bolt.horizontal") { settings.useAppRemote = true }
+                }
             }
         } label: {
             badge
@@ -151,6 +156,7 @@ struct SyncIndicator: View {
     }
 
     private var sdkNote: String? {
+        guard player.supportsSpotifyFeatures else { return nil }
         guard settings.useAppRemote else { return String(localized: "без приложения Spotify") }
         switch appRemote.status {
         case .connected: return nil
@@ -163,7 +169,8 @@ struct SyncIndicator: View {
 
     /// "App Remote" / "Web API" in words people know.
     private static func sourceName(_ source: String) -> String {
-        source == "App Remote" ? String(localized: "приложение") : String(localized: "интернет")
+        if source == "Apple Music" { return source }
+        return source == "App Remote" ? String(localized: "приложение") : String(localized: "интернет")
     }
 
     private var badge: some View {
@@ -171,12 +178,12 @@ struct SyncIndicator: View {
             let sync = SyncLog.shared.lastSync
             HStack(spacing: 6) {
                 Circle()
-                    .fill(player.remoteConnected ? Color.green : Color.orange)
+                    .fill(player.remoteConnected || player.playbackSource == .appleMusic ? Color.green : Color.orange)
                     .frame(width: 7, height: 7)
                 if let sync {
                     Text("\(Self.sourceName(sync.source)) \(sync.drift.signedMs) · \(String(format: "%.1f", context.date.timeIntervalSince(sync.at)))s")
                 } else {
-                    Text(Self.sourceName(player.remoteConnected ? "App Remote" : "Web API"))
+                    Text(Self.sourceName(player.playbackSource == .appleMusic ? "Apple Music" : (player.remoteConnected ? "App Remote" : "Web API")))
                 }
                 if let sdkNote {
                     Text("· " + sdkNote).foregroundStyle(.orange)
