@@ -34,7 +34,14 @@ These features work, but still need testing and refinement.
 
 ## Apple Music and playback sources
 
-`PlaybackSource` in `AppSettings` selects Spotify (default) or Apple Music manually.
+`PlayerChoice` in `AppSettings` is the user's pick: Auto (default), Spotify or Apple Music.
+`PlaybackSource` is the player followed right now: fixed by a manual pick, or switched by
+`AutoSourceSwitcher` under Auto. It reads the Music system player once a second and takes
+over when Music has been playing (its position moving) for 1.5 s, unless Spotify still plays
+on this phone; while Apple Music is the source and silent it asks the Web API every 5 s and
+switches to Spotify when it plays on any device. Switches are at least 4 s apart, and a player
+that cannot be followed (signed out, no library access) gives way to the other one. A switch
+is just a change of `playbackSource`, handled like a manual one.
 `PlayerModel` routes sampling and transport controls; the Spotify clock and network path
 remain in use only in Spotify mode. Queue, history, search, App Remote and auto-skip are
 Spotify-only. Apple Music onboarding does not require a Spotify account or Client ID.
