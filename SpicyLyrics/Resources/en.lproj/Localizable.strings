@@ -478,6 +478,8 @@
 "Разработчик ответил на ваш отчёт" = "The Developer Answered Your Report";
 "Открыть" = "Open";
 "Источник музыки" = "Music Source";
+"Плеер" = "Player";
+"Текст идёт за тем плеером, который сейчас играет. Если играют оба, побеждает тот, что на этом телефоне. Для Apple Music нужен доступ к медиатеке, для Spotify — вход." = "The lyrics follow whichever player is playing. If both are, the one on this phone wins. Apple Music needs library access, Spotify needs you signed in.";
 "Пословные тексты для Spotify и Apple Music." = "Word-by-word lyrics for Spotify and Apple Music.";
 "Apple Music работает без Spotify Client ID. Разрешите доступ к медиатеке и включите песню в приложении «Музыка»." = "Apple Music works without a Spotify Client ID. Allow music library access and play a song in Music.";
 "Продолжить с Apple Music" = "Continue with Apple Music";
