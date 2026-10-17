@@ -215,6 +215,8 @@ private struct WordFlowView: View {
     let alpha: GradientAlpha
     let typography: LyricsTypography
     let alignment: HorizontalAlignment
+    /// Laid-out width of each whole-syllable item, for keeping a word's syllables together.
+    @State private var widths: [Int: CGFloat] = [:]
 
     /// Syllables in reading order, each knowing whether it is glued to the next (same word).
     /// Letter-animated syllables are laid out letter by letter (still glued), so a very long
@@ -264,7 +266,25 @@ private struct WordFlowView: View {
         (CGFloat(l) - CGFloat(count - 1) / 2) * 0.58 * fontSize * CGFloat(visual(item).glyph.scale - 1)
     }
 
+    /// Each syllable scales about its own centre, so a word whose syllables are still unsung
+    /// (smaller) opened gaps inside it ("flo wers"). Shift every syllable so the word shrinks as
+    /// one piece about its own centre; once sung (scale 1) nothing moves.
+    private func wordShift(_ item: FlowItem, in all: [FlowItem]) -> CGFloat {
+        guard item.letter == nil else { return 0 }
+        let word = all.filter { $0.w == item.w }
+        guard word.count > 1, word.allSatisfy({ $0.letter == nil }) else { return 0 }
+        var x: CGFloat = 0
+        var center: CGFloat = 0
+        for other in word {
+            guard let width = widths[other.id] else { return 0 }
+            if other.id == item.id { center = x + width / 2 }
+            x += width
+        }
+        return (center - x / 2) * (CGFloat(visual(item).glyph.scale) - 1)
+    }
+
     var body: some View {
+        let items = items
         FlowLayout(alignment: alignment, spacing: typography.wordGap(fontSize), rowSpacing: 0) {
             ForEach(items) { item in
                 Group {
@@ -276,7 +296,9 @@ private struct WordFlowView: View {
                     } else {
                         GlyphView(text: words[item.w].syllables[item.s].text, visual: visual(item).glyph,
                                   fontSize: fontSize, font: font, alpha: alpha, fade: typography.fillFade,
-                                  glowKind: .syllable, glowScale: typography.glowScale)
+                                  glowKind: .syllable, glowScale: typography.glowScale,
+                                  xOffset: wordShift(item, in: items))
+                            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { widths[item.id] = $0 }
                     }
                 }
                 .layoutValue(key: GluedToNext.self, value: item.gluedToNext)
