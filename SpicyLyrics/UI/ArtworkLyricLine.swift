@@ -30,12 +30,14 @@ struct ArtworkLyricLine: View {
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: player.isPlaying ? 1.0 / 30 : 1.0 / 10)) { _ in
+        let frameInterval = player.isPlaying ? 1.0 / 30 : 1.0 / 10
+        TimelineView(.animation(minimumInterval: frameInterval)) { _ in
             let box = glide.value(toward: frame, now: CACurrentMediaTime())
             let now = MediaClock.now()
             let position = player.position(at: now)
-            let _ = animator.step(position: position, now: now, blurEnabled: false)
-            let _ = switcher.show(Self.shownLine(animator.lyrics.lines, focus: animator.focusIndex, at: position),
+            let _ = animator.step(position: position, now: now, blurEnabled: false, frameInterval: frameInterval)
+            let _ = switcher.show(Self.shownLine(animator.lyrics.lines, focus: animator.focusIndex,
+                                                 at: position + animator.presentationLead),
                                   now: now, instantly: animator.snapped)
             let progress = switcher.progress(at: now)
             let rise = box.height * 0.35

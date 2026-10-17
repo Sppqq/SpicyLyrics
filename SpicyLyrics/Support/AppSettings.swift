@@ -403,8 +403,8 @@ final class AppSettings {
 
     var provider: TranslationProvider {
         let chosen = TranslationProvider(rawValue: translationProvider) ?? .defaultProvider
-        // Apple's on-device translation needs iOS 18: fall back to Google before that.
-        return chosen.isAvailable ? chosen : .google
+        // Apple's on-device translation needs iOS 18: fall back to the server before that.
+        return chosen.isAvailable ? chosen : .server
     }
 
     var format: PiPFormat { PiPFormat(rawValue: pipFormat) ?? .wide }

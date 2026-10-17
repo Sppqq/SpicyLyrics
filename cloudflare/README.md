@@ -1,4 +1,4 @@
-# Report collector (Cloudflare Worker)
+# Report collector and translation cache (Cloudflare Worker)
 
 Receives the reports the app sends (Settings → Error Reports): a note, up to three photos and the sync
 log. Text goes to D1, photos to R2. Every report is a thread: the developer (or the bot) answers, the
@@ -10,6 +10,12 @@ status change (nightly cron), so a thread still being talked in stays.
 - `GET /v1/threads`, `POST /v1/threads/{id}/messages`: the sender's side, header `X-Install-Id`.
 - `/v1/bot/…` (`inbox`, `report/{id}`, `reply`, `status`): private report processing, `Authorization: Bearer
   $BOT_TOKEN`. The scheduled processor runs on the server; see [`server/report-bot`](../server/report-bot/README.md).
+- `POST /v1/translate`: lyric translations for the app. JSON `{"target": "ru", "lines": ["…"]}` (up to 300 lines
+  of 500 characters) → `{"translations": {"line": "перевод"}, "cached": n, "limited": false}`. Google's free endpoint,
+  Yandex when Google refuses; every answer goes into D1 (`translations`), shared by all installs, so a line anyone
+  has had translated costs no request upstream. Only uncached lines count against a network's limit (60 000
+  characters an hour); over it, the cached lines still come back (`limited: true`). Lines nobody asked for in
+  180 days are dropped by the nightly cron.
 - `/admin`: the list, a report with its photos and log, answer, set the status, delete. HTTP Basic: any user name, the password
   is the `ADMIN_TOKEN` secret.
 
@@ -34,6 +40,11 @@ npx wrangler deploy
 `schema.sql` is the whole current schema: run it alone on a new database. `migrations/` only brings a
 database made before threads existed up to date (`wrangler d1 execute … --file=migrations/0001_threads.sql`);
 never run it on a database made from the current `schema.sql` (the columns already exist).
+`migrations/0002_translations.sql` adds the translation cache and is safe on any database:
+
+```sh
+npx wrangler d1 execute sweet-lyrics-reports --remote --file=migrations/0002_translations.sql
+```
 
 After the first setup, GitHub Actions deploys the Worker (`.github/workflows/cloudflare-worker.yml`):
 pull requests that touch `cloudflare/` or `server/report-bot/` get a check (syntax, report bot tests,

@@ -107,7 +107,8 @@ struct LyricsView: View {
                         let now = MediaClock.now()
                         let _ = settings.showLyricsFPS ? frameCounter.tick(now) : ()
                         let _ = animator.step(position: player.position(at: now), now: now,
-                                              blurEnabled: settings.blurInactiveLines && !userScrolling && !reduced)
+                                              blurEnabled: settings.blurInactiveLines && !userScrolling && !reduced,
+                                              frameInterval: frameInterval)
                         let focus = animator.focusIndex
                         let visuals = animator.visuals
 

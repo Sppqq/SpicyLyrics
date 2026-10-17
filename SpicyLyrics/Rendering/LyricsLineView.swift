@@ -215,8 +215,6 @@ private struct WordFlowView: View {
     let alpha: GradientAlpha
     let typography: LyricsTypography
     let alignment: HorizontalAlignment
-    /// Laid-out width of each whole-syllable item, for keeping a word's syllables together.
-    @State private var widths: [Int: CGFloat] = [:]
 
     /// Syllables in reading order, each knowing whether it is glued to the next (same word).
     /// Letter-animated syllables are laid out letter by letter (still glued), so a very long
@@ -261,47 +259,23 @@ private struct WordFlowView: View {
         return letter
     }
 
-    /// As the word grows, its letters spread from the word's centre.
-    private func letterSpread(_ item: FlowItem, _ l: Int, count: Int) -> CGFloat {
-        (CGFloat(l) - CGFloat(count - 1) / 2) * 0.58 * fontSize * CGFloat(visual(item).glyph.scale - 1)
-    }
-
-    /// Each syllable scales about its own centre, so a word whose syllables are still unsung
-    /// (smaller) opened gaps inside it ("flo wers"). Shift every syllable so the word shrinks as
-    /// one piece about its own centre; once sung (scale 1) nothing moves.
-    private func wordShift(_ item: FlowItem, in all: [FlowItem]) -> CGFloat {
-        guard item.letter == nil else { return 0 }
-        let word = all.filter { $0.w == item.w }
-        guard word.count > 1, word.allSatisfy({ $0.letter == nil }) else { return 0 }
-        var x: CGFloat = 0
-        var center: CGFloat = 0
-        for other in word {
-            guard let width = widths[other.id] else { return 0 }
-            if other.id == item.id { center = x + width / 2 }
-            x += width
-        }
-        return (center - x / 2) * (CGFloat(visual(item).glyph.scale) - 1)
-    }
-
     var body: some View {
-        let items = items
         FlowLayout(alignment: alignment, spacing: typography.wordGap(fontSize), rowSpacing: 0) {
             ForEach(items) { item in
                 Group {
                     if let l = item.letter, let letters = words[item.w].syllables[item.s].letters {
                         GlyphView(text: letters[l].text, visual: letterVisual(item, l),
                                   fontSize: fontSize, font: font, alpha: alpha, fade: typography.fillFade,
-                                  glowKind: .letter, glowScale: typography.glowScale,
-                                  xOffset: letterSpread(item, l, count: letters.count))
+                                  glowKind: .letter, glowScale: typography.glowScale)
                     } else {
                         GlyphView(text: words[item.w].syllables[item.s].text, visual: visual(item).glyph,
                                   fontSize: fontSize, font: font, alpha: alpha, fade: typography.fillFade,
-                                  glowKind: .syllable, glowScale: typography.glowScale,
-                                  xOffset: wordShift(item, in: items))
-                            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { widths[item.id] = $0 }
+                                  glowKind: .syllable, glowScale: typography.glowScale)
                     }
                 }
                 .layoutValue(key: GluedToNext.self, value: item.gluedToNext)
+                // A letter grows with its syllable; its own pop on top may overlap, as in the extension.
+                .layoutValue(key: GlyphGrowth.self, value: CGFloat(visual(item).glyph.scale))
             }
         }
     }
@@ -316,7 +290,6 @@ private struct GlyphView: View {
     let fade: Double
     let glowKind: GlowKind
     let glowScale: Double
-    var xOffset: CGFloat = 0
 
     var body: some View {
         Text(text)
@@ -325,7 +298,7 @@ private struct GlyphView: View {
             .lyricFill(visual.gradient, alpha: alpha, fade: fade)
             .lyricGlow(visual.glow * glowScale, kind: glowKind)
             .scaleEffect(visual.scale)
-            .offset(x: xOffset, y: visual.yOffset * fontSize)
+            .offset(y: visual.yOffset * fontSize)
     }
 }
 
@@ -376,6 +349,25 @@ private struct InterludeDotsView: View {
 /// The next item belongs to the same word: keep them on one row when the word fits.
 struct GluedToNext: LayoutValueKey {
     static let defaultValue = false
+}
+
+/// How much a piece is scaled about its own centre. The pieces of one word move apart or
+/// together by it, so the word grows as one: scaled each about its own centre, a growing
+/// syllable ran into its neighbours and a shrinking one left a gap (worst with three or more).
+struct GlyphGrowth: LayoutValueKey {
+    static let defaultValue: CGFloat = 1
+}
+
+/// Horizontal shifts that keep the pieces of a word touching while each is scaled by its
+/// growth about its own centre; the word as a whole stays centred where it was laid out.
+func wordGrowthShifts(widths: [CGFloat], growth: [CGFloat]) -> [CGFloat] {
+    let extra = zip(widths, growth).map { $0 * ($1 - 1) }
+    let total = extra.reduce(0, +)
+    var before: CGFloat = 0
+    return extra.map { piece in
+        defer { before += piece }
+        return before + piece / 2 - total / 2
+    }
 }
 
 /// Wrapping row layout for syllables. Words (runs of glued syllables) stay together and wrap as
@@ -465,15 +457,36 @@ struct FlowLayout: Layout {
             case .center: start = bounds.minX + (bounds.width - row.width) / 2
             default: start = bounds.minX
             }
-            for item in row.items {
+            let shifts = growthShifts(row, sizes: sizes, subviews: subviews)
+            for (k, item) in row.items.enumerated() {
                 let size = sizes[item.index]
                 subviews[item.index].place(
-                    at: CGPoint(x: start + item.x, y: y + (row.height - size.height)),
+                    at: CGPoint(x: start + item.x + shifts[k], y: y + (row.height - size.height)),
                     anchor: .topLeading,
                     proposal: ProposedViewSize(size)
                 )
             }
             y += row.height + rowSpacing
         }
+    }
+
+    /// Per item of `row`: the shift that keeps each word's pieces touching as they grow. A word
+    /// broken over two rows is a word of its own on each.
+    private func growthShifts(_ row: Row, sizes: [CGSize], subviews: Subviews) -> [CGFloat] {
+        var shifts: [CGFloat] = []
+        shifts.reserveCapacity(row.items.count)
+        var run: [Int] = []
+        func flush() {
+            guard !run.isEmpty else { return }
+            shifts += wordGrowthShifts(widths: run.map { sizes[$0].width },
+                                       growth: run.map { subviews[$0][GlyphGrowth.self] })
+            run = []
+        }
+        for item in row.items {
+            run.append(item.index)
+            if !subviews[item.index][GluedToNext.self] { flush() }
+        }
+        flush()
+        return shifts
     }
 }

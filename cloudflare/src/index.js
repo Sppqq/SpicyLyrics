@@ -3,6 +3,9 @@
 // works through reports, /v1/bot) answers, the app shows the answers and lets the sender reply.
 // Status: open → in_progress → closed; a reply from the sender reopens a closed report.
 // /admin is a small page for reading, answering and closing them.
+// /v1/translate translates lyric lines for the app, with a cache every install shares (translate.js).
+
+import { pruneTranslations, translate } from "./translate.js";
 
 const MAX_BODY = 8 * 1024 * 1024;
 const MAX_LOG = 300_000;
@@ -26,6 +29,7 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/v1/report" && request.method === "POST") return await receive(request, env);
+      if (url.pathname === "/v1/translate" && request.method === "POST") return await translate(request, env);
       if (url.pathname.startsWith("/v1/threads")) return await threads(request, env, url);
       if (url.pathname.startsWith("/v1/bot/")) return await bot(request, env, url);
       if (url.pathname === "/") return text("Sweet Lyrics reports\n");
@@ -50,6 +54,7 @@ export default {
       await deletePhotos(env, row);
       await env.DB.prepare("DELETE FROM messages WHERE report_id = ?").bind(row.id).run();
     }
+    await pruneTranslations(env);
   },
 };
 

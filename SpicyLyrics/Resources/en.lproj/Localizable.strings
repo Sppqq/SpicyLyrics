@@ -335,6 +335,8 @@
 "Скрывать несинхронный текст" = "Hide Unsynced Lyrics";
 "Вместо сообщения или статичного текста остаётся только фон. В горизонтальном режиме кнопки тоже прячутся; касание возвращает их." = "Instead of the notice or static lyrics, only the background stays. In landscape the controls hide too; a tap brings them back.";
 "Apple (на устройстве)" = "Apple (on device)";
+"Sweet Lyrics (сервер)" = "Sweet Lyrics (server)";
+"Строки текста отправляются на сервер Sweet Lyrics, он переводит их через Google. Переводы общие для всех: песню, которую уже кто-то слушал, сервер отдаёт сразу. Ничего о вас не отправляется; переводы запоминаются и на телефоне." = "The lyric lines are sent to the Sweet Lyrics server, which translates them with Google. Translations are shared: a song someone has already listened to comes back at once. Nothing about you is sent; translations are also kept on the phone.";
 "Яндекс" = "Yandex";
 "Нужен ключ DeepL API" = "A DeepL API key is needed";
 "DeepL не принял ключ" = "DeepL didn't accept the key";
